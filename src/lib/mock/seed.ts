@@ -1,0 +1,834 @@
+import { catalog, productUrl, type CatalogProduct } from "@/lib/mock/catalog";
+import { clients } from "@/lib/mock/clients";
+import { settings } from "@/lib/mock/settings";
+import { ORDER_PIPELINE } from "@/lib/constants";
+import type {
+  Expense,
+  Order,
+  OrderEvent,
+  OrderItem,
+  OrderSource,
+  OrderStatus,
+  Payment,
+  Purchase,
+  PurchaseStatus,
+  Shipment,
+  ShipmentEvent,
+  ShipmentStatus,
+} from "@/lib/types";
+
+/**
+ * Deterministic mock dataset.
+ *
+ * Everything below is generated from a fixed seed and a fixed "today", so the
+ * server and the browser always produce byte-identical data — no hydration
+ * mismatches, and screenshots/tests stay stable. Swap this module out entirely
+ * when the API lands; nothing outside `src/lib` imports it.
+ */
+
+/** Frozen reference date. All ages, ETAs and ageing buckets derive from this. */
+export const TODAY = new Date("2026-08-11T09:00:00.000Z");
+
+/**
+ * Multiplier applied to the FX rate when quoting a product to a client. Covers
+ * the store's sales tax, domestic shipping to the forwarder, and FX drift
+ * between quoting and buying — roughly 15% in practice.
+ */
+const QUOTE_MARKUP = 1.15;
+
+/* -------------------------------------------------------------------------- */
+/* Deterministic RNG                                                           */
+/* -------------------------------------------------------------------------- */
+
+function mulberry32(seed: number) {
+  let a = seed;
+  return function random(): number {
+    a |= 0;
+    a = (a + 0x6d2b79f5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+const rand = mulberry32(20260811);
+
+const int = (min: number, max: number) =>
+  Math.floor(rand() * (max - min + 1)) + min;
+const pick = <T,>(list: readonly T[]): T => list[Math.floor(rand() * list.length)];
+const chance = (p: number) => rand() < p;
+/** Multiplier in [1-spread, 1+spread]. */
+const jitter = (spread: number) => 1 + (rand() * 2 - 1) * spread;
+
+const DAY = 86_400_000;
+const iso = (d: Date) => d.toISOString();
+const shift = (from: Date, days: number, hours = 0) =>
+  new Date(from.getTime() + days * DAY + hours * 3_600_000);
+
+/* -------------------------------------------------------------------------- */
+/* FX — the AFN/USD rate drifts across the period                              */
+/* -------------------------------------------------------------------------- */
+
+/** Months covered by the dataset, oldest first: Oct 2025 … Aug 2026. */
+const MONTHS: Array<{ year: number; month: number; orders: number }> = [
+  { year: 2025, month: 9, orders: 9 },
+  { year: 2025, month: 10, orders: 11 },
+  { year: 2025, month: 11, orders: 10 },
+  { year: 2026, month: 0, orders: 13 },
+  { year: 2026, month: 1, orders: 12 },
+  { year: 2026, month: 2, orders: 15 },
+  { year: 2026, month: 3, orders: 16 },
+  { year: 2026, month: 4, orders: 18 },
+  { year: 2026, month: 5, orders: 19 },
+  { year: 2026, month: 6, orders: 21 },
+  { year: 2026, month: 7, orders: 12 },
+];
+
+function fxRateAt(date: Date): number {
+  const monthsElapsed =
+    (date.getUTCFullYear() - 2025) * 12 + (date.getUTCMonth() - 9);
+  const base = 68.4 + monthsElapsed * 0.36;
+  return Math.round((base + (rand() * 2 - 1) * 0.5) * 100) / 100;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Client weighting — a few regulars drive most of the volume                  */
+/* -------------------------------------------------------------------------- */
+
+const clientPool: string[] = [];
+clients.forEach((client, index) => {
+  if (client.status === "blocked") return;
+  // Businesses and the earliest individuals order far more often.
+  let weight = client.type === "business" ? 5 : 2;
+  if (index < 10) weight += 2;
+  if (client.status === "inactive") weight = 1;
+  for (let i = 0; i < weight; i += 1) clientPool.push(client.id);
+});
+
+const clientById = new Map(clients.map((c) => [c.id, c]));
+
+const SOURCES: OrderSource[] = [
+  "whatsapp",
+  "whatsapp",
+  "whatsapp",
+  "whatsapp",
+  "phone",
+  "phone",
+  "walk_in",
+  "facebook",
+  "referral",
+];
+
+const OPERATORS = ["Rahim Jan", "Sohaila Nazari", "Mustafa Amiri"];
+const ACCOUNTANTS = ["Yalda Sediqi", "Sohaila Nazari"];
+
+const storeById = new Map(settings.stores.map((s) => [s.id, s]));
+
+/* -------------------------------------------------------------------------- */
+/* Status selection                                                            */
+/* -------------------------------------------------------------------------- */
+
+function statusForAge(ageDays: number): OrderStatus {
+  if (ageDays > 12 && chance(0.035)) return "cancelled";
+  if (ageDays > 45 && chance(0.022)) return "refunded";
+
+  if (ageDays >= 42) return "delivered";
+  if (ageDays >= 32)
+    return pick<OrderStatus>([
+      "delivered",
+      "delivered",
+      "delivered",
+      "ready_for_pickup",
+    ]);
+  if (ageDays >= 24)
+    return pick<OrderStatus>([
+      "delivered",
+      "ready_for_pickup",
+      "arrived",
+      "in_transit",
+    ]);
+  if (ageDays >= 15)
+    return pick<OrderStatus>(["in_transit", "in_transit", "arrived", "purchased"]);
+  if (ageDays >= 9)
+    return pick<OrderStatus>(["purchased", "in_transit", "purchasing"]);
+  if (ageDays >= 4)
+    return pick<OrderStatus>(["confirmed", "purchasing", "purchased"]);
+  return pick<OrderStatus>(["requested", "quoted", "quoted", "confirmed"]);
+}
+
+const stageIndex = (status: OrderStatus) => ORDER_PIPELINE.indexOf(status);
+
+/** Cancelled/refunded orders still carry the history of how far they got. */
+function effectiveStage(status: OrderStatus): number {
+  if (status === "cancelled") return stageIndex("confirmed");
+  if (status === "refunded") return stageIndex("delivered");
+  return stageIndex(status);
+}
+
+/* -------------------------------------------------------------------------- */
+/* Generation                                                                  */
+/* -------------------------------------------------------------------------- */
+
+const orders: Order[] = [];
+const purchases: Purchase[] = [];
+const shipments: Shipment[] = [];
+const payments: Payment[] = [];
+const expenses: Expense[] = [];
+
+let orderSeq = 0;
+let purchaseSeq = 0;
+let receiptSeq = 0;
+
+function buildItems(
+  orderId: string,
+  fxRate: number,
+  count: number,
+): OrderItem[] {
+  const chosen: CatalogProduct[] = [];
+  while (chosen.length < count) {
+    const product = pick(catalog);
+    if (!chosen.some((p) => p.slug === product.slug)) chosen.push(product);
+  }
+
+  return chosen.map((product, index) => {
+    const qty =
+      product.costUsd > 400 ? 1 : chance(0.72) ? 1 : int(2, product.costUsd < 60 ? 6 : 3);
+    const unitCostUsd = Math.round(product.costUsd * jitter(0.04) * 100) / 100;
+    /*
+     * The quoted product price is the *landed* price, not the sticker price:
+     * on top of the FX rate it absorbs the store's sales tax, the domestic
+     * shipping to the forwarder, and a buffer for the rate moving between the
+     * quote and the day we actually buy. The service fee on the order is the
+     * margin on top of that.
+     */
+    const quotedRate = fxRate * QUOTE_MARKUP;
+    const unitPriceAfn = Math.round((unitCostUsd * quotedRate) / 50) * 50;
+
+    return {
+      id: `${orderId}-item-${index + 1}`,
+      name: product.name,
+      productUrl: productUrl(product, `B0${int(10000000, 99999999)}`),
+      storeId: product.storeId,
+      category: product.category,
+      variant: product.variants ? pick(product.variants) : undefined,
+      qty,
+      unitPriceAfn,
+      unitCostUsd,
+      weightKg: Math.round(product.weightKg * qty * 100) / 100,
+      notes: chance(0.12) ? "Client asked for the exact colour in the link." : undefined,
+    } satisfies OrderItem;
+  });
+}
+
+function buildTimeline(
+  order: Omit<Order, "timeline">,
+  stage: number,
+): OrderEvent[] {
+  const events: OrderEvent[] = [];
+  const requested = new Date(order.requestedAt);
+  const operator = pick(OPERATORS);
+  let cursor = requested;
+  let n = 0;
+
+  const push = (
+    status: OrderEvent["status"],
+    title: string,
+    description: string,
+    at: Date,
+  ) => {
+    n += 1;
+    events.push({
+      id: `${order.id}-evt-${n}`,
+      at: iso(at),
+      status,
+      title,
+      description,
+      actor: operator,
+    });
+  };
+
+  const client = clientById.get(order.clientId);
+  push(
+    "requested",
+    "Request received",
+    `${client?.name ?? "Client"} sent ${order.items.length} product link${
+      order.items.length > 1 ? "s" : ""
+    } via ${order.source === "whatsapp" ? "WhatsApp" : order.source.replace("_", " ")}.`,
+    cursor,
+  );
+
+  if (stage >= stageIndex("quoted")) {
+    cursor = shift(cursor, 0, int(2, 20));
+    push("quoted", "Quotation sent", "Priced from the store listing plus service fee and freight.", cursor);
+  }
+  if (stage >= stageIndex("confirmed")) {
+    cursor = shift(cursor, int(0, 2), int(1, 10));
+    push("confirmed", "Order confirmed", "Client approved the quotation and paid the advance.", cursor);
+  }
+  if (stage >= stageIndex("purchasing")) {
+    cursor = shift(cursor, int(0, 1), int(2, 12));
+    push("purchasing", "Purchasing started", "Cart prepared on the store, waiting for card authorisation.", cursor);
+  }
+  if (stage >= stageIndex("purchased")) {
+    cursor = shift(cursor, int(0, 2), int(1, 8));
+    push("purchase", "Purchase placed", "Store order placed and confirmation email received.", cursor);
+  }
+  if (stage >= stageIndex("in_transit")) {
+    cursor = shift(cursor, int(2, 6), int(1, 12));
+    push("shipment", "Shipment booked", "Consolidated at the forwarder and handed to the carrier.", cursor);
+  }
+  if (stage >= stageIndex("arrived")) {
+    cursor = shift(cursor, int(4, 11), int(1, 10));
+    push("arrived", "Arrived in Kabul", "Cleared customs and checked into the shop.", cursor);
+  }
+  if (stage >= stageIndex("ready_for_pickup")) {
+    cursor = shift(cursor, 0, int(2, 14));
+    push("ready_for_pickup", "Ready for handover", "Client notified that the parcel is ready.", cursor);
+  }
+  if (stage >= stageIndex("delivered") && order.status !== "cancelled") {
+    cursor = shift(cursor, int(0, 3), int(1, 9));
+    push("delivered", "Handed over", "Client collected the order and signed the receipt.", cursor);
+  }
+  if (order.status === "cancelled") {
+    cursor = shift(cursor, int(1, 4), int(1, 9));
+    push("cancelled", "Order cancelled", "Client changed their mind before we placed the purchase.", cursor);
+  }
+  if (order.status === "refunded") {
+    cursor = shift(cursor, int(2, 7), int(1, 9));
+    push("refunded", "Order refunded", "Item arrived damaged — refunded in full and returned to the store.", cursor);
+  }
+
+  return events;
+}
+
+function buildPurchases(order: Order, fxRate: number): Purchase[] {
+  // Items are grouped by store — one store order per store, like real life.
+  const byStore = new Map<string, OrderItem[]>();
+  order.items.forEach((item) => {
+    const list = byStore.get(item.storeId) ?? [];
+    list.push(item);
+    byStore.set(item.storeId, list);
+  });
+
+  const purchasedEvent = order.timeline.find((e) => e.status === "purchase");
+  const purchasedAt = purchasedEvent
+    ? new Date(purchasedEvent.at)
+    : shift(new Date(order.requestedAt), 4);
+
+  const stage = effectiveStage(order.status);
+
+  let status: PurchaseStatus = "placed";
+  if (order.status === "cancelled") status = "cancelled";
+  else if (order.status === "refunded") status = "refunded";
+  else if (stage >= stageIndex("arrived")) status = "received";
+  else if (stage >= stageIndex("in_transit")) status = "shipped_to_warehouse";
+  else if (stage >= stageIndex("purchased")) status = "placed";
+  else status = "pending";
+
+  return Array.from(byStore.entries()).map(([storeId, items]) => {
+    purchaseSeq += 1;
+    const itemsCostUsd =
+      Math.round(
+        items.reduce((sum, i) => sum + i.unitCostUsd * i.qty, 0) *
+          // Sometimes the price moved between quote and purchase.
+          jitter(0.035) *
+          100,
+      ) / 100;
+    const taxUsd = Math.round(itemsCostUsd * (chance(0.5) ? 0.07 : 0) * 100) / 100;
+    const domesticShippingUsd = chance(0.45)
+      ? Math.round(int(5, 24) * 100) / 100
+      : 0;
+    const otherCostUsd = chance(0.18) ? Math.round(int(3, 15) * 100) / 100 : 0;
+    const store = storeById.get(storeId);
+
+    return {
+      id: `purchase-${String(purchaseSeq).padStart(4, "0")}`,
+      purchaseNo: `PO-${purchasedAt.getUTCFullYear()}-${String(purchaseSeq).padStart(4, "0")}`,
+      orderId: order.id,
+      orderItemIds: items.map((i) => i.id),
+      storeId,
+      externalOrderNumber: externalOrderNumber(storeId),
+      status,
+      purchasedAt: iso(purchasedAt),
+      purchasedBy: pick(OPERATORS),
+      paymentMethodId: chance(0.72) ? "pm-visa" : "pm-hawala",
+      itemsCostUsd,
+      taxUsd,
+      domesticShippingUsd,
+      otherCostUsd,
+      fxRate,
+      invoiceRef: `${store?.name.split(" ")[0] ?? "STORE"}-${int(100000, 999999)}`,
+      notes:
+        status === "refunded"
+          ? "Returned to seller — full refund credited to the business card."
+          : undefined,
+    } satisfies Purchase;
+  });
+}
+
+function externalOrderNumber(storeId: string): string {
+  switch (storeId) {
+    case "store-amazon-us":
+    case "store-amazon-ae":
+      return `${int(111, 114)}-${int(1000000, 9999999)}-${int(1000000, 9999999)}`;
+    case "store-daraz-pk":
+      return `${int(100000000, 999999999)}`;
+    case "store-noon":
+      return `N${int(10000000, 99999999)}`;
+    case "store-aliexpress":
+      return `${int(8000000000000, 8999999999999)}`;
+    default:
+      return `${int(10000000000, 99999999999)}`;
+  }
+}
+
+const CARRIER_ROUTES: Array<{
+  carrier: string;
+  origin: string;
+  destination: string;
+  stores: string[];
+  tracking: () => string;
+  url: (t: string) => string;
+}> = [
+  {
+    carrier: "DHL Express",
+    origin: "Dubai, UAE",
+    destination: "Kabul, Afghanistan",
+    stores: ["store-amazon-ae", "store-noon", "store-amazon-us"],
+    tracking: () => `${int(1000000000, 9999999999)}`,
+    url: (t) => `https://www.dhl.com/af-en/home/tracking.html?tracking-id=${t}`,
+  },
+  {
+    carrier: "Aramex",
+    origin: "Dubai, UAE",
+    destination: "Kabul, Afghanistan",
+    stores: ["store-amazon-ae", "store-noon"],
+    tracking: () => `${int(10000000000, 99999999999)}`,
+    url: (t) => `https://www.aramex.com/track/results?ShipmentNumber=${t}`,
+  },
+  {
+    carrier: "FedEx",
+    origin: "Memphis, USA",
+    destination: "Kabul, Afghanistan",
+    stores: ["store-amazon-us"],
+    tracking: () => `${int(100000000000, 999999999999)}`,
+    url: (t) => `https://www.fedex.com/fedextrack/?trknbr=${t}`,
+  },
+  {
+    carrier: "Silk Road Air Cargo",
+    origin: "Guangzhou, China",
+    destination: "Kabul, Afghanistan",
+    stores: ["store-aliexpress"],
+    tracking: () => `SRA${int(100000, 999999)}AF`,
+    url: (t) => `https://track.silkroadcargo.af/${t}`,
+  },
+  {
+    carrier: "Kabul City Courier",
+    origin: "Peshawar, Pakistan",
+    destination: "Kabul, Afghanistan",
+    stores: ["store-daraz-pk"],
+    tracking: () => `KCC-${int(100000, 999999)}`,
+    url: (t) => `https://kabulcitycourier.af/track/${t}`,
+  },
+];
+
+function buildShipment(order: Order, itemsAfn: number): Shipment {
+  const primaryStore = order.items[0]?.storeId ?? "store-amazon-us";
+  const route =
+    CARRIER_ROUTES.find((r) => r.stores.includes(primaryStore)) ?? CARRIER_ROUTES[0];
+  const trackingNumber = route.tracking();
+
+  const stage = effectiveStage(order.status);
+  const shipEvent = order.timeline.find((e) => e.status === "shipment");
+  const shippedAt = shipEvent
+    ? new Date(shipEvent.at)
+    : shift(new Date(order.requestedAt), 7);
+
+  const store = storeById.get(primaryStore);
+  const leadTime = store?.leadTimeDays ?? 18;
+  const etaAt = shift(shippedAt, Math.round(leadTime * 0.6) + int(-2, 4));
+
+  const weightKg =
+    Math.round(order.items.reduce((s, i) => s + (i.weightKg ?? 0.5), 0) * 100) / 100;
+
+  let status: ShipmentStatus;
+  if (order.status === "refunded") status = "delivered";
+  else if (stage >= stageIndex("arrived")) status = "delivered";
+  else if (chance(0.14)) status = "customs";
+  else if (chance(0.1)) status = "exception";
+  else status = pick<ShipmentStatus>(["in_transit", "in_transit", "picked_up"]);
+
+  const arrivedEvent = order.timeline.find((e) => e.status === "arrived");
+  const deliveredAt =
+    status === "delivered"
+      ? arrivedEvent
+        ? new Date(arrivedEvent.at)
+        : shift(shippedAt, leadTime)
+      : undefined;
+
+  const events: ShipmentEvent[] = [];
+  let seq = 0;
+  const addEvent = (
+    at: Date,
+    evtStatus: ShipmentStatus,
+    location: string,
+    description: string,
+  ) => {
+    seq += 1;
+    events.push({
+      id: `${order.id}-shp-evt-${seq}`,
+      at: iso(at),
+      status: evtStatus,
+      location,
+      description,
+    });
+  };
+
+  addEvent(shippedAt, "label_created", route.origin, "Shipping label created by the forwarder.");
+  addEvent(shift(shippedAt, 0, int(6, 20)), "picked_up", route.origin, `Picked up by ${route.carrier}.`);
+
+  if (status !== "picked_up") {
+    addEvent(
+      shift(shippedAt, int(1, 3)),
+      "in_transit",
+      route.origin.split(",")[0],
+      "Departed origin facility.",
+    );
+    addEvent(
+      shift(shippedAt, int(4, 7)),
+      "in_transit",
+      "Kabul International Airport",
+      "Arrived at destination airport.",
+    );
+  }
+
+  if (status === "customs") {
+    addEvent(
+      shift(shippedAt, int(6, 9)),
+      "customs",
+      "Kabul Customs House",
+      "Held for import clearance — commercial invoice requested.",
+    );
+  }
+
+  if (status === "exception") {
+    addEvent(
+      shift(shippedAt, int(6, 10)),
+      "exception",
+      "Kabul, Afghanistan",
+      "Delivery attempt failed — client phone unreachable.",
+    );
+  }
+
+  if (status === "delivered" && deliveredAt) {
+    addEvent(
+      shift(deliveredAt, -1),
+      "customs",
+      "Kabul Customs House",
+      "Cleared import formalities, duty paid.",
+    );
+    addEvent(
+      shift(deliveredAt, 0, -3),
+      "out_for_delivery",
+      "Kabul, Afghanistan",
+      "Out for delivery to the Amanat shop.",
+    );
+    addEvent(
+      deliveredAt,
+      "delivered",
+      "Shahr-e-Naw, Kabul",
+      "Delivered and checked into shop inventory.",
+    );
+  }
+
+  // Freight is roughly weight-based; duty is a share of the declared value.
+  const freightCostAfn = Math.round(Math.max(280, weightKg * int(78, 105)) / 10) * 10;
+  const customsDutyAfn =
+    itemsAfn > 12000 ? Math.round((itemsAfn * (chance(0.5) ? 0.03 : 0.045)) / 10) * 10 : 0;
+
+  return {
+    id: `shipment-${order.id.replace("order-", "")}`,
+    orderId: order.id,
+    carrier: route.carrier,
+    trackingNumber,
+    trackingUrl: route.url(trackingNumber),
+    status,
+    origin: route.origin,
+    destination: route.destination,
+    shippedAt: iso(shippedAt),
+    etaAt: iso(etaAt),
+    deliveredAt: deliveredAt ? iso(deliveredAt) : undefined,
+    weightKg,
+    freightCostAfn,
+    customsDutyAfn,
+    events: events.sort((a, b) => a.at.localeCompare(b.at)),
+  };
+}
+
+/* -------------------------------------------------------------------------- */
+/* Main generation pass                                                        */
+/* -------------------------------------------------------------------------- */
+
+const draft: Array<{ requestedAt: Date; clientId: string }> = [];
+
+MONTHS.forEach(({ year, month, orders: count }) => {
+  for (let i = 0; i < count; i += 1) {
+    const daysInMonth = new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
+    const day = int(1, daysInMonth);
+    const requestedAt = new Date(
+      Date.UTC(year, month, day, int(7, 19), int(0, 59)),
+    );
+    if (requestedAt.getTime() > TODAY.getTime()) continue;
+    draft.push({ requestedAt, clientId: pick(clientPool) });
+  }
+});
+
+draft.sort((a, b) => a.requestedAt.getTime() - b.requestedAt.getTime());
+
+draft.forEach(({ requestedAt, clientId }) => {
+  orderSeq += 1;
+  const id = `order-${String(orderSeq).padStart(4, "0")}`;
+  const orderNo = `AS-${requestedAt.getUTCFullYear()}-${String(orderSeq).padStart(4, "0")}`;
+  const ageDays = Math.floor((TODAY.getTime() - requestedAt.getTime()) / DAY);
+  const status = statusForAge(ageDays);
+  const fxRate = fxRateAt(requestedAt);
+  const client = clientById.get(clientId);
+
+  const itemCount = client?.type === "business" ? int(1, 4) : chance(0.62) ? 1 : int(2, 3);
+  const items = buildItems(id, fxRate, itemCount);
+
+  const itemsAfn = items.reduce((s, i) => s + i.unitPriceAfn * i.qty, 0);
+  const totalWeight = items.reduce((s, i) => s + (i.weightKg ?? 0.5), 0);
+
+  const shippingChargedAfn = Math.round(Math.max(400, totalWeight * int(105, 140)) / 50) * 50;
+  const discountAfn =
+    chance(0.14) ? Math.round((itemsAfn * (rand() * 0.04 + 0.01)) / 50) * 50 : 0;
+
+  const base: Omit<Order, "timeline"> = {
+    id,
+    orderNo,
+    clientId,
+    status,
+    source: pick(SOURCES),
+    requestedAt: iso(requestedAt),
+    items,
+    serviceFeeType: "percent",
+    serviceFeeValue:
+      client?.serviceFeePercent ?? settings.company.defaultServiceFeePercent,
+    shippingChargedAfn,
+    discountAfn,
+    notes: chance(0.18)
+      ? "Client will collect from the shop. Call before closing."
+      : undefined,
+  };
+
+  const stage = effectiveStage(status);
+  const timeline = buildTimeline(base, stage);
+
+  const deliveredEvent = timeline.find((e) => e.status === "delivered");
+  const order: Order = {
+    ...base,
+    deliveredAt: deliveredEvent?.at,
+    timeline,
+  };
+
+  orders.push(order);
+
+  /* --- purchases --------------------------------------------------------- */
+  if (stage >= stageIndex("purchasing")) {
+    purchases.push(...buildPurchases(order, fxRate));
+  }
+
+  /* --- shipment ---------------------------------------------------------- */
+  if (stage >= stageIndex("in_transit") && status !== "cancelled") {
+    shipments.push(buildShipment(order, itemsAfn));
+  }
+
+  /* --- payments ---------------------------------------------------------- */
+  const serviceFeeAfn = Math.round((itemsAfn * base.serviceFeeValue) / 100);
+  const revenue = itemsAfn + serviceFeeAfn + shippingChargedAfn - discountAfn;
+
+  const confirmEvent = timeline.find((e) => e.status === "confirmed");
+  if (confirmEvent && status !== "cancelled") {
+    receiptSeq += 1;
+    const advanceRatio = client?.type === "business" ? 0.4 : 0.5;
+    const advance = Math.round((revenue * advanceRatio) / 100) * 100;
+    const at = new Date(confirmEvent.at);
+    payments.push({
+      id: `payment-${String(receiptSeq).padStart(4, "0")}`,
+      receiptNo: `RCT-${at.getUTCFullYear()}-${String(receiptSeq).padStart(4, "0")}`,
+      clientId,
+      orderId: id,
+      at: iso(at),
+      amountAfn: advance,
+      methodId: pick(["pm-cash", "pm-cash", "pm-azizi", "pm-hesabpay", "pm-aib"]),
+      type: "advance",
+      reference: chance(0.4) ? `TRX${int(100000, 999999)}` : undefined,
+      recordedBy: pick(ACCOUNTANTS),
+    });
+
+    // The balance is settled at handover — but not always in full.
+    if (deliveredEvent && status === "delivered") {
+      const settleAll = chance(0.78);
+      const remaining = revenue - advance;
+      const paid = settleAll
+        ? remaining
+        : Math.round((remaining * (rand() * 0.5 + 0.25)) / 100) * 100;
+      if (paid > 0) {
+        receiptSeq += 1;
+        const payAt = shift(new Date(deliveredEvent.at), settleAll ? 0 : int(1, 6), int(0, 6));
+        payments.push({
+          id: `payment-${String(receiptSeq).padStart(4, "0")}`,
+          receiptNo: `RCT-${payAt.getUTCFullYear()}-${String(receiptSeq).padStart(4, "0")}`,
+          clientId,
+          orderId: id,
+          at: iso(payAt),
+          amountAfn: paid,
+          methodId: pick(["pm-cash", "pm-cash", "pm-azizi", "pm-hesabpay"]),
+          type: settleAll ? "final" : "partial",
+          reference: chance(0.35) ? `TRX${int(100000, 999999)}` : undefined,
+          note: settleAll ? undefined : "Client asked to pay the rest next week.",
+          recordedBy: pick(ACCOUNTANTS),
+        });
+      }
+    }
+
+    if (status === "refunded") {
+      receiptSeq += 1;
+      const refundAt = shift(new Date(timeline[timeline.length - 1].at), int(1, 3));
+      payments.push({
+        id: `payment-${String(receiptSeq).padStart(4, "0")}`,
+        receiptNo: `RCT-${refundAt.getUTCFullYear()}-${String(receiptSeq).padStart(4, "0")}`,
+        clientId,
+        orderId: id,
+        at: iso(refundAt),
+        amountAfn: -advance,
+        methodId: "pm-cash",
+        type: "refund",
+        note: "Advance returned in cash after the damaged item was sent back.",
+        recordedBy: pick(ACCOUNTANTS),
+      });
+    }
+  }
+});
+
+/* -------------------------------------------------------------------------- */
+/* Operating expenses — monthly run rate plus ad-hoc costs                     */
+/* -------------------------------------------------------------------------- */
+
+let expenseSeq = 0;
+
+function addExpense(
+  at: Date,
+  categoryId: string,
+  description: string,
+  amountAfn: number,
+  methodId: string,
+  vendor?: string,
+) {
+  expenseSeq += 1;
+  expenses.push({
+    id: `expense-${String(expenseSeq).padStart(4, "0")}`,
+    at: iso(at),
+    categoryId,
+    description,
+    amountAfn,
+    methodId,
+    vendor,
+    receiptRef: chance(0.55) ? `EXP-${int(10000, 99999)}` : undefined,
+    recordedBy: "Yalda Sediqi",
+  });
+}
+
+MONTHS.forEach(({ year, month }) => {
+  const monthStart = new Date(Date.UTC(year, month, 1, 8, 0));
+  if (monthStart.getTime() > TODAY.getTime()) return;
+  const label = monthStart.toLocaleDateString("en-US", {
+    month: "long",
+    year: "numeric",
+    timeZone: "UTC",
+  });
+
+  addExpense(
+    new Date(Date.UTC(year, month, 3, 9, 0)),
+    "exp-rent",
+    `Shop rent — ${label}`,
+    25000,
+    "pm-cash",
+    "Zarnegar Plaza management",
+  );
+  addExpense(
+    new Date(Date.UTC(year, month, 28, 15, 0)),
+    "exp-salaries",
+    `Team salaries — ${label}`,
+    int(38, 46) * 1000,
+    "pm-cash",
+  );
+  addExpense(
+    new Date(Date.UTC(year, month, 6, 11, 0)),
+    "exp-utilities",
+    `Electricity, generator fuel and internet — ${label}`,
+    int(4200, 6800),
+    "pm-cash",
+    "DABS / Etisalat",
+  );
+  addExpense(
+    new Date(Date.UTC(year, month, int(8, 22), 13, 0)),
+    "exp-marketing",
+    chance(0.5)
+      ? "Facebook page promotion"
+      : "Printed flyers and shop banner",
+    int(3500, 14000),
+    chance(0.5) ? "pm-visa" : "pm-cash",
+    chance(0.5) ? "Meta Platforms" : "Kabul Print House",
+  );
+  addExpense(
+    new Date(Date.UTC(year, month, int(10, 26), 10, 0)),
+    "exp-bank",
+    "Hawala commission and card FX fees",
+    int(2200, 7400),
+    "pm-hawala",
+  );
+  addExpense(
+    new Date(Date.UTC(year, month, int(5, 25), 12, 0)),
+    "exp-misc",
+    pick([
+      "Packaging materials and bubble wrap",
+      "Shop transport and taxi fares",
+      "Stationery and printer toner",
+      "Tea, water and shop supplies",
+    ]),
+    int(1200, 5200),
+    "pm-cash",
+  );
+  if (chance(0.55)) {
+    addExpense(
+      new Date(Date.UTC(year, month, int(6, 24), 14, 0)),
+      "exp-freight",
+      "Consolidation and warehouse fees not billed to a client",
+      int(4000, 16000),
+      "pm-hawala",
+      "Dubai forwarder",
+    );
+  }
+});
+
+/* -------------------------------------------------------------------------- */
+
+orders.sort((a, b) => b.requestedAt.localeCompare(a.requestedAt));
+purchases.sort((a, b) => b.purchasedAt.localeCompare(a.purchasedAt));
+payments.sort((a, b) => b.at.localeCompare(a.at));
+expenses.sort((a, b) => b.at.localeCompare(a.at));
+shipments.sort((a, b) => (b.shippedAt ?? "").localeCompare(a.shippedAt ?? ""));
+
+export const seedData = {
+  clients,
+  orders,
+  purchases,
+  shipments,
+  payments,
+  expenses,
+  settings,
+};
+
+export type SeedData = typeof seedData;
