@@ -82,7 +82,7 @@ export function PaymentMethodsSettingsScreen() {
   return (
     <>
       <Card className="overflow-hidden py-0">
-        <CardHeader className="px-5 pt-5">
+        <CardHeader>
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <CardTitle className="text-sm">Payment methods</CardTitle>

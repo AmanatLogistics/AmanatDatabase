@@ -2,6 +2,13 @@ import * as React from "react";
 
 import { cn } from "@/lib/utils";
 
+/**
+ * Card spacing is owned entirely by these primitives — screens should not need
+ * to patch it with `pt-*` overrides. `CardContent` carries the bottom padding
+ * and only adds top padding when it is the first child (a card with no header),
+ * so a header always sits clear of the content beneath it.
+ */
+
 function Card({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
@@ -20,7 +27,7 @@ function CardHeader({ className, ...props }: React.ComponentProps<"div">) {
     <div
       data-slot="card-header"
       className={cn(
-        "@container/card-header grid auto-rows-min items-start gap-1 px-5 pt-5 has-[[data-slot=card-action]]:grid-cols-[1fr_auto]",
+        "@container/card-header grid auto-rows-min items-start gap-1 px-4 pt-4 pb-3 has-[[data-slot=card-action]]:grid-cols-[1fr_auto]",
         className,
       )}
       {...props}
@@ -63,7 +70,11 @@ function CardAction({ className, ...props }: React.ComponentProps<"div">) {
 
 function CardContent({ className, ...props }: React.ComponentProps<"div">) {
   return (
-    <div data-slot="card-content" className={cn("px-5 py-5", className)} {...props} />
+    <div
+      data-slot="card-content"
+      className={cn("px-4 pb-4 [&:first-child]:pt-4", className)}
+      {...props}
+    />
   );
 }
 
@@ -71,7 +82,7 @@ function CardFooter({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
       data-slot="card-footer"
-      className={cn("flex items-center px-5 pb-5", className)}
+      className={cn("flex items-center px-4 pb-4", className)}
       {...props}
     />
   );

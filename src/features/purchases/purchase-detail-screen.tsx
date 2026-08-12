@@ -32,7 +32,8 @@ export function PurchaseDetailScreen({ purchaseId }: { purchaseId: string }) {
   const { purchase, order, client, store, totalUsd, totalAfn } = row;
   const method = methodOf(purchase.paymentMethodId);
   const coveredItems =
-    order?.items.filter((item) => purchase.orderItemIds.includes(item.id)) ?? [];
+    order?.items.filter((item) => purchase.orderItemIds.includes(item.id)) ??
+    [];
 
   return (
     <>
@@ -69,29 +70,34 @@ export function PurchaseDetailScreen({ purchaseId }: { purchaseId: string }) {
         }
       />
 
-      <div className="grid gap-5 xl:grid-cols-[1fr_320px]">
-        <div className="min-w-0 space-y-5">
-          <Card>
+      <div className="grid gap-4 xl:grid-cols-[1fr_320px]">
+        <div className="min-w-0">
+          <Card className="h-full">
             <CardHeader>
               <CardTitle className="text-sm">Store order</CardTitle>
             </CardHeader>
-            <CardContent className="pt-1">
+            <CardContent>
               <dl className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
                 <Field label="Store" value={store?.name ?? "—"} />
                 <Field
                   label="Store order number"
                   value={
-                    <span className="tabular">{purchase.externalOrderNumber}</span>
+                    <span className="tabular">
+                      {purchase.externalOrderNumber}
+                    </span>
                   }
                 />
-                <Field label="Seller invoice" value={purchase.invoiceRef ?? "—"} />
-                <Field label="Paid with" value={method?.name ?? "—"} />
-                <Field label="Purchased" value={formatDate(purchase.purchasedAt)} />
-                <Field label="Purchased by" value={purchase.purchasedBy} />
                 <Field
-                  label="Country"
-                  value={store?.country ?? "—"}
+                  label="Seller invoice"
+                  value={purchase.invoiceRef ?? "—"}
                 />
+                <Field label="Paid with" value={method?.name ?? "—"} />
+                <Field
+                  label="Purchased"
+                  value={formatDate(purchase.purchasedAt)}
+                />
+                <Field label="Purchased by" value={purchase.purchasedBy} />
+                <Field label="Country" value={store?.country ?? "—"} />
                 <Field
                   label="Typical lead time"
                   value={store ? `${store.leadTimeDays} days` : "—"}
@@ -119,69 +125,6 @@ export function PurchaseDetailScreen({ purchaseId }: { purchaseId: string }) {
               )}
             </CardContent>
           </Card>
-
-          <Card className="overflow-hidden py-0">
-            <div className="px-5 pt-5 pb-3">
-              <CardTitle className="text-sm">Items covered</CardTitle>
-              <p className="text-muted-foreground text-xs">
-                The order lines this store purchase paid for.
-              </p>
-            </div>
-            {coveredItems.length === 0 ? (
-              <p className="text-muted-foreground px-5 pb-5 text-sm">
-                No order items are linked to this purchase.
-              </p>
-            ) : (
-              <Table>
-                <TableHeader className="bg-muted/40">
-                  <TableRow className="hover:bg-transparent">
-                    <TableHead>Product</TableHead>
-                    <TableHead className="text-right">Qty</TableHead>
-                    <TableHead className="text-right">Est. unit cost</TableHead>
-                    <TableHead className="text-right">Charged client</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {coveredItems.map((item) => (
-                    <TableRow key={item.id}>
-                      <TableCell>
-                        <div className="flex items-center gap-3">
-                          <ProductThumb
-                            size="sm"
-                            category={item.category}
-                            imageUrl={item.imageUrl}
-                            name={item.name}
-                          />
-                          <div className="min-w-0">
-                            <p className="text-[13px] font-medium">{item.name}</p>
-                            <p className="text-muted-foreground text-xs">
-                              {PRODUCT_CATEGORY_LABEL[item.category]}
-                              {item.variant ? ` · ${item.variant}` : ""}
-                            </p>
-                          </div>
-                        </div>
-                      </TableCell>
-                      <TableCell className="tabular text-right text-[13px]">
-                        {item.qty}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <MoneyUsd
-                          value={item.unitCostUsd}
-                          className="text-muted-foreground text-[13px]"
-                        />
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <Money
-                          value={item.unitPriceAfn * item.qty}
-                          className="text-[13px]"
-                        />
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            )}
-          </Card>
         </div>
 
         <div className="space-y-4">
@@ -189,10 +132,13 @@ export function PurchaseDetailScreen({ purchaseId }: { purchaseId: string }) {
             <CardHeader>
               <CardTitle className="text-sm">Cost breakdown</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-2 pt-1 text-sm">
+            <CardContent className="space-y-2 text-sm">
               <CostLine label="Items" value={purchase.itemsCostUsd} />
               <CostLine label="Tax" value={purchase.taxUsd} />
-              <CostLine label="Domestic shipping" value={purchase.domesticShippingUsd} />
+              <CostLine
+                label="Domestic shipping"
+                value={purchase.domesticShippingUsd}
+              />
               <CostLine label="Other charges" value={purchase.otherCostUsd} />
               <Separator className="my-2" />
               <div className="flex items-center justify-between font-semibold">
@@ -206,7 +152,11 @@ export function PurchaseDetailScreen({ purchaseId }: { purchaseId: string }) {
               </div>
               <div className="flex items-center justify-between">
                 <span className="font-medium">Cost in Afghani</span>
-                <Money value={totalAfn} className="font-semibold" />
+                <Money
+                  value={totalAfn}
+                  unit="suffix"
+                  className="font-semibold"
+                />
               </div>
             </CardContent>
           </Card>
@@ -216,7 +166,7 @@ export function PurchaseDetailScreen({ purchaseId }: { purchaseId: string }) {
               <CardHeader>
                 <CardTitle className="text-sm">For client</CardTitle>
               </CardHeader>
-              <CardContent className="pt-1">
+              <CardContent>
                 <Link
                   href={`/clients/${client.id}`}
                   className="font-medium hover:underline"
@@ -231,6 +181,69 @@ export function PurchaseDetailScreen({ purchaseId }: { purchaseId: string }) {
           )}
         </div>
       </div>
+
+      <Card className="overflow-hidden py-0">
+        <div className="px-4 pt-4 pb-3">
+          <CardTitle className="text-sm">Items covered</CardTitle>
+          <p className="text-muted-foreground text-xs">
+            The order lines this store purchase paid for.
+          </p>
+        </div>
+        {coveredItems.length === 0 ? (
+          <p className="text-muted-foreground px-4 pb-4 text-sm">
+            No order items are linked to this purchase.
+          </p>
+        ) : (
+          <Table>
+            <TableHeader className="bg-muted/40">
+              <TableRow className="hover:bg-transparent">
+                <TableHead>Product</TableHead>
+                <TableHead className="text-right">Qty</TableHead>
+                <TableHead className="text-right">Est. unit cost (USD)</TableHead>
+                <TableHead className="text-right">Charged client (AFN)</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {coveredItems.map((item) => (
+                <TableRow key={item.id}>
+                  <TableCell>
+                    <div className="flex items-center gap-3">
+                      <ProductThumb
+                        size="sm"
+                        category={item.category}
+                        imageUrl={item.imageUrl}
+                        name={item.name}
+                      />
+                      <div className="min-w-0">
+                        <p className="text-[13px] font-medium">{item.name}</p>
+                        <p className="text-muted-foreground text-xs">
+                          {PRODUCT_CATEGORY_LABEL[item.category]}
+                          {item.variant ? ` · ${item.variant}` : ""}
+                        </p>
+                      </div>
+                    </div>
+                  </TableCell>
+                  <TableCell className="tabular text-right text-[13px]">
+                    {item.qty}
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <MoneyUsd
+                      value={item.unitCostUsd}
+                      className="text-muted-foreground text-[13px]"
+                    />
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <Money
+                      value={item.unitPriceAfn * item.qty}
+                      className="text-[13px]"
+                    />
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
+      </Card>
     </>
   );
 }

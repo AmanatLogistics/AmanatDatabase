@@ -58,6 +58,10 @@ export function ClientDetailScreen({ clientId }: { clientId: string }) {
 
   const { client, summary } = row;
 
+  const digits = (value?: string) => (value ?? "").replace(/\D/g, "");
+  const sameWhatsapp =
+    !!client.whatsapp && digits(client.whatsapp) === digits(client.phone);
+
   /** Running-balance statement: orders debit, payments credit. */
   const ledger = React.useMemo(() => {
     const entries: Array<{
@@ -145,14 +149,14 @@ export function ClientDetailScreen({ clientId }: { clientId: string }) {
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard
           label="Lifetime revenue"
-          value={formatAfn(summary.lifetimeRevenueAfn)}
+          value={formatAfn(summary.lifetimeRevenueAfn, { unit: "suffix" })}
           caption={`across ${summary.orderCount} orders`}
           icon={ShoppingCartIcon}
           accent="brand"
         />
         <StatCard
           label="Gross profit earned"
-          value={formatAfn(summary.lifetimeProfitAfn)}
+          value={formatAfn(summary.lifetimeProfitAfn, { unit: "suffix" })}
           caption={
             summary.lifetimeRevenueAfn > 0
               ? `${((summary.lifetimeProfitAfn / summary.lifetimeRevenueAfn) * 100).toFixed(1)}% margin`
@@ -163,7 +167,7 @@ export function ClientDetailScreen({ clientId }: { clientId: string }) {
         />
         <StatCard
           label="Outstanding balance"
-          value={formatAfn(summary.balanceAfn)}
+          value={formatAfn(summary.balanceAfn, { unit: "suffix" })}
           caption={
             summary.balanceAfn > 0
               ? `oldest debt ${summary.oldestDebtDays} days`
@@ -174,7 +178,7 @@ export function ClientDetailScreen({ clientId }: { clientId: string }) {
         />
         <StatCard
           label="Average order"
-          value={formatAfn(summary.avgOrderAfn)}
+          value={formatAfn(summary.avgOrderAfn, { unit: "suffix" })}
           caption={
             summary.lastOrderAt
               ? `last order ${formatRelative(summary.lastOrderAt)}`
@@ -185,9 +189,9 @@ export function ClientDetailScreen({ clientId }: { clientId: string }) {
         />
       </div>
 
-      <div className="grid gap-5 xl:grid-cols-[300px_1fr]">
+      <div className="grid items-start gap-4 xl:grid-cols-[300px_1fr]">
         {/* Contact card ------------------------------------------------ */}
-        <div className="space-y-4">
+        <div className="space-y-4 xl:sticky xl:top-20">
           <Card>
             <CardContent className="space-y-4">
               <div className="flex items-center gap-3">
@@ -211,8 +215,14 @@ export function ClientDetailScreen({ clientId }: { clientId: string }) {
                 >
                   <PhoneIcon className="size-4 shrink-0" />
                   <span className="tabular">{client.phone}</span>
+                  {sameWhatsapp && (
+                    <span className="text-muted-foreground/70 ml-auto text-xs">
+                      also WhatsApp
+                    </span>
+                  )}
                 </a>
-                {client.whatsapp && (
+                {/* Only a *different* WhatsApp number earns its own line. */}
+                {client.whatsapp && !sameWhatsapp && (
                   <a
                     href={`https://wa.me/${client.whatsapp.replace(/\D/g, "")}`}
                     target="_blank"
@@ -307,8 +317,8 @@ export function ClientDetailScreen({ clientId }: { clientId: string }) {
                         <TableHead>Order</TableHead>
                         <TableHead>Items</TableHead>
                         <TableHead>Status</TableHead>
-                        <TableHead className="text-right">Total</TableHead>
-                        <TableHead className="text-right">Balance</TableHead>
+                        <TableHead className="text-right">Total (AFN)</TableHead>
+                        <TableHead className="text-right">Balance (AFN)</TableHead>
                         <TableHead>Date</TableHead>
                       </TableRow>
                     </TableHeader>
@@ -338,11 +348,10 @@ export function ClientDetailScreen({ clientId }: { clientId: string }) {
                           <TableCell className="text-right">
                             <Money
                               value={economics.balanceAfn}
+                              zeroDash
                               className={cn(
                                 "text-[13px]",
-                                economics.balanceAfn > 0
-                                  ? "text-destructive"
-                                  : "text-muted-foreground",
+                                economics.balanceAfn > 0 && "text-destructive",
                               )}
                             />
                           </TableCell>
@@ -377,7 +386,7 @@ export function ClientDetailScreen({ clientId }: { clientId: string }) {
                         <TableHead>Order</TableHead>
                         <TableHead>Method</TableHead>
                         <TableHead>Type</TableHead>
-                        <TableHead className="text-right">Amount</TableHead>
+                        <TableHead className="text-right">Amount (AFN)</TableHead>
                         <TableHead>Date</TableHead>
                         <TableHead />
                       </TableRow>
@@ -455,9 +464,9 @@ export function ClientDetailScreen({ clientId }: { clientId: string }) {
                         <TableRow className="hover:bg-transparent">
                           <TableHead>Date</TableHead>
                           <TableHead>Description</TableHead>
-                          <TableHead className="text-right">Charged</TableHead>
-                          <TableHead className="text-right">Paid</TableHead>
-                          <TableHead className="text-right">Balance</TableHead>
+                          <TableHead className="text-right">Charged (AFN)</TableHead>
+                          <TableHead className="text-right">Paid (AFN)</TableHead>
+                          <TableHead className="text-right">Balance (AFN)</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -506,7 +515,7 @@ export function ClientDetailScreen({ clientId }: { clientId: string }) {
                         ))}
                       </TableBody>
                     </Table>
-                    <div className="bg-muted/25 flex items-center justify-between border-t px-5 py-3.5 text-sm">
+                    <div className="bg-muted/25 flex items-center justify-between border-t px-4 py-3 text-sm">
                       <span className="text-muted-foreground">
                         Closing balance
                       </span>

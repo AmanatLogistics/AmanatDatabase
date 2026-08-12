@@ -54,7 +54,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           onOpenMobileNav={() => setMobileOpen(true)}
         />
         <main className="scrollbar-thin flex-1 overflow-y-auto">
-          <div className="mx-auto w-full max-w-[1600px] space-y-5 p-4 sm:p-6">
+          <div className="mx-auto w-full max-w-[1600px] space-y-4 p-4 sm:px-6 sm:py-5">
             {children}
           </div>
         </main>

@@ -2,23 +2,33 @@ import { formatAfn, formatUsd } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 /**
- * AFN amount. Positive/negative colouring is opt-in so ordinary totals stay
- * neutral and only profit/balance columns carry meaning.
+ * An Afghani amount.
+ *
+ * By default it renders bare grouped digits — the unit belongs in the column
+ * header ("Total (AFN)"), not repeated in every cell. Standalone figures with no
+ * header to lean on pass `unit="suffix"` to get "148,500 AFN".
  */
 export function Money({
   value,
   className,
   tone = "plain",
   sign = false,
-  symbol = true,
+  unit = "none",
+  zeroDash = false,
 }: {
   value: number;
   className?: string;
   /** "plain" = inherit, "signed" = green/red by sign, "muted" = de-emphasised. */
   tone?: "plain" | "signed" | "muted";
   sign?: boolean;
-  symbol?: boolean;
+  unit?: "none" | "suffix";
+  /** Render an em dash instead of a lone "0" — keeps sparse columns quiet. */
+  zeroDash?: boolean;
 }) {
+  if (zeroDash && Math.round(value) === 0) {
+    return <span className={cn("text-muted-foreground/50", className)}>—</span>;
+  }
+
   return (
     <span
       className={cn(
@@ -33,27 +43,29 @@ export function Money({
         className,
       )}
     >
-      {formatAfn(value, { sign, symbol })}
+      {formatAfn(value, { sign, unit })}
     </span>
   );
 }
 
-/** USD amount — what we actually paid a store or forwarder. */
+/** A USD amount — what we actually paid a store or forwarder. */
 export function MoneyUsd({
   value,
   className,
+  symbol = true,
 }: {
   value: number;
   className?: string;
+  symbol?: boolean;
 }) {
   return (
     <span className={cn("tabular whitespace-nowrap", className)}>
-      {formatUsd(value)}
+      {symbol ? formatUsd(value) : formatUsd(value).replace("$", "")}
     </span>
   );
 }
 
-/** Percentage change pill used on KPI cards. */
+/** Percentage-change pill used on KPI cards. */
 export function DeltaPill({
   value,
   className,
@@ -81,7 +93,7 @@ export function DeltaPill({
   return (
     <span
       className={cn(
-        "rounded-full px-2 py-0.5 text-[11px] font-medium tabular",
+        "tabular rounded-full px-2 py-0.5 text-[11px] font-medium",
         positive
           ? "bg-success/12 text-success"
           : "bg-destructive/10 text-destructive",

@@ -192,9 +192,9 @@ export function ClientsScreen() {
       },
       {
         id: "revenue",
-        meta: "Lifetime revenue",
+        meta: "Lifetime revenue (AFN)",
         accessorFn: (row) => row.summary.lifetimeRevenueAfn,
-        header: "Lifetime",
+        header: "Lifetime (AFN)",
         cell: ({ row }) => (
           <Money
             value={row.original.summary.lifetimeRevenueAfn}
@@ -204,9 +204,9 @@ export function ClientsScreen() {
       },
       {
         id: "balance",
-        meta: "Balance",
+        meta: "Balance (AFN)",
         accessorFn: (row) => row.summary.balanceAfn,
-        header: "Balance",
+        header: "Balance (AFN)",
         cell: ({ row }) => {
           const { balanceAfn, oldestDebtDays } = row.original.summary;
           return (
@@ -343,6 +343,7 @@ export function ClientsScreen() {
         data={filtered}
         entityName="clients"
         exportFileName="amanat-clients"
+        numericColumns={["orders", "revenue", "balance"]}
         initialSorting={[{ id: "balance", desc: true }]}
         onRowClick={(row) => router.push(`/clients/${row.client.id}`)}
         emptyIcon={UsersIcon}

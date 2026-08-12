@@ -64,6 +64,17 @@ export interface DataTableProps<TData> {
   emptyIcon?: React.ComponentType<{ className?: string }>;
   /** Turns the Export button into a CSV download of the visible rows. */
   exportFileName?: string;
+  /**
+   * Column ids holding figures. Their header and cells are right-aligned so
+   * digits line up down the column and are quick to compare.
+   */
+  numericColumns?: string[];
+  /**
+   * Columns hidden on first render. They stay available from the Columns menu —
+   * use this to keep the default view inside the viewport rather than dropping
+   * information entirely.
+   */
+  initialHiddenColumns?: string[];
   className?: string;
 }
 
@@ -79,11 +90,21 @@ export function DataTable<TData>({
   emptyDescription,
   emptyIcon,
   exportFileName,
+  numericColumns,
+  initialHiddenColumns,
   className,
 }: DataTableProps<TData>) {
+  const numeric = React.useMemo(
+    () => new Set(numericColumns ?? []),
+    [numericColumns],
+  );
   const [sorting, setSorting] = React.useState<SortingState>(initialSorting);
-  const [columnVisibility, setColumnVisibility] =
-    React.useState<VisibilityState>({});
+  const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>(
+    () =>
+      Object.fromEntries(
+        (initialHiddenColumns ?? []).map((id) => [id, false]),
+      ),
+  );
   const [pagination, setPagination] = React.useState({
     pageIndex: 0,
     pageSize: initialPageSize,
@@ -188,13 +209,20 @@ export function DataTable<TData>({
                 {headerGroup.headers.map((header) => {
                   const canSort = header.column.getCanSort();
                   const sorted = header.column.getIsSorted();
+                  const isNumeric = numeric.has(header.column.id);
                   return (
-                    <TableHead key={header.id} style={{ width: header.getSize() !== 150 ? header.getSize() : undefined }}>
+                    <TableHead
+                      key={header.id}
+                      className={cn(isNumeric && "text-right")}
+                    >
                       {header.isPlaceholder ? null : canSort ? (
                         <button
                           type="button"
                           onClick={header.column.getToggleSortingHandler()}
-                          className="hover:text-foreground -mx-1 flex items-center gap-1 rounded px-1 py-0.5 transition-colors"
+                          className={cn(
+                            "hover:text-foreground -mx-1 flex items-center gap-1 rounded px-1 py-0.5 transition-colors",
+                            isNumeric && "ml-auto flex-row-reverse",
+                          )}
                         >
                           {flexRender(
                             header.column.columnDef.header,
@@ -242,7 +270,10 @@ export function DataTable<TData>({
                   className={onRowClick ? "cursor-pointer" : undefined}
                 >
                   {row.getVisibleCells().map((cell) => (
-                    <TableCell key={cell.id}>
+                    <TableCell
+                      key={cell.id}
+                      className={cn(numeric.has(cell.column.id) && "text-right")}
+                    >
                       {flexRender(cell.column.columnDef.cell, cell.getContext())}
                     </TableCell>
                   ))}

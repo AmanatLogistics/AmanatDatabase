@@ -132,9 +132,9 @@ export function PurchasesScreen() {
       },
       {
         id: "items",
-        meta: "Items cost",
+        meta: "Items (USD)",
         accessorFn: (row) => row.purchase.itemsCostUsd,
-        header: "Items",
+        header: "Items (USD)",
         cell: ({ row }) => (
           <MoneyUsd
             value={row.original.purchase.itemsCostUsd}
@@ -144,13 +144,13 @@ export function PurchasesScreen() {
       },
       {
         id: "extras",
-        meta: "Tax & shipping",
+        meta: "Tax + ship (USD)",
         enableSorting: false,
         accessorFn: (row) =>
           row.purchase.taxUsd +
           row.purchase.domesticShippingUsd +
           row.purchase.otherCostUsd,
-        header: "Tax + ship",
+        header: "Tax + ship (USD)",
         cell: ({ row }) => {
           const { purchase } = row.original;
           const extras =
@@ -260,6 +260,7 @@ export function PurchasesScreen() {
         data={filtered}
         entityName="purchases"
         exportFileName="amanat-purchases"
+        numericColumns={["items", "extras", "totalUsd", "totalAfn"]}
         initialSorting={[{ id: "purchasedAt", desc: true }]}
         onRowClick={(row) => router.push(`/purchases/${row.purchase.id}`)}
         emptyIcon={PackageIcon}

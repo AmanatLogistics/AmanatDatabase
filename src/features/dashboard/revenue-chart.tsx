@@ -69,7 +69,7 @@ export function RevenueChart({
           cursor={{ strokeDasharray: "4 4" }}
           content={
             <ChartTooltipContent
-              formatter={(value) => formatAfn(Number(value))}
+              formatter={(value) => formatAfn(Number(value), { unit: "suffix" })}
               indicator="dot"
             />
           }

@@ -23,26 +23,6 @@ import { useDashboard, useTeam, useToday } from "@/lib/api";
 import { formatAfn, initials } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
-/** Page titles for routes the breadcrumb can't infer from a record. */
-const TITLES: Record<string, string> = {
-  "/orders": "Orders",
-  "/orders/new": "New order",
-  "/clients": "Clients",
-  "/clients/new": "New client",
-  "/purchases": "Purchases",
-  "/tracking": "Tracking",
-  "/payments": "Payments",
-  "/finance": "Finance & accounting",
-  "/finance/expenses": "Expenses",
-  "/finance/balances": "Client balances",
-  "/documents": "Documents",
-  "/settings": "Settings",
-  "/settings/stores": "Stores",
-  "/settings/payment-methods": "Payment methods",
-  "/settings/expense-categories": "Expense categories",
-  "/settings/team": "Team",
-};
-
 function greeting(hour: number): string {
   if (hour < 12) return "Good morning";
   if (hour < 17) return "Good afternoon";
@@ -62,8 +42,9 @@ export function Topbar({
   const dashboard = useDashboard();
   const owner = team[0];
 
+  // Every screen renders its own <h1> through PageHeader, so the topbar must not
+  // repeat it. It only carries the dashboard greeting plus global controls.
   const isDashboard = pathname === "/";
-  const title = TITLES[pathname] ?? "";
 
   const notifications = dashboard.attention.length;
 
@@ -80,22 +61,16 @@ export function Topbar({
       </Button>
 
       <div className="min-w-0 flex-1">
-        {isDashboard ? (
+        {isDashboard && (
           <>
             <h1 className="truncate text-[17px] leading-tight font-semibold tracking-tight">
               {greeting(today.getUTCHours())}, {owner?.name.split(" ")[0] ?? "there"}
             </h1>
             <p className="text-muted-foreground truncate text-xs">
               {dashboard.activeOrders} orders in progress ·{" "}
-              {formatAfn(dashboard.outstandingAfn)} outstanding
+              {formatAfn(dashboard.outstandingAfn, { unit: "suffix" })} outstanding
             </p>
           </>
-        ) : (
-          title && (
-            <h1 className="truncate text-[17px] font-semibold tracking-tight">
-              {title}
-            </h1>
-          )
         )}
       </div>
 

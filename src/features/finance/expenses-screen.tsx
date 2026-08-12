@@ -172,9 +172,9 @@ export function ExpensesScreen() {
       },
       {
         id: "amount",
-        meta: "Amount",
+        meta: "Amount (AFN)",
         accessorFn: (row) => row.expense.amountAfn,
-        header: "Amount",
+        header: "Amount (AFN)",
         cell: ({ row }) => (
           <Money
             value={row.original.expense.amountAfn}
@@ -207,7 +207,7 @@ export function ExpensesScreen() {
         <Card className="p-4">
           <p className="text-muted-foreground text-[13px]">This month</p>
           <p className="tabular mt-1 text-xl font-semibold">
-            {formatAfn(stats.month)}
+            {formatAfn(stats.month, { unit: "suffix" })}
           </p>
         </Card>
         <Card className="p-4">
@@ -215,13 +215,13 @@ export function ExpensesScreen() {
             Year to date {today.getUTCFullYear()}
           </p>
           <p className="tabular mt-1 text-xl font-semibold">
-            {formatAfn(stats.year)}
+            {formatAfn(stats.year, { unit: "suffix" })}
           </p>
         </Card>
         <Card className="p-4">
           <p className="text-muted-foreground text-[13px]">Filtered total</p>
           <p className="tabular mt-1 text-xl font-semibold">
-            {formatAfn(stats.filtered)}
+            {formatAfn(stats.filtered, { unit: "suffix" })}
           </p>
         </Card>
       </div>
@@ -233,6 +233,7 @@ export function ExpensesScreen() {
         data={filtered}
         entityName="expenses"
         exportFileName="amanat-expenses"
+        numericColumns={["amount"]}
         initialSorting={[{ id: "at", desc: true }]}
         emptyIcon={ReceiptTextIcon}
         emptyTitle="No expenses match these filters"

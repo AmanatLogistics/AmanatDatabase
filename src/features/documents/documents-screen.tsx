@@ -15,7 +15,6 @@ import {
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 import { DataTable } from "@/components/shared/data-table";
 import {
   CountTabs,
@@ -135,9 +134,9 @@ export function DocumentsScreen() {
       },
       {
         id: "amount",
-        meta: "Amount",
+        meta: "Amount (AFN)",
         accessorFn: (row) => row.doc.totalAfn,
-        header: "Amount",
+        header: "Amount (AFN)",
         cell: ({ row }) => {
           const { doc } = row.original;
           if (doc.kind === "shipping_label") {
@@ -182,22 +181,13 @@ export function DocumentsScreen() {
     <>
       <PageHeader
         title="Documents"
-        description="Every printable invoice, quotation, receipt, packing list and shipping label."
+        description="Generated on demand from live order data. Opening one renders a print-ready A4 sheet in a new tab."
         meta={
           <span className="text-muted-foreground text-sm">
             {rows.length} documents
           </span>
         }
       />
-
-      <Card className="bg-muted/30 p-4">
-        <p className="text-sm">
-          Documents are generated on demand from live order data — there is
-          nothing to upload or keep in sync. Opening one renders a print-ready A4
-          sheet in a new tab; use your browser&apos;s print dialog to save it as
-          a PDF or send it to the shop printer.
-        </p>
-      </Card>
 
       <CountTabs value={tab} onChange={setTab} chips={chips} />
 
@@ -206,6 +196,7 @@ export function DocumentsScreen() {
         data={filtered}
         entityName="documents"
         exportFileName="amanat-documents"
+        numericColumns={["amount"]}
         initialSorting={[{ id: "issuedAt", desc: true }]}
         emptyIcon={FileTextIcon}
         emptyTitle="No documents match these filters"

@@ -109,7 +109,7 @@ export function NewClientScreen() {
           <CardHeader>
             <CardTitle className="text-sm">Who are they?</CardTitle>
           </CardHeader>
-          <CardContent className="grid gap-4 pt-1">
+          <CardContent className="grid gap-4">
             <div className="grid gap-2">
               <Label htmlFor="client-name">Full name or business name</Label>
               <Input
@@ -146,7 +146,7 @@ export function NewClientScreen() {
           <CardHeader>
             <CardTitle className="text-sm">How do we reach them?</CardTitle>
           </CardHeader>
-          <CardContent className="grid gap-4 pt-1 sm:grid-cols-2">
+          <CardContent className="grid gap-4 sm:grid-cols-2">
             <div className="grid gap-2">
               <Label htmlFor="client-phone">Phone</Label>
               <Input
@@ -232,7 +232,7 @@ export function NewClientScreen() {
           <CardHeader>
             <CardTitle className="text-sm">Commercial terms</CardTitle>
           </CardHeader>
-          <CardContent className="grid gap-4 pt-1">
+          <CardContent className="grid gap-4">
             <div className="grid gap-2 sm:max-w-xs">
               <Label htmlFor="client-fee">Agreed service fee %</Label>
               <Input

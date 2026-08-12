@@ -21,6 +21,8 @@ type BadgeTone =
   | "success"
   | "warning"
   | "info"
+  | "teal"
+  | "purple"
   | "muted"
   | "brand"
   | "gold";
@@ -66,14 +68,15 @@ export const ORDER_STATUS: Record<OrderStatus, StatusMeta<OrderStatus>> = {
   quoted: meta("quoted", "Quoted", "info", "bg-info"),
   confirmed: meta("confirmed", "Confirmed", "brand", "bg-brand-600"),
   purchasing: meta("purchasing", "Purchasing", "warning", "bg-warning"),
-  purchased: meta("purchased", "Purchased", "gold", "bg-gold-500"),
+  purchased: meta("purchased", "Purchased", "teal", "bg-teal"),
   in_transit: meta("in_transit", "In transit", "info", "bg-info"),
-  arrived: meta("arrived", "Arrived", "brand", "bg-brand-500"),
+  arrived: meta("arrived", "Arrived", "purple", "bg-purple"),
+  // The one stage that needs the client to act, so it gets the loudest tone.
   ready_for_pickup: meta(
     "ready_for_pickup",
     "Ready for pickup",
-    "warning",
-    "bg-warning",
+    "gold",
+    "bg-gold-500",
   ),
   delivered: meta("delivered", "Delivered", "success", "bg-success"),
   cancelled: meta("cancelled", "Cancelled", "secondary", "bg-muted-foreground"),
@@ -138,8 +141,8 @@ export const PURCHASE_STATUS: Record<
   shipped_to_warehouse: meta(
     "shipped_to_warehouse",
     "To warehouse",
-    "warning",
-    "bg-warning",
+    "teal",
+    "bg-teal",
   ),
   received: meta("received", "Received", "success", "bg-success"),
   cancelled: meta("cancelled", "Cancelled", "secondary", "bg-muted-foreground"),
@@ -164,7 +167,7 @@ export const SHIPMENT_STATUS: Record<
   StatusMeta<ShipmentStatus>
 > = {
   label_created: meta("label_created", "Label created", "muted", "bg-muted-foreground"),
-  picked_up: meta("picked_up", "Picked up", "info", "bg-info"),
+  picked_up: meta("picked_up", "Picked up", "teal", "bg-teal"),
   in_transit: meta("in_transit", "In transit", "info", "bg-info"),
   customs: meta("customs", "In customs", "warning", "bg-warning"),
   out_for_delivery: meta(
@@ -191,7 +194,7 @@ export const CARRIERS = [
 /* -------------------------------------------------------------------------- */
 
 export const PAYMENT_TYPE: Record<PaymentType, StatusMeta<PaymentType>> = {
-  advance: meta("advance", "Advance", "info", "bg-info"),
+  advance: meta("advance", "Advance", "gold", "bg-gold-500"),
   partial: meta("partial", "Partial", "warning", "bg-warning"),
   final: meta("final", "Final", "success", "bg-success"),
   refund: meta("refund", "Refund", "destructive", "bg-destructive"),

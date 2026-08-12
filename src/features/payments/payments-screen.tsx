@@ -172,9 +172,9 @@ export function PaymentsScreen() {
       },
       {
         id: "amount",
-        meta: "Amount",
+        meta: "Amount (AFN)",
         accessorFn: (row) => row.payment.amountAfn,
-        header: "Amount",
+        header: "Amount (AFN)",
         cell: ({ row }) => (
           <Money
             value={row.original.payment.amountAfn}
@@ -238,19 +238,19 @@ export function PaymentsScreen() {
         <Card className="p-4">
           <p className="text-muted-foreground text-[13px]">Collected this month</p>
           <p className="tabular mt-1 text-xl font-semibold">
-            {formatAfn(stats.collectedThisMonth)}
+            {formatAfn(stats.collectedThisMonth, { unit: "suffix" })}
           </p>
         </Card>
         <Card className="p-4">
           <p className="text-muted-foreground text-[13px]">Still outstanding</p>
           <p className="tabular text-destructive mt-1 text-xl font-semibold">
-            {formatAfn(stats.outstanding)}
+            {formatAfn(stats.outstanding, { unit: "suffix" })}
           </p>
         </Card>
         <Card className="p-4">
           <p className="text-muted-foreground text-[13px]">Collected all time</p>
           <p className="tabular mt-1 text-xl font-semibold">
-            {formatAfn(stats.total)}
+            {formatAfn(stats.total, { unit: "suffix" })}
           </p>
         </Card>
       </div>
@@ -262,6 +262,7 @@ export function PaymentsScreen() {
         data={filtered}
         entityName="payments"
         exportFileName="amanat-payments"
+        numericColumns={["amount"]}
         initialSorting={[{ id: "at", desc: true }]}
         emptyIcon={WalletIcon}
         emptyTitle="No payments match these filters"

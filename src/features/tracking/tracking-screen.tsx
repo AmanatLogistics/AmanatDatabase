@@ -177,10 +177,10 @@ export function TrackingScreen() {
       },
       {
         id: "cost",
-        meta: "Freight + duty",
+        meta: "Freight + duty (AFN)",
         accessorFn: (row) =>
           row.shipment.freightCostAfn + row.shipment.customsDutyAfn,
-        header: "Freight + duty",
+        header: "Freight + duty (AFN)",
         cell: ({ row }) => {
           const { shipment } = row.original;
           return (
@@ -317,6 +317,7 @@ export function TrackingScreen() {
         data={filtered}
         entityName="shipments"
         exportFileName="amanat-shipments"
+        numericColumns={["weight", "cost"]}
         initialSorting={[{ id: "shipped", desc: true }]}
         onRowClick={(row) => router.push(`/tracking/${row.shipment.id}`)}
         emptyIcon={TruckIcon}

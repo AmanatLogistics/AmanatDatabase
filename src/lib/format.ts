@@ -16,21 +16,26 @@ const usdFormatter = new Intl.NumberFormat("en-US", {
 });
 
 /**
- * "148,500 ؋" — the reporting currency.
+ * Afghani amounts.
  *
- * The Afghani sign is a right-to-left character, so it is placed after the
- * number and the whole string is emitted inside an LTR isolate. Without that,
- * the browser reorders the symbol and negative signs land on the wrong side.
+ * The Afghani sign (؋, U+060B) is an Arabic-script glyph: next to Latin digits
+ * it renders small and off-baseline, and repeating it in every table cell reads
+ * as a rendering artifact. So amounts are formatted as bare grouped digits and
+ * the unit is carried by the column header — "Total (AFN)" — the way finance
+ * software normally does it.
+ *
+ * Pass `unit: "suffix"` for standalone figures (KPI tiles, invoice totals) that
+ * have no column header to lean on: "148,500 AFN".
  */
 export function formatAfn(
   amount: number,
-  opts: { sign?: boolean; symbol?: boolean } = {},
+  opts: { sign?: boolean; unit?: "none" | "suffix" } = {},
 ): string {
-  const { sign = false, symbol = true } = opts;
+  const { sign = false, unit = "none" } = opts;
   const abs = Math.abs(Math.round(amount));
   const body = afnFormatter.format(abs);
   const prefix = amount < 0 ? "−" : sign ? "+" : "";
-  return symbol ? `⁦${prefix}${body} ؋⁩` : `${prefix}${body}`;
+  return unit === "suffix" ? `${prefix}${body} AFN` : `${prefix}${body}`;
 }
 
 /** "$1,249.99" — what we actually paid the store. */

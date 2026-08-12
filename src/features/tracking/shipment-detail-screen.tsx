@@ -137,29 +137,32 @@ export function ShipmentDetailScreen({ shipmentId }: { shipmentId: string }) {
 
       {/* Progress rail ------------------------------------------------- */}
       <Card className="p-5">
-        <ol className="flex flex-wrap items-center gap-y-4">
+        <ol className="flex items-start gap-y-4">
           {SHIPMENT_PIPELINE.map((step, index) => {
-            const done = index < currentIndex || shipment.status === "delivered";
-            const current = index === currentIndex;
+            const done =
+              index < currentIndex || shipment.status === "delivered";
+            const current = index === currentIndex && !done;
             return (
-              <li key={step} className="flex flex-1 items-center gap-2">
-                <div className="flex flex-col items-center gap-1.5">
+              <li key={step} className="flex flex-1 items-start gap-2 last:flex-none">
+                <div className="flex w-[84px] shrink-0 flex-col items-center gap-1.5">
                   <span
                     className={cn(
-                      "flex size-7 items-center justify-center rounded-full border text-[10px] font-semibold",
+                      "flex size-7 shrink-0 items-center justify-center rounded-full border text-[10px] font-semibold",
                       done && "bg-primary border-primary text-primary-foreground",
                       current &&
-                        !done &&
                         "border-primary text-primary ring-primary/20 ring-4",
                       !done && !current && "border-border text-muted-foreground",
                     )}
                   >
                     {done ? <CheckCircle2Icon className="size-3.5" /> : index + 1}
                   </span>
+                  {/* Fixed height so two-line labels keep the rail level. */}
                   <span
                     className={cn(
-                      "max-w-[84px] text-center text-[10.5px] leading-tight",
-                      current ? "text-foreground font-medium" : "text-muted-foreground",
+                      "flex h-7 items-start justify-center text-center text-[10.5px] leading-tight text-balance",
+                      current || done
+                        ? "text-foreground font-medium"
+                        : "text-muted-foreground",
                     )}
                   >
                     {SHIPMENT_STATUS[step].label}
@@ -168,10 +171,8 @@ export function ShipmentDetailScreen({ shipmentId }: { shipmentId: string }) {
                 {index < SHIPMENT_PIPELINE.length - 1 && (
                   <span
                     className={cn(
-                      "-mt-5 h-px flex-1",
-                      index < currentIndex || shipment.status === "delivered"
-                        ? "bg-primary"
-                        : "bg-border",
+                      "mt-3.5 h-px flex-1",
+                      done ? "bg-primary" : "bg-border",
                     )}
                   />
                 )}
@@ -181,12 +182,12 @@ export function ShipmentDetailScreen({ shipmentId }: { shipmentId: string }) {
         </ol>
       </Card>
 
-      <div className="grid gap-5 xl:grid-cols-[1fr_320px]">
+      <div className="grid items-start gap-4 xl:grid-cols-[1fr_320px]">
         <Card>
           <CardHeader>
             <CardTitle className="text-sm">Delivery timeline</CardTitle>
           </CardHeader>
-          <CardContent className="pt-1">
+          <CardContent>
             <Timeline
               entries={shipment.events
                 .slice()
@@ -207,12 +208,12 @@ export function ShipmentDetailScreen({ shipmentId }: { shipmentId: string }) {
           </CardContent>
         </Card>
 
-        <div className="space-y-4">
+        <div className="space-y-4 xl:sticky xl:top-20">
           <Card>
             <CardHeader>
               <CardTitle className="text-sm">Shipment</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-3 pt-1 text-sm">
+            <CardContent className="space-y-3 text-sm">
               <Field label="Carrier" value={shipment.carrier} />
               <Field
                 label="Tracking number"
@@ -247,9 +248,14 @@ export function ShipmentDetailScreen({ shipmentId }: { shipmentId: string }) {
 
           <Card>
             <CardHeader>
-              <CardTitle className="text-sm">Landed cost</CardTitle>
+              <CardTitle className="flex items-baseline justify-between text-sm">
+                Landed cost
+                <span className="text-muted-foreground text-[11px] font-normal">
+                  AFN
+                </span>
+              </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-2 pt-1 text-sm">
+            <CardContent className="space-y-2 text-sm">
               <div className="flex items-center justify-between">
                 <span className="text-muted-foreground">Freight</span>
                 <Money value={shipment.freightCostAfn} />
@@ -273,7 +279,7 @@ export function ShipmentDetailScreen({ shipmentId }: { shipmentId: string }) {
               <CardHeader>
                 <CardTitle className="text-sm">Contents</CardTitle>
               </CardHeader>
-              <CardContent className="space-y-3 pt-1">
+              <CardContent className="space-y-3">
                 <div>
                   <Link
                     href={`/orders/${order.id}`}

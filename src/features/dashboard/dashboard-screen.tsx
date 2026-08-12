@@ -92,16 +92,16 @@ export function DashboardScreen() {
         />
         <StatCard
           label="Revenue"
-          value={formatAfn(thisMonth.revenueAfn)}
+          value={formatAfn(thisMonth.revenueAfn, { unit: "suffix" })}
           delta={deltaPercent(thisMonth.revenueAfn, lastMonth.revenueAfn)}
-          caption={`${formatAfn(yearToDate.revenueAfn)} year to date`}
+          caption={`${formatAfn(yearToDate.revenueAfn, { unit: "suffix" })} year to date`}
           progress={(thisMonth.revenueAfn / peakRevenue) * 100}
           icon={TrendingUpIcon}
           accent="gold"
         />
         <StatCard
           label="Gross profit"
-          value={formatAfn(thisMonth.grossProfitAfn)}
+          value={formatAfn(thisMonth.grossProfitAfn, { unit: "suffix" })}
           delta={deltaPercent(thisMonth.grossProfitAfn, lastMonth.grossProfitAfn)}
           caption={`${formatPercent(thisMonth.grossMarginPercent)} margin`}
           progress={(thisMonth.grossProfitAfn / peakProfit) * 100}
@@ -110,7 +110,7 @@ export function DashboardScreen() {
         />
         <StatCard
           label="Outstanding"
-          value={formatAfn(data.outstandingAfn)}
+          value={formatAfn(data.outstandingAfn, { unit: "suffix" })}
           caption="owed by clients across all orders"
           progress={
             yearToDate.revenueAfn > 0
@@ -123,7 +123,7 @@ export function DashboardScreen() {
       </div>
 
       {/* Chart + status ------------------------------------------------ */}
-      <div className="grid gap-5 xl:grid-cols-[1fr_360px]">
+      <div className="grid items-start gap-4 xl:grid-cols-[1fr_360px]">
         <Card>
           <CardHeader>
             <div className="flex flex-wrap items-start justify-between gap-3">
@@ -145,7 +145,7 @@ export function DashboardScreen() {
               </Select>
             </div>
           </CardHeader>
-          <CardContent className="pt-0">
+          <CardContent>
             <RevenueChart data={data.monthly} months={Number(range)} />
           </CardContent>
         </Card>
@@ -157,7 +157,7 @@ export function DashboardScreen() {
               Where every order sits in the pipeline
             </p>
           </CardHeader>
-          <CardContent className="pt-0">
+          <CardContent>
             <StatusDonut
               data={data.ordersByStatus}
               total={data.ordersByStatus.reduce((sum, s) => sum + s.count, 0)}
@@ -177,7 +177,7 @@ export function DashboardScreen() {
               </Button>
             </div>
           </CardHeader>
-          <CardContent className="space-y-3 pt-0">
+          <CardContent className="space-y-3">
             <ProfitRow
               accent="bg-brand-700/10 text-brand-700 dark:bg-brand-400/15 dark:text-brand-300"
               icon={TrendingUpIcon}
@@ -210,11 +210,12 @@ export function DashboardScreen() {
                 <Money
                   value={thisMonth.netProfitAfn}
                   tone="signed"
+                  unit="suffix"
                   className="font-semibold"
                 />
               </div>
               <p className="text-muted-foreground text-xs">
-                After {formatAfn(thisMonth.expensesAfn)} of operating expenses
+                After {formatAfn(thisMonth.expensesAfn, { unit: "suffix" })} of operating expenses
               </p>
             </div>
           </CardContent>
@@ -224,10 +225,10 @@ export function DashboardScreen() {
           <CardHeader>
             <CardTitle className="text-base">Where we buy</CardTitle>
             <p className="text-muted-foreground text-xs">
-              Revenue attributed by source store
+              Revenue attributed by source store, in AFN
             </p>
           </CardHeader>
-          <CardContent className="space-y-3.5 pt-0">
+          <CardContent className="space-y-3.5">
             {data.salesByStore.map((store, index) => (
               <div key={store.storeId} className="space-y-1.5">
                 <div className="flex items-center justify-between text-[13px]">
@@ -257,7 +258,7 @@ export function DashboardScreen() {
               Things that will not resolve themselves
             </p>
           </CardHeader>
-          <CardContent className="pt-0">
+          <CardContent>
             {data.attention.length === 0 ? (
               <EmptyState
                 title="All clear"
@@ -310,7 +311,7 @@ export function DashboardScreen() {
 
       {/* Recent orders ------------------------------------------------- */}
       <Card className="overflow-hidden py-0">
-        <div className="flex items-center justify-between px-5 pt-5 pb-3">
+        <div className="flex items-center justify-between px-4 pt-4 pb-3">
           <div>
             <CardTitle className="text-base">Recent orders</CardTitle>
             <p className="text-muted-foreground text-xs">
@@ -479,7 +480,7 @@ function ProfitRow({
       </span>
       <span className="min-w-0 flex-1">
         <span className="tabular block text-[15px] font-semibold">
-          {formatAfn(value)}
+          {formatAfn(value, { unit: "suffix" })}
         </span>
         <span className="text-muted-foreground block text-xs">{label}</span>
       </span>

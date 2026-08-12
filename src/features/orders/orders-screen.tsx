@@ -171,7 +171,7 @@ export function OrdersScreen() {
         cell: ({ row }) => {
           const { order } = row.original;
           return (
-            <div className="flex flex-col">
+            <div className="flex flex-col whitespace-nowrap">
               <span className="tabular text-[13px] font-medium">
                 {order.orderNo}
               </span>
@@ -190,11 +190,14 @@ export function OrdersScreen() {
         cell: ({ row }) => {
           const { client } = row.original;
           return (
-            <div className="flex flex-col">
-              <span className="text-[13px] font-medium">
+            <div className="flex max-w-[170px] flex-col">
+              <span
+                className="truncate text-[13px] font-medium"
+                title={client?.name}
+              >
                 {client?.name ?? "—"}
               </span>
-              <span className="text-muted-foreground text-xs">
+              <span className="text-muted-foreground truncate text-xs">
                 {client?.city ?? ""}
               </span>
             </div>
@@ -211,7 +214,7 @@ export function OrdersScreen() {
           const { order, unitCount } = row.original;
           const first = order.items[0];
           return (
-            <div className="flex min-w-[220px] items-center gap-2.5">
+            <div className="flex min-w-[190px] items-center gap-2.5">
               {first && (
                 <ProductThumb
                   size="sm"
@@ -222,7 +225,7 @@ export function OrdersScreen() {
               )}
               <div className="min-w-0">
                 <p className="truncate text-[13px]">
-                  {first ? truncate(first.name, 34) : "—"}
+                  {first ? truncate(first.name, 30) : "—"}
                 </p>
                 <p className="text-muted-foreground text-xs">
                   {order.items.length > 1
@@ -236,9 +239,9 @@ export function OrdersScreen() {
       },
       {
         id: "total",
-        meta: "Total",
+        meta: "Total (AFN)",
         accessorFn: (row) => row.economics.revenue.totalAfn,
-        header: "Total",
+        header: "Total (AFN)",
         cell: ({ row }) => (
           <Money
             value={row.original.economics.revenue.totalAfn}
@@ -248,30 +251,32 @@ export function OrdersScreen() {
       },
       {
         id: "paid",
-        meta: "Paid",
+        meta: "Paid (AFN)",
         accessorFn: (row) => row.economics.paidAfn,
-        header: "Paid",
+        header: "Paid (AFN)",
         cell: ({ row }) => (
           <Money
             value={row.original.economics.paidAfn}
             tone="muted"
+            zeroDash
             className="text-[13px]"
           />
         ),
       },
       {
         id: "balance",
-        meta: "Balance",
+        meta: "Balance (AFN)",
         accessorFn: (row) => row.economics.balanceAfn,
-        header: "Balance",
+        header: "Balance (AFN)",
         cell: ({ row }) => {
           const balance = row.original.economics.balanceAfn;
           return (
             <Money
               value={balance}
+              zeroDash
               className={cn(
                 "text-[13px] font-medium",
-                balance > 0 ? "text-destructive" : "text-success",
+                balance > 0 && "text-destructive",
               )}
             />
           );
@@ -279,23 +284,23 @@ export function OrdersScreen() {
       },
       {
         id: "profit",
-        meta: "Profit",
+        meta: "Profit (AFN)",
         accessorFn: (row) => row.economics.grossProfitAfn,
-        header: "Profit",
+        header: "Profit (AFN)",
         cell: ({ row }) => {
           const { grossProfitAfn, marginPercent, cost } = row.original.economics;
+          // Margin sits inline with the figure so every row stays one line tall.
           return (
-            <div className="flex flex-col">
+            <span className="flex items-baseline justify-end gap-1.5 whitespace-nowrap">
               <Money
                 value={grossProfitAfn}
                 tone="signed"
                 className="text-[13px] font-medium"
               />
               <span className="text-muted-foreground tabular text-xs">
-                {marginPercent.toFixed(1)}%
-                {cost.estimated && " est."}
+                {marginPercent.toFixed(0)}%{cost.estimated && "*"}
               </span>
-            </div>
+            </span>
           );
         },
       },
@@ -417,6 +422,8 @@ export function OrdersScreen() {
         data={filtered}
         entityName="orders"
         exportFileName="amanat-orders"
+        numericColumns={["total", "paid", "balance", "profit"]}
+        initialHiddenColumns={["paid"]}
         initialSorting={[{ id: "requested", desc: true }]}
         onRowClick={(row) => router.push(`/orders/${row.order.id}`)}
         emptyIcon={ShoppingCartIcon}

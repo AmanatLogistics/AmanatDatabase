@@ -160,7 +160,7 @@ export function FinanceScreen() {
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard
           label="Revenue"
-          value={formatAfn(pnl.revenueAfn)}
+          value={formatAfn(pnl.revenueAfn, { unit: "suffix" })}
           delta={deltaPercent(pnl.revenueAfn, previousPnl.revenueAfn)}
           deltaSuffix="vs previous period"
           caption={`${pnl.orderCount} billable orders`}
@@ -169,7 +169,7 @@ export function FinanceScreen() {
         />
         <StatCard
           label="Gross profit"
-          value={formatAfn(pnl.grossProfitAfn)}
+          value={formatAfn(pnl.grossProfitAfn, { unit: "suffix" })}
           delta={deltaPercent(pnl.grossProfitAfn, previousPnl.grossProfitAfn)}
           deltaSuffix="vs previous period"
           caption={`${formatPercent(pnl.grossMarginPercent)} margin`}
@@ -177,7 +177,7 @@ export function FinanceScreen() {
         />
         <StatCard
           label="Operating expenses"
-          value={formatAfn(pnl.expensesAfn)}
+          value={formatAfn(pnl.expensesAfn, { unit: "suffix" })}
           delta={deltaPercent(pnl.expensesAfn, previousPnl.expensesAfn)}
           deltaSuffix="vs previous period"
           caption={`${pnl.expenseBreakdown.length} categories`}
@@ -185,7 +185,7 @@ export function FinanceScreen() {
         />
         <StatCard
           label="Net profit"
-          value={formatAfn(pnl.netProfitAfn)}
+          value={formatAfn(pnl.netProfitAfn, { unit: "suffix" })}
           delta={deltaPercent(pnl.netProfitAfn, previousPnl.netProfitAfn)}
           deltaSuffix="vs previous period"
           caption={`${formatPercent(pnl.netMarginPercent)} net margin`}
@@ -193,7 +193,7 @@ export function FinanceScreen() {
         />
       </div>
 
-      <div className="grid gap-5 xl:grid-cols-[1fr_400px]">
+      <div className="grid items-start gap-4 xl:grid-cols-[1fr_400px]">
         {/* P&L statement -------------------------------------------- */}
         <Card>
           <CardHeader>
@@ -202,7 +202,7 @@ export function FinanceScreen() {
               {formatDate(from)} — {formatDate(to)}
             </p>
           </CardHeader>
-          <CardContent className="space-y-1 pt-1 text-sm">
+          <CardContent className="space-y-1 text-sm">
             <PnlRow label="Revenue from clients" value={pnl.revenueAfn} strong />
             <PnlRow
               label="Cost of goods, freight and duty"
@@ -270,7 +270,7 @@ export function FinanceScreen() {
                 Where the operating money goes
               </p>
             </CardHeader>
-            <CardContent className="pt-0">
+            <CardContent>
               {pnl.expenseBreakdown.length === 0 ? (
                 <p className="text-muted-foreground py-8 text-center text-sm">
                   No expenses recorded in this period.
@@ -285,7 +285,7 @@ export function FinanceScreen() {
                       content={
                         <ChartTooltipContent
                           hideLabel
-                          formatter={(value) => formatAfn(Number(value))}
+                          formatter={(value) => formatAfn(Number(value), { unit: "suffix" })}
                         />
                       }
                     />
@@ -337,7 +337,7 @@ export function FinanceScreen() {
                 </Button>
               </div>
             </CardHeader>
-            <CardContent className="space-y-2.5 pt-0 text-sm">
+            <CardContent className="space-y-2.5 text-sm">
               {(
                 Object.keys(AGING_BUCKET_LABEL) as Array<
                   keyof typeof AGING_BUCKET_LABEL
@@ -387,7 +387,7 @@ export function FinanceScreen() {
             Gross profit against operating expenses, in AFN
           </p>
         </CardHeader>
-        <CardContent className="pt-0">
+        <CardContent>
           <ChartContainer
             config={trendConfig}
             className="aspect-auto h-[260px] w-full"
@@ -412,7 +412,7 @@ export function FinanceScreen() {
                 cursor={{ fill: "var(--color-muted)", opacity: 0.4 }}
                 content={
                   <ChartTooltipContent
-                    formatter={(value) => formatAfn(Number(value))}
+                    formatter={(value) => formatAfn(Number(value), { unit: "suffix" })}
                   />
                 }
               />

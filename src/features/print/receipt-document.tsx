@@ -62,7 +62,7 @@ export function ReceiptDocument({ paymentId }: { paymentId: string }) {
             Amount received
           </p>
           <p className="text-3xl font-bold tracking-tight text-neutral-900">
-            {formatAfn(payment.amountAfn)}
+            {formatAfn(payment.amountAfn, { unit: "suffix" })}
           </p>
           {payment.reference && (
             <p className="mt-1 font-mono text-[11px] text-neutral-500">
@@ -93,7 +93,7 @@ export function ReceiptDocument({ paymentId }: { paymentId: string }) {
                 : "Unallocated credit on the client account"}
             </td>
             <td className="px-2 py-3 text-right font-mono font-medium">
-              {formatAfn(payment.amountAfn, { symbol: false })}
+              {formatAfn(payment.amountAfn)}
             </td>
           </tr>
         </tbody>
@@ -105,19 +105,19 @@ export function ReceiptDocument({ paymentId }: { paymentId: string }) {
             <div className="flex items-center justify-between py-0.5">
               <span className="text-neutral-600">Order total</span>
               <span className="font-mono">
-                {formatAfn(orderRow.economics.revenue.totalAfn, { symbol: false })}
+                {formatAfn(orderRow.economics.revenue.totalAfn)}
               </span>
             </div>
             <div className="flex items-center justify-between py-0.5">
               <span className="text-neutral-600">Total paid to date</span>
               <span className="font-mono">
-                {formatAfn(orderRow.economics.paidAfn, { symbol: false })}
+                {formatAfn(orderRow.economics.paidAfn)}
               </span>
             </div>
             <div className="mt-1 flex items-center justify-between border-t border-neutral-300 pt-2 text-sm font-bold">
               <span>Remaining balance</span>
               <span className="font-mono">
-                {formatAfn(orderRow.economics.balanceAfn)}
+                {formatAfn(orderRow.economics.balanceAfn, { unit: "suffix" })}
               </span>
             </div>
           </div>

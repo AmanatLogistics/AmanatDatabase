@@ -168,14 +168,14 @@ export function NewOrderScreen() {
         description="Capture a client request — the links, quantities and the price you quoted."
       />
 
-      <div className="grid gap-5 xl:grid-cols-[1fr_340px]">
+      <div className="grid items-start gap-4 xl:grid-cols-[1fr_340px]">
         <div className="min-w-0 space-y-5">
           {/* Client & channel ------------------------------------------ */}
           <Card>
             <CardHeader>
               <CardTitle className="text-sm">Client</CardTitle>
             </CardHeader>
-            <CardContent className="grid gap-4 pt-1 sm:grid-cols-2">
+            <CardContent className="grid gap-4 sm:grid-cols-2">
               <div className="grid gap-2">
                 <Label htmlFor="order-client">Who is this for?</Label>
                 <Select value={clientId} onValueChange={setClientId}>
@@ -227,7 +227,7 @@ export function NewOrderScreen() {
                 price you are quoting them.
               </p>
             </CardHeader>
-            <CardContent className="space-y-4 pt-1">
+            <CardContent className="space-y-4">
               {items.map((item, index) => (
                 <ItemFields
                   key={item.key}
@@ -264,7 +264,7 @@ export function NewOrderScreen() {
             <CardHeader>
               <CardTitle className="text-sm">Internal note</CardTitle>
             </CardHeader>
-            <CardContent className="pt-1">
+            <CardContent>
               <Textarea
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
@@ -281,7 +281,7 @@ export function NewOrderScreen() {
             <CardHeader>
               <CardTitle className="text-sm">Quotation</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4 pt-1">
+            <CardContent className="space-y-4">
               <div className="grid grid-cols-3 gap-2">
                 <div className="grid gap-1.5">
                   <Label htmlFor="order-fee" className="text-xs">
@@ -341,6 +341,7 @@ export function NewOrderScreen() {
                 </div>
               </div>
 
+              {validItems.length > 0 && (
               <div className="bg-muted/40 space-y-1 rounded-lg border p-3 text-xs">
                 <div className="flex items-center justify-between">
                   <span className="text-muted-foreground">Estimated cost</span>
@@ -359,6 +360,7 @@ export function NewOrderScreen() {
                   freight are logged.
                 </p>
               </div>
+              )}
 
               <Button
                 className="w-full"
@@ -566,7 +568,7 @@ function ItemFields({
           </div>
 
           <div className="grid gap-2">
-            <Label htmlFor={field("price")}>Client price (؋/unit)</Label>
+            <Label htmlFor={field("price")}>Client price (AFN/unit)</Label>
             <Input
               id={field("price")}
               inputMode="numeric"

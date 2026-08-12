@@ -80,32 +80,38 @@ export const navigation: NavSection[] = [
   {
     caption: "System",
     items: [
-      {
-        label: "Settings",
-        href: "/settings",
-        icon: SettingsIcon,
-        children: [
-          { label: "Company profile", href: "/settings", icon: BuildingIcon },
-          { label: "Stores", href: "/settings/stores", icon: ShoppingCartIcon },
-          {
-            label: "Payment methods",
-            href: "/settings/payment-methods",
-            icon: CreditCardIcon,
-          },
-          {
-            label: "Expense categories",
-            href: "/settings/expense-categories",
-            icon: TagsIcon,
-          },
-          { label: "Team", href: "/settings/team", icon: UsersRoundIcon },
-        ],
-      },
+      /*
+       * No `children` here on purpose: the Settings screen renders its own
+       * sub-navigation column, so expanding the same five links in the sidebar
+       * would show the identical list twice.
+       */
+      { label: "Settings", href: "/settings", icon: SettingsIcon },
     ],
   },
 ];
 
+/**
+ * Settings sub-pages. Rendered as the in-page column on /settings and folded
+ * into the ⌘K palette below — the sidebar deliberately does not repeat them.
+ */
+export const settingsPages = [
+  { label: "Company profile", href: "/settings", icon: BuildingIcon },
+  { label: "Stores", href: "/settings/stores", icon: ShoppingCartIcon },
+  {
+    label: "Payment methods",
+    href: "/settings/payment-methods",
+    icon: CreditCardIcon,
+  },
+  {
+    label: "Expense categories",
+    href: "/settings/expense-categories",
+    icon: TagsIcon,
+  },
+  { label: "Team", href: "/settings/team", icon: UsersRoundIcon },
+];
+
 /** Flat list of every navigable page, used by the ⌘K palette. */
-export const allNavLinks = navigation.flatMap((section) =>
+const sidebarLinks = navigation.flatMap((section) =>
   section.items.flatMap((item) =>
     item.children
       ? item.children.map((child) => ({
@@ -124,3 +130,12 @@ export const allNavLinks = navigation.flatMap((section) =>
         ],
   ),
 );
+
+export const allNavLinks = [
+  ...sidebarLinks,
+  // The settings sub-pages are still reachable from the palette even though the
+  // sidebar links only to the settings landing page.
+  ...settingsPages
+    .filter((page) => page.href !== "/settings")
+    .map((page) => ({ ...page, section: "Settings" })),
+];

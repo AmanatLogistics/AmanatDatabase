@@ -198,12 +198,12 @@ export function OrderDetailScreen({ orderId }: { orderId: string }) {
         <OrderStatusStepper status={order.status} />
       </Card>
 
-      <div className="grid gap-5 xl:grid-cols-[1fr_320px]">
+      <div className="grid items-start gap-4 xl:grid-cols-[1fr_320px]">
         {/* ------------------------------------------------------------- */}
         {/* Main column                                                    */}
         {/* ------------------------------------------------------------- */}
         <div className="min-w-0">
-          <Tabs defaultValue="items">
+          <Tabs defaultValue="items" className="xl:min-h-[460px]">
             <TabsList>
               <TabsTrigger value="items">
                 Items
@@ -236,8 +236,8 @@ export function OrderDetailScreen({ orderId }: { orderId: string }) {
                       <TableHead>Product</TableHead>
                       <TableHead>Store</TableHead>
                       <TableHead className="text-right">Qty</TableHead>
-                      <TableHead className="text-right">Unit price</TableHead>
-                      <TableHead className="text-right">Line total</TableHead>
+                      <TableHead className="text-right">Unit price (AFN)</TableHead>
+                      <TableHead className="text-right">Line total (AFN)</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -304,7 +304,7 @@ export function OrderDetailScreen({ orderId }: { orderId: string }) {
                   </TableBody>
                 </Table>
 
-                <div className="bg-muted/25 space-y-1.5 border-t px-5 py-4 text-sm">
+                <div className="bg-muted/25 space-y-1.5 border-t px-4 py-3.5 text-sm">
                   <SummaryLine label="Items subtotal" value={economics.revenue.itemsAfn} />
                   <SummaryLine
                     label={`Service fee (${order.serviceFeeValue}%)`}
@@ -330,7 +330,7 @@ export function OrderDetailScreen({ orderId }: { orderId: string }) {
                   <CardHeader>
                     <CardTitle className="text-sm">Order note</CardTitle>
                   </CardHeader>
-                  <CardContent className="pt-0 text-sm">{order.notes}</CardContent>
+                  <CardContent className="text-sm">{order.notes}</CardContent>
                 </Card>
               )}
             </TabsContent>
@@ -378,7 +378,7 @@ export function OrderDetailScreen({ orderId }: { orderId: string }) {
                             {purchase.purchasedBy}
                           </p>
                         </CardHeader>
-                        <CardContent className="pt-1">
+                        <CardContent>
                           <dl className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-sm sm:grid-cols-4">
                             <CostCell label="Items" value={purchase.itemsCostUsd} />
                             <CostCell label="Tax" value={purchase.taxUsd} />
@@ -458,7 +458,7 @@ export function OrderDetailScreen({ orderId }: { orderId: string }) {
                       </div>
                     </div>
                   </CardHeader>
-                  <CardContent className="space-y-4 pt-1">
+                  <CardContent className="space-y-4">
                     <dl className="grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
                       <Field label="Route" value={`${shipment.origin.split(",")[0]} → ${shipment.destination.split(",")[0]}`} />
                       <Field label="Shipped" value={formatDate(shipment.shippedAt)} />
@@ -505,7 +505,7 @@ export function OrderDetailScreen({ orderId }: { orderId: string }) {
                           <TableHead>Date</TableHead>
                           <TableHead>Method</TableHead>
                           <TableHead>Type</TableHead>
-                          <TableHead className="text-right">Amount</TableHead>
+                          <TableHead className="text-right">Amount (AFN)</TableHead>
                           <TableHead />
                         </TableRow>
                       </TableHeader>
@@ -549,7 +549,7 @@ export function OrderDetailScreen({ orderId }: { orderId: string }) {
                         ))}
                       </TableBody>
                     </Table>
-                    <div className="bg-muted/25 flex items-center justify-between border-t px-5 py-3.5 text-sm">
+                    <div className="bg-muted/25 flex items-center justify-between border-t px-4 py-3 text-sm">
                       <span className="text-muted-foreground">
                         Paid {formatPercent(
                           economics.revenue.totalAfn > 0
@@ -630,12 +630,17 @@ export function OrderDetailScreen({ orderId }: { orderId: string }) {
         {/* ------------------------------------------------------------- */}
         {/* Right rail                                                     */}
         {/* ------------------------------------------------------------- */}
-        <div className="space-y-4">
+        <div className="space-y-4 xl:sticky xl:top-20">
           <Card>
             <CardHeader>
-              <CardTitle className="text-sm">Financial summary</CardTitle>
+              <CardTitle className="flex items-baseline justify-between text-sm">
+                Financial summary
+                <span className="text-muted-foreground text-[11px] font-normal">
+                  AFN
+                </span>
+              </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-2 pt-1 text-sm">
+            <CardContent className="space-y-2 text-sm">
               <SummaryLine label="Revenue" value={economics.revenue.totalAfn} />
               <SummaryLine
                 label="Goods cost"
@@ -694,7 +699,7 @@ export function OrderDetailScreen({ orderId }: { orderId: string }) {
               <CardHeader>
                 <CardTitle className="text-sm">Client</CardTitle>
               </CardHeader>
-              <CardContent className="space-y-3 pt-1">
+              <CardContent className="space-y-3">
                 <div>
                   <Link
                     href={`/clients/${client.id}`}
@@ -731,7 +736,7 @@ export function OrderDetailScreen({ orderId }: { orderId: string }) {
             <CardHeader>
               <CardTitle className="text-sm">Quick actions</CardTitle>
             </CardHeader>
-            <CardContent className="grid gap-2 pt-1">
+            <CardContent className="grid gap-2">
               <Button
                 variant="outline"
                 size="sm"
@@ -741,16 +746,29 @@ export function OrderDetailScreen({ orderId }: { orderId: string }) {
                 <PackagePlusIcon />
                 Log purchase
               </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                className="justify-start"
-                onClick={() => setTrackingOpen(true)}
-                disabled={!!shipment}
-              >
-                <TruckIcon />
-                {shipment ? "Tracking added" : "Add tracking"}
-              </Button>
+              {shipment ? (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="justify-start"
+                  asChild
+                >
+                  <Link href={`/tracking/${shipment.id}`}>
+                    <TruckIcon />
+                    View tracking
+                  </Link>
+                </Button>
+              ) : (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="justify-start"
+                  onClick={() => setTrackingOpen(true)}
+                >
+                  <TruckIcon />
+                  Add tracking
+                </Button>
+              )}
               <Button variant="outline" size="sm" className="justify-start" asChild>
                 <Link href={`/print/quotation/${order.id}`} target="_blank">
                   <PrinterIcon />

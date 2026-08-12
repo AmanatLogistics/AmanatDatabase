@@ -52,7 +52,7 @@ export function CompanySettingsScreen() {
         <CardHeader>
           <CardTitle className="text-sm">Brand</CardTitle>
         </CardHeader>
-        <CardContent className="pt-1">
+        <CardContent>
           <div className="flex flex-wrap items-center gap-5">
             <div className="brand-gradient flex size-24 items-center justify-center rounded-xl">
               <Logo showWordmark={false} className="scale-150" />
@@ -83,7 +83,7 @@ export function CompanySettingsScreen() {
         <CardHeader>
           <CardTitle className="text-sm">Company details</CardTitle>
         </CardHeader>
-        <CardContent className="grid gap-4 pt-1 sm:grid-cols-2">
+        <CardContent className="grid gap-4 sm:grid-cols-2">
           <Field
             label="Trading name"
             value={draft.name}
@@ -144,7 +144,7 @@ export function CompanySettingsScreen() {
             their own.
           </p>
         </CardHeader>
-        <CardContent className="grid gap-4 pt-1 sm:grid-cols-2 lg:grid-cols-4">
+        <CardContent className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <div className="grid gap-2">
             <Label htmlFor="setting-currency">Reporting currency</Label>
             <Input id="setting-currency" value={draft.currency} disabled />
@@ -195,7 +195,7 @@ export function CompanySettingsScreen() {
         <CardHeader>
           <CardTitle className="text-sm">Document wording</CardTitle>
         </CardHeader>
-        <CardContent className="grid gap-4 pt-1">
+        <CardContent className="grid gap-4">
           <div className="grid gap-2">
             <Label htmlFor="setting-footer">Invoice footer</Label>
             <Textarea

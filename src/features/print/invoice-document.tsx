@@ -79,11 +79,11 @@ export function InvoiceDocument({
             {isInvoice ? "Amount due" : "Quoted total"}
           </p>
           <p className="text-3xl font-bold tracking-tight text-neutral-900">
-            {formatAfn(isInvoice ? economics.balanceAfn : economics.revenue.totalAfn)}
+            {formatAfn(isInvoice ? economics.balanceAfn : economics.revenue.totalAfn, { unit: "suffix" })}
           </p>
           <p className="mt-1 text-[11px] text-neutral-500">
             {isInvoice
-              ? `of ${formatAfn(economics.revenue.totalAfn)} total`
+              ? `of ${formatAfn(economics.revenue.totalAfn, { unit: "suffix" })} total`
               : "excluding customs charges payable on arrival"}
           </p>
         </div>
@@ -116,10 +116,10 @@ export function InvoiceDocument({
                 </td>
                 <td className="px-2 py-2.5 text-right font-mono">{item.qty}</td>
                 <td className="px-2 py-2.5 text-right font-mono">
-                  {formatAfn(item.unitPriceAfn, { symbol: false })}
+                  {formatAfn(item.unitPriceAfn)}
                 </td>
                 <td className="px-2 py-2.5 text-right font-mono font-medium">
-                  {formatAfn(item.unitPriceAfn * item.qty, { symbol: false })}
+                  {formatAfn(item.unitPriceAfn * item.qty)}
                 </td>
               </tr>
             );
@@ -162,7 +162,7 @@ export function InvoiceDocument({
                       {method?.name}
                     </span>
                     <span className="font-mono">
-                      −{formatAfn(payment.amountAfn, { symbol: false })}
+                      −{formatAfn(payment.amountAfn)}
                     </span>
                   </div>
                 ))}
@@ -173,7 +173,7 @@ export function InvoiceDocument({
               <div className="flex items-center justify-between border-t border-neutral-300 pt-2 text-sm font-bold">
                 <span>Balance due</span>
                 <span className="font-mono">
-                  {formatAfn(economics.balanceAfn)}
+                  {formatAfn(economics.balanceAfn, { unit: "suffix" })}
                 </span>
               </div>
             </>
@@ -208,7 +208,7 @@ function TotalRow({ label, value }: { label: string; value: number }) {
   return (
     <div className="flex items-center justify-between py-0.5">
       <span className="text-neutral-600">{label}</span>
-      <span className="font-mono">{formatAfn(value, { symbol: false })}</span>
+      <span className="font-mono">{formatAfn(value)}</span>
     </div>
   );
 }

@@ -79,7 +79,7 @@ export function BalancesScreen() {
                 bucket === "d31_60" && "text-warning-foreground dark:text-warning",
               )}
             >
-              {formatAfn(totals[bucket] ?? 0)}
+              {formatAfn(totals[bucket] ?? 0, { unit: "suffix" })}
             </p>
             <p className="text-muted-foreground mt-1 text-xs">
               {grandTotal > 0
@@ -91,7 +91,7 @@ export function BalancesScreen() {
       </div>
 
       <Card className="overflow-hidden py-0">
-        <CardHeader className="px-5 pt-5">
+        <CardHeader>
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <CardTitle className="text-base">Ageing report</CardTitle>
@@ -133,7 +133,7 @@ export function BalancesScreen() {
                       {AGING_BUCKET_LABEL[bucket]}
                     </TableHead>
                   ))}
-                  <TableHead className="text-right">Total owed</TableHead>
+                  <TableHead className="text-right">Total owed (AFN)</TableHead>
                   <TableHead />
                 </TableRow>
               </TableHeader>

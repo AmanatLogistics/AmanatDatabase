@@ -31,25 +31,28 @@ export function OrderStatusStepper({
   }
 
   const currentIndex = ORDER_PIPELINE.indexOf(status);
+  // The last stage is the finish line: once an order reaches it there is nothing
+  // left to do, so it renders complete rather than "in progress".
+  const isFinished = currentIndex === ORDER_PIPELINE.length - 1;
 
   return (
     <ol
       className={cn(
-        "scrollbar-thin flex items-center gap-0 overflow-x-auto pb-1",
+        "scrollbar-thin flex items-start gap-0 overflow-x-auto pb-1",
         className,
       )}
     >
       {ORDER_PIPELINE.map((step, index) => {
-        const done = index < currentIndex;
-        const current = index === currentIndex;
+        const done = index < currentIndex || (isFinished && index === currentIndex);
+        const current = index === currentIndex && !isFinished;
         const meta = ORDER_STATUS[step];
 
         return (
-          <li key={step} className="flex shrink-0 items-center">
-            <div className="flex flex-col items-center gap-1.5 px-1">
+          <li key={step} className="flex shrink-0 items-start">
+            <div className="flex w-[76px] flex-col items-center gap-1.5">
               <span
                 className={cn(
-                  "flex size-6 items-center justify-center rounded-full border text-[10px] font-semibold transition-colors",
+                  "flex size-6 shrink-0 items-center justify-center rounded-full border text-[10px] font-semibold transition-colors",
                   done && "bg-primary border-primary text-primary-foreground",
                   current &&
                     "border-primary text-primary ring-primary/20 bg-background ring-4",
@@ -58,10 +61,11 @@ export function OrderStatusStepper({
               >
                 {done ? <CheckIcon className="size-3" /> : index + 1}
               </span>
+              {/* Fixed height keeps two-line labels from shifting the rail. */}
               <span
                 className={cn(
-                  "max-w-[74px] text-center text-[10.5px] leading-tight",
-                  current
+                  "flex h-7 items-start justify-center text-center text-[10.5px] leading-tight text-balance",
+                  current || done
                     ? "text-foreground font-medium"
                     : "text-muted-foreground",
                 )}
@@ -72,8 +76,8 @@ export function OrderStatusStepper({
             {index < ORDER_PIPELINE.length - 1 && (
               <span
                 className={cn(
-                  "-mt-5 h-px w-6 sm:w-9",
-                  index < currentIndex ? "bg-primary" : "bg-border",
+                  "mt-3 h-px w-4 shrink-0 sm:w-8",
+                  done ? "bg-primary" : "bg-border",
                 )}
               />
             )}
