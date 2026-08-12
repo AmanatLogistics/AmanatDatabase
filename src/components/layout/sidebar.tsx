@@ -17,7 +17,7 @@ import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { navigation, type NavItem } from "@/components/layout/nav-config";
-import { useDashboard, useTeam } from "@/lib/api";
+import { useNavCounts, useTeam } from "@/lib/api";
 import { initials } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
@@ -40,14 +40,14 @@ export function Sidebar({
   onNavigate?: () => void;
 }) {
   const pathname = usePathname();
-  const dashboard = useDashboard();
+  const nav = useNavCounts();
   const team = useTeam();
   const owner = team[0];
 
   const badgeCounts: Record<string, number> = {
-    activeOrders: dashboard.activeOrders,
-    customsHolds: dashboard.attention.filter((a) => a.kind === "customs").length,
-    overdueClients: dashboard.attention.filter((a) => a.kind === "overdue").length,
+    activeOrders: nav.activeOrders,
+    customsHolds: nav.customsHolds,
+    overdueClients: nav.attention.filter((a) => a.kind === "overdue").length,
   };
 
   return (

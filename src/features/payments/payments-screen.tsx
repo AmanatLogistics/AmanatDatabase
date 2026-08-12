@@ -219,7 +219,6 @@ export function PaymentsScreen() {
   return (
     <>
       <PageHeader
-        title="Payments"
         description="Money in from clients — advances, settlements and refunds."
         meta={
           <span className="text-muted-foreground text-sm">

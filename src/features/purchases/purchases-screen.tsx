@@ -15,12 +15,22 @@ import {
   ResetFiltersButton,
   SearchInput,
 } from "@/components/shared/filter-bar";
-import { Money, MoneyUsd } from "@/components/shared/money";
+import { Money } from "@/components/shared/money";
 import { PageHeader } from "@/components/shared/page-header";
+import { ProductThumb } from "@/components/shared/product-thumb";
 import { StatusBadge } from "@/components/shared/status-badge";
 import { LogPurchaseDialog } from "@/features/purchases/log-purchase-dialog";
 import { usePurchaseRows, useStores, type PurchaseRow } from "@/lib/api";
-import { formatDateShort, formatUsd } from "@/lib/format";
+import { formatDateShort, truncate } from "@/lib/format";
+
+/** The order lines a purchase paid for, resolved off its parent order. */
+function coveredItems(row: PurchaseRow) {
+  return (
+    row.order?.items.filter((item) =>
+      row.purchase.orderItemIds.includes(item.id),
+    ) ?? []
+  );
+}
 
 export function PurchasesScreen() {
   const router = useRouter();
@@ -63,11 +73,8 @@ export function PurchasesScreen() {
     });
   }, [rows, tab, search, store]);
 
-  const totals = React.useMemo(
-    () => ({
-      usd: filtered.reduce((sum, r) => sum + r.totalUsd, 0),
-      afn: filtered.reduce((sum, r) => sum + r.totalAfn, 0),
-    }),
+  const spendAfn = React.useMemo(
+    () => filtered.reduce((sum, r) => sum + r.purchase.totalCostAfn, 0),
     [filtered],
   );
 
@@ -131,59 +138,47 @@ export function PurchasesScreen() {
         },
       },
       {
-        id: "items",
-        meta: "Items (USD)",
-        accessorFn: (row) => row.purchase.itemsCostUsd,
-        header: "Items (USD)",
-        cell: ({ row }) => (
-          <MoneyUsd
-            value={row.original.purchase.itemsCostUsd}
-            className="text-muted-foreground text-[13px]"
-          />
-        ),
-      },
-      {
-        id: "extras",
-        meta: "Tax + ship (USD)",
+        id: "products",
+        meta: "Products",
         enableSorting: false,
-        accessorFn: (row) =>
-          row.purchase.taxUsd +
-          row.purchase.domesticShippingUsd +
-          row.purchase.otherCostUsd,
-        header: "Tax + ship (USD)",
+        accessorFn: (row) => coveredItems(row)[0]?.name ?? "",
+        header: "What we bought",
         cell: ({ row }) => {
-          const { purchase } = row.original;
-          const extras =
-            purchase.taxUsd + purchase.domesticShippingUsd + purchase.otherCostUsd;
+          const items = coveredItems(row.original);
+          if (items.length === 0) {
+            return <span className="text-muted-foreground text-[13px]">—</span>;
+          }
           return (
-            <MoneyUsd
-              value={extras}
-              className="text-muted-foreground text-[13px]"
-            />
+            <div className="flex items-center gap-2.5">
+              <ProductThumb
+                size="sm"
+                category={items[0].category}
+                imageUrl={items[0].imageUrl}
+                name={items[0].name}
+              />
+              <div className="min-w-0">
+                <p className="text-[13px]">{truncate(items[0].name, 30)}</p>
+                {items.length > 1 && (
+                  <p className="text-muted-foreground text-xs">
+                    +{items.length - 1} more line
+                    {items.length > 2 ? "s" : ""}
+                  </p>
+                )}
+              </div>
+            </div>
           );
         },
       },
       {
-        id: "totalUsd",
-        meta: "Total USD",
-        accessorFn: (row) => row.totalUsd,
-        header: "Total (USD)",
+        id: "cost",
+        meta: "Cost",
+        accessorFn: (row) => row.purchase.totalCostAfn,
+        header: "Cost (AFN)",
         cell: ({ row }) => (
-          <MoneyUsd value={row.original.totalUsd} className="text-[13px] font-medium" />
-        ),
-      },
-      {
-        id: "totalAfn",
-        meta: "Total AFN",
-        accessorFn: (row) => row.totalAfn,
-        header: "Total (AFN)",
-        cell: ({ row }) => (
-          <div className="flex flex-col">
-            <Money value={row.original.totalAfn} className="text-[13px] font-medium" />
-            <span className="text-muted-foreground tabular text-xs">
-              @ {row.original.purchase.fxRate}
-            </span>
-          </div>
+          <Money
+            value={row.original.purchase.totalCostAfn}
+            className="text-[13px] font-medium"
+          />
         ),
       },
       {
@@ -213,8 +208,7 @@ export function PurchasesScreen() {
   return (
     <>
       <PageHeader
-        title="Purchases"
-        description="What we bought, where we bought it, and what it cost before freight."
+        description="What we bought, where we bought it, and what we paid the store."
         meta={
           <span className="text-muted-foreground text-sm">
             {rows.length} purchases
@@ -232,13 +226,18 @@ export function PurchasesScreen() {
         <Card className="p-4">
           <p className="text-muted-foreground text-[13px]">Spend (filtered)</p>
           <p className="tabular mt-1 text-xl font-semibold">
-            {formatUsd(totals.usd)}
+            <Money value={spendAfn} unit="suffix" />
           </p>
         </Card>
         <Card className="p-4">
-          <p className="text-muted-foreground text-[13px]">In Afghani</p>
+          <p className="text-muted-foreground text-[13px]">Average purchase</p>
           <p className="tabular mt-1 text-xl font-semibold">
-            <Money value={totals.afn} />
+            <Money
+              value={
+                filtered.length > 0 ? Math.round(spendAfn / filtered.length) : 0
+              }
+              unit="suffix"
+            />
           </p>
         </Card>
         <Card className="p-4">
@@ -260,7 +259,7 @@ export function PurchasesScreen() {
         data={filtered}
         entityName="purchases"
         exportFileName="amanat-purchases"
-        numericColumns={["items", "extras", "totalUsd", "totalAfn"]}
+        numericColumns={["cost"]}
         initialSorting={[{ id: "purchasedAt", desc: true }]}
         onRowClick={(row) => router.push(`/purchases/${row.purchase.id}`)}
         emptyIcon={PackageIcon}

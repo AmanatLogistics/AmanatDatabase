@@ -22,10 +22,9 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
-import { Money, MoneyUsd } from "@/components/shared/money";
+import { Money } from "@/components/shared/money";
 import {
   createPurchase,
-  useCompany,
   useOrderRows,
   usePaymentMethods,
   useStores,
@@ -34,8 +33,9 @@ import {
 import type { PurchaseStatus } from "@/lib/types";
 
 /**
- * Records what we actually paid a store. Costs are entered in USD — the way the
- * receipt reads — and converted with the FX rate in force on the day.
+ * Records what we actually paid a store, as one amount in Afghani. The business
+ * runs a single currency, so there is nothing to convert and nothing to reconcile
+ * — the operator types what left the till.
  */
 export function LogPurchaseDialog({
   open,
@@ -52,7 +52,7 @@ export function LogPurchaseDialog({
         <DialogHeader>
           <DialogTitle>Log a purchase</DialogTitle>
           <DialogDescription>
-            What we paid the store, in USD, plus the rate we bought dollars at.
+            One amount in AFN — everything the store charged for this purchase.
           </DialogDescription>
         </DialogHeader>
         {open && (
@@ -75,8 +75,6 @@ function PurchaseForm({
   const methods = usePaymentMethods().filter(
     (m) => m.active && m.usedFor !== "incoming",
   );
-  const company = useCompany();
-
   const purchasableOrders = React.useMemo(
     () =>
       allRows
@@ -93,21 +91,17 @@ function PurchaseForm({
   const initialStore =
     initialOrder?.order.items[0]?.storeId ?? stores[0]?.id ?? "";
   /* Pre-fill with the estimate we quoted from, so the operator only corrects it. */
-  const initialItemsCost =
+  const initialCost =
     initialOrder?.order.items
       .filter((i) => i.storeId === initialStore)
-      .reduce((sum, i) => sum + i.unitCostUsd * i.qty, 0) ?? 0;
+      .reduce((sum, i) => sum + i.unitCostAfn * i.qty, 0) ?? 0;
 
   const [orderId, setOrderId] = React.useState(initialOrder?.order.id ?? "");
   const [storeId, setStoreId] = React.useState(initialStore);
   const [externalOrderNumber, setExternalOrderNumber] = React.useState("");
-  const [itemsCost, setItemsCost] = React.useState(
-    initialItemsCost ? initialItemsCost.toFixed(2) : "",
+  const [cost, setCost] = React.useState(
+    initialCost ? String(Math.round(initialCost)) : "",
   );
-  const [tax, setTax] = React.useState("0");
-  const [domesticShipping, setDomesticShipping] = React.useState("0");
-  const [otherCost, setOtherCost] = React.useState("0");
-  const [fxRate, setFxRate] = React.useState(String(company.referenceFxRate));
   const [methodId, setMethodId] = React.useState(methods[0]?.id ?? "pm-visa");
   const [status, setStatus] = React.useState<PurchaseStatus>("placed");
   const [saving, setSaving] = React.useState(false);
@@ -115,16 +109,13 @@ function PurchaseForm({
   const activeOrder = order ?? allRows.find((r) => r.order.id === orderId);
 
   const num = (value: string) => Number(value) || 0;
-  const totalUsd =
-    num(itemsCost) + num(tax) + num(domesticShipping) + num(otherCost);
-  const totalAfn = Math.round(totalUsd * num(fxRate));
+  const totalCostAfn = Math.round(num(cost));
 
   const invalid =
     !activeOrder ||
     !storeId ||
     !externalOrderNumber.trim() ||
-    num(itemsCost) <= 0 ||
-    num(fxRate) <= 0;
+    totalCostAfn <= 0;
 
   async function handleSubmit() {
     if (!activeOrder || invalid) return;
@@ -138,11 +129,7 @@ function PurchaseForm({
         storeId,
         externalOrderNumber: externalOrderNumber.trim(),
         paymentMethodId: methodId,
-        itemsCostUsd: num(itemsCost),
-        taxUsd: num(tax),
-        domesticShippingUsd: num(domesticShipping),
-        otherCostUsd: num(otherCost),
-        fxRate: num(fxRate),
+        totalCostAfn,
         status,
       });
       toast.success(`Purchase ${purchase.purchaseNo} logged`, {
@@ -203,25 +190,15 @@ function PurchaseForm({
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <MoneyField label="Items ($)" value={itemsCost} onChange={setItemsCost} />
-          <MoneyField label="Tax ($)" value={tax} onChange={setTax} />
-          <MoneyField
-            label="Shipping ($)"
-            value={domesticShipping}
-            onChange={setDomesticShipping}
-          />
-          <MoneyField label="Other ($)" value={otherCost} onChange={setOtherCost} />
-        </div>
-
         <div className="grid grid-cols-3 gap-3">
           <div className="grid gap-2">
-            <Label htmlFor="purchase-fx">FX (AFN/USD)</Label>
+            <Label htmlFor="purchase-cost">Total cost (AFN)</Label>
             <Input
-              id="purchase-fx"
-              inputMode="decimal"
-              value={fxRate}
-              onChange={(e) => setFxRate(e.target.value.replace(/[^\d.]/g, ""))}
+              id="purchase-cost"
+              inputMode="numeric"
+              value={cost}
+              onChange={(e) => setCost(e.target.value.replace(/[^\d]/g, ""))}
+              placeholder="0"
               className="tabular"
             />
           </div>
@@ -262,11 +239,8 @@ function PurchaseForm({
         <Separator />
 
         <div className="flex items-center justify-between text-sm">
-          <span className="text-muted-foreground">Total cost</span>
-          <span className="flex items-center gap-3">
-            <MoneyUsd value={totalUsd} className="text-muted-foreground" />
-            <Money value={totalAfn} className="font-semibold" />
-          </span>
+          <span className="text-muted-foreground">Recorded against this order</span>
+          <Money value={totalCostAfn} unit="suffix" className="font-semibold" />
         </div>
       </div>
 
@@ -279,32 +253,5 @@ function PurchaseForm({
         </Button>
       </DialogFooter>
     </>
-  );
-}
-
-function MoneyField({
-  label,
-  value,
-  onChange,
-}: {
-  label: string;
-  value: string;
-  onChange: (value: string) => void;
-}) {
-  const id = React.useId();
-  return (
-    <div className="grid gap-2">
-      <Label htmlFor={id} className="text-xs">
-        {label}
-      </Label>
-      <Input
-        id={id}
-        inputMode="decimal"
-        value={value}
-        onChange={(e) => onChange(e.target.value.replace(/[^\d.]/g, ""))}
-        placeholder="0.00"
-        className="tabular"
-      />
-    </div>
   );
 }

@@ -7,12 +7,9 @@
  *
  * Money convention
  * ----------------
- * - Every field named `*Afn` is a whole number of Afghani (AFN) — the billing and
- *   reporting currency.
- * - Every field named `*Usd` is a US dollar amount with 2 decimals — what we
- *   actually pay Amazon / Daraz / a forwarder.
- * - A `Purchase` carries the `fxRate` (AFN per 1 USD) in force when it was paid,
- *   so historic costs never drift when the rate moves.
+ * The business runs in Afghani. Every monetary field is named `*Afn` and holds a
+ * whole number of AFN — there is no second currency and no exchange rate anywhere
+ * in the model. A purchase records what was actually paid out in Afghani.
  */
 
 export type ID = string;
@@ -97,8 +94,8 @@ export interface OrderItem {
   qty: number;
   /** What we charge the client, per unit, in AFN. */
   unitPriceAfn: number;
-  /** What we expect to pay the store, per unit, in USD. */
-  unitCostUsd: number;
+  /** What we expect to pay the store, per unit, in AFN. */
+  unitCostAfn: number;
   weightKg?: number;
   notes?: string;
 }
@@ -160,13 +157,8 @@ export interface Purchase {
   purchasedAt: ISODate;
   purchasedBy: string;
   paymentMethodId: ID;
-  /** Cost lines, all USD. */
-  itemsCostUsd: number;
-  taxUsd: number;
-  domesticShippingUsd: number;
-  otherCostUsd: number;
-  /** AFN per 1 USD at time of purchase. */
-  fxRate: number;
+  /** Everything we paid out for this store order, in AFN. */
+  totalCostAfn: number;
   invoiceRef?: string;
   notes?: string;
 }
@@ -236,23 +228,6 @@ export interface Payment {
 }
 
 /* -------------------------------------------------------------------------- */
-/* Expenses                                                                    */
-/* -------------------------------------------------------------------------- */
-
-export interface Expense {
-  id: ID;
-  at: ISODate;
-  categoryId: ID;
-  description: string;
-  /** AFN. */
-  amountAfn: number;
-  methodId: ID;
-  vendor?: string;
-  receiptRef?: string;
-  recordedBy: string;
-}
-
-/* -------------------------------------------------------------------------- */
 /* Settings / reference data                                                   */
 /* -------------------------------------------------------------------------- */
 
@@ -281,14 +256,6 @@ export interface PaymentMethod {
   /** Which side of the business uses it. */
   usedFor: "incoming" | "outgoing" | "both";
   active: boolean;
-}
-
-export interface ExpenseCategory {
-  id: ID;
-  name: string;
-  /** CSS colour token used by charts and the category chip. */
-  color: string;
-  description?: string;
 }
 
 export type TeamRole = "owner" | "manager" | "operator" | "accountant";
@@ -320,10 +287,8 @@ export interface CompanyProfile {
   orderPrefix: string;
   /** Default markup applied to new orders, percent. */
   defaultServiceFeePercent: number;
-  /** Reporting currency. AFN today — the money layer reads this. */
+  /** Reporting currency. The money layer reads this. */
   currency: "AFN";
-  /** Reference rate shown in Settings; each purchase stores its own. */
-  referenceFxRate: number;
   invoiceFooter: string;
   termsAndConditions: string;
 }
@@ -332,7 +297,6 @@ export interface Settings {
   company: CompanyProfile;
   stores: Store[];
   paymentMethods: PaymentMethod[];
-  expenseCategories: ExpenseCategory[];
   team: TeamMember[];
 }
 

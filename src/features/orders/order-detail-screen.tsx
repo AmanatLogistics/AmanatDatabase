@@ -5,7 +5,6 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { toast } from "sonner";
 import {
-  ArrowLeftIcon,
   CreditCardIcon,
   ExternalLinkIcon,
   MessageSquarePlusIcon,
@@ -42,7 +41,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { EmptyState } from "@/components/shared/empty-state";
-import { Money, MoneyUsd } from "@/components/shared/money";
+import { Money } from "@/components/shared/money";
 import { PageHeader } from "@/components/shared/page-header";
 import { ProductThumb } from "@/components/shared/product-thumb";
 import { StatusBadge } from "@/components/shared/status-badge";
@@ -65,7 +64,6 @@ import {
   ORDER_TERMINAL,
   PRODUCT_CATEGORY_LABEL,
 } from "@/lib/constants";
-import { purchaseTotalAfn, purchaseTotalUsd } from "@/lib/finance";
 import {
   formatDate,
   formatDateTime,
@@ -113,20 +111,6 @@ export function OrderDetailScreen({ orderId }: { orderId: string }) {
   return (
     <>
       <PageHeader
-        breadcrumbs={[
-          { label: "Orders", href: "/orders" },
-          { label: order.orderNo },
-        ]}
-        title={
-          <span className="flex items-center gap-3">
-            <Button variant="ghost" size="icon-sm" asChild className="-ml-2">
-              <Link href="/orders" aria-label="Back to orders">
-                <ArrowLeftIcon />
-              </Link>
-            </Button>
-            <span className="tabular">{order.orderNo}</span>
-          </span>
-        }
         meta={<StatusBadge kind="order" value={order.status} />}
         description={
           <>
@@ -289,7 +273,7 @@ export function OrderDetailScreen({ orderId }: { orderId: string }) {
                           <TableCell className="text-right">
                             <Money value={item.unitPriceAfn} className="text-[13px]" />
                             <p className="text-muted-foreground text-xs">
-                              cost {`$${item.unitCostUsd.toFixed(2)}`}
+                              cost <Money value={item.unitCostAfn} />
                             </p>
                           </TableCell>
                           <TableCell className="text-right">
@@ -379,30 +363,17 @@ export function OrderDetailScreen({ orderId }: { orderId: string }) {
                           </p>
                         </CardHeader>
                         <CardContent>
-                          <dl className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-sm sm:grid-cols-4">
-                            <CostCell label="Items" value={purchase.itemsCostUsd} />
-                            <CostCell label="Tax" value={purchase.taxUsd} />
-                            <CostCell
-                              label="Domestic ship"
-                              value={purchase.domesticShippingUsd}
-                            />
-                            <CostCell label="Other" value={purchase.otherCostUsd} />
-                          </dl>
-                          <Separator className="my-3" />
                           <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
                             <span className="text-muted-foreground text-xs">
-                              FX {purchase.fxRate} AFN / USD
+                              {purchase.orderItemIds.length} order line
+                              {purchase.orderItemIds.length === 1 ? "" : "s"}{" "}
+                              covered
                             </span>
-                            <span className="flex items-center gap-3">
-                              <MoneyUsd
-                                value={purchaseTotalUsd(purchase)}
-                                className="text-muted-foreground"
-                              />
-                              <Money
-                                value={purchaseTotalAfn(purchase)}
-                                className="font-semibold"
-                              />
-                            </span>
+                            <Money
+                              value={purchase.totalCostAfn}
+                              unit="suffix"
+                              className="font-semibold"
+                            />
                           </div>
                         </CardContent>
                       </Card>
@@ -659,9 +630,9 @@ export function OrderDetailScreen({ orderId }: { orderId: string }) {
               />
               <Separator className="my-2" />
               <div className="flex items-center justify-between">
-                <span className="font-medium">Gross profit</span>
+                <span className="font-medium">Profit</span>
                 <Money
-                  value={economics.grossProfitAfn}
+                  value={economics.profitAfn}
                   tone="signed"
                   className="font-semibold"
                 />
@@ -825,15 +796,6 @@ function SummaryLine({
     <div className="flex items-center justify-between">
       <span className="text-muted-foreground">{label}</span>
       <Money value={value} tone={muted ? "muted" : "plain"} />
-    </div>
-  );
-}
-
-function CostCell({ label, value }: { label: string; value: number }) {
-  return (
-    <div>
-      <dt className="text-muted-foreground text-xs">{label}</dt>
-      <dd className="tabular text-[13px]">${value.toFixed(2)}</dd>
     </div>
   );
 }

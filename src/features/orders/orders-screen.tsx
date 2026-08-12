@@ -285,15 +285,15 @@ export function OrdersScreen() {
       {
         id: "profit",
         meta: "Profit (AFN)",
-        accessorFn: (row) => row.economics.grossProfitAfn,
+        accessorFn: (row) => row.economics.profitAfn,
         header: "Profit (AFN)",
         cell: ({ row }) => {
-          const { grossProfitAfn, marginPercent, cost } = row.original.economics;
+          const { profitAfn, marginPercent, cost } = row.original.economics;
           // Margin sits inline with the figure so every row stays one line tall.
           return (
             <span className="flex items-baseline justify-end gap-1.5 whitespace-nowrap">
               <Money
-                value={grossProfitAfn}
+                value={profitAfn}
                 tone="signed"
                 className="text-[13px] font-medium"
               />
@@ -390,7 +390,6 @@ export function OrdersScreen() {
   return (
     <>
       <PageHeader
-        title="Orders"
         description="Every client request from the first WhatsApp message through to handover."
         meta={
           <span className="text-muted-foreground text-sm">

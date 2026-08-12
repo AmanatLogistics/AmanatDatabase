@@ -1,14 +1,11 @@
 import {
   ACTIVE_ORDER_STATUSES,
   BILLABLE_ORDER_STATUSES,
-  DEFAULT_FX_RATE,
   FREIGHT_COST_RATIO,
 } from "@/lib/constants";
 import { daysBetween } from "@/lib/format";
 import type {
   Client,
-  Expense,
-  ExpenseCategory,
   ID,
   ISODate,
   Order,
@@ -20,10 +17,63 @@ import type {
 /**
  * Every AFN figure the app displays is produced here.
  *
- * These functions are pure — they take entities in and return numbers out — so
- * the dashboard, the order page, the client statement and the P&L can never
- * disagree about what an order earned.
+ * These functions are pure — entities in, numbers out — so the dashboard, the
+ * order page, the client statement and the P&L can never disagree about what an
+ * order earned.
+ *
+ * Everything is Afghani. There is no second currency and no exchange rate.
+ *
+ * Performance note: the derivations take a `LedgerIndex` rather than flat arrays.
+ * Looking a payment or purchase up by order id used to mean a linear scan inside
+ * a per-order loop, which is O(n²) and was costing tens of thousands of
+ * comparisons on every render of the orders and clients screens.
  */
+
+/* -------------------------------------------------------------------------- */
+/* Index                                                                       */
+/* -------------------------------------------------------------------------- */
+
+export interface LedgerIndex {
+  purchasesByOrder: Map<ID, Purchase[]>;
+  paymentsByOrder: Map<ID, Payment[]>;
+  paymentsByClient: Map<ID, Payment[]>;
+  shipmentByOrder: Map<ID, Shipment>;
+  ordersByClient: Map<ID, Order[]>;
+}
+
+function push<K, V>(map: Map<K, V[]>, key: K, value: V) {
+  const list = map.get(key);
+  if (list) list.push(value);
+  else map.set(key, [value]);
+}
+
+/** Build once per data change, then reuse for every derivation on the screen. */
+export function buildLedgerIndex(
+  orders: Order[],
+  purchases: Purchase[],
+  payments: Payment[],
+  shipments: Shipment[],
+): LedgerIndex {
+  const index: LedgerIndex = {
+    purchasesByOrder: new Map(),
+    paymentsByOrder: new Map(),
+    paymentsByClient: new Map(),
+    shipmentByOrder: new Map(),
+    ordersByClient: new Map(),
+  };
+
+  purchases.forEach((p) => push(index.purchasesByOrder, p.orderId, p));
+  payments.forEach((p) => {
+    if (p.orderId) push(index.paymentsByOrder, p.orderId, p);
+    push(index.paymentsByClient, p.clientId, p);
+  });
+  shipments.forEach((s) => index.shipmentByOrder.set(s.orderId, s));
+  orders.forEach((o) => push(index.ordersByClient, o.clientId, o));
+
+  return index;
+}
+
+const EMPTY: never[] = [];
 
 /* -------------------------------------------------------------------------- */
 /* Order economics                                                             */
@@ -52,15 +102,14 @@ export function orderRevenue(order: Order): OrderRevenue {
     serviceFeeAfn,
     shippingAfn: order.shippingChargedAfn,
     discountAfn: order.discountAfn,
-    totalAfn: itemsAfn + serviceFeeAfn + order.shippingChargedAfn - order.discountAfn,
+    totalAfn:
+      itemsAfn + serviceFeeAfn + order.shippingChargedAfn - order.discountAfn,
   };
 }
 
 export interface OrderCost {
-  /** What the stores charged us, converted at each purchase's own FX rate. */
+  /** What the stores charged us, in AFN. */
   goodsAfn: number;
-  /** Same, in the original USD. */
-  goodsUsd: number;
   freightAfn: number;
   customsAfn: number;
   totalAfn: number;
@@ -69,19 +118,6 @@ export interface OrderCost {
    * from the unit costs captured on the quotation rather than measured.
    */
   estimated: boolean;
-}
-
-export function purchaseTotalUsd(purchase: Purchase): number {
-  return (
-    purchase.itemsCostUsd +
-    purchase.taxUsd +
-    purchase.domesticShippingUsd +
-    purchase.otherCostUsd
-  );
-}
-
-export function purchaseTotalAfn(purchase: Purchase): number {
-  return Math.round(purchaseTotalUsd(purchase) * purchase.fxRate);
 }
 
 /**
@@ -93,23 +129,18 @@ export function purchaseTotalAfn(purchase: Purchase): number {
  */
 export function orderCost(
   order: Order,
-  purchases: Purchase[],
-  shipment?: Shipment,
-  estimateFxRate: number = DEFAULT_FX_RATE,
+  index: LedgerIndex,
 ): OrderCost {
-  const linked = purchases.filter(
-    (p) => p.orderId === order.id && p.status !== "cancelled",
+  const linked = (index.purchasesByOrder.get(order.id) ?? EMPTY).filter(
+    (p) => p.status !== "cancelled",
   );
+  const shipment = index.shipmentByOrder.get(order.id);
 
   const estimated = linked.length === 0;
 
-  const goodsUsd = estimated
-    ? order.items.reduce((sum, item) => sum + item.unitCostUsd * item.qty, 0)
-    : linked.reduce((sum, p) => sum + purchaseTotalUsd(p), 0);
-
   const goodsAfn = estimated
-    ? Math.round(goodsUsd * estimateFxRate)
-    : linked.reduce((sum, p) => sum + purchaseTotalAfn(p), 0);
+    ? order.items.reduce((sum, item) => sum + item.unitCostAfn * item.qty, 0)
+    : linked.reduce((sum, p) => sum + p.totalCostAfn, 0);
 
   const freightAfn =
     shipment?.freightCostAfn ??
@@ -118,7 +149,6 @@ export function orderCost(
 
   return {
     goodsAfn,
-    goodsUsd,
     freightAfn,
     customsAfn,
     totalAfn: goodsAfn + freightAfn + customsAfn,
@@ -129,8 +159,8 @@ export function orderCost(
 export interface OrderEconomics {
   revenue: OrderRevenue;
   cost: OrderCost;
-  grossProfitAfn: number;
-  /** Gross profit as a percentage of revenue. */
+  profitAfn: number;
+  /** Profit as a percentage of revenue. */
   marginPercent: number;
   paidAfn: number;
   balanceAfn: number;
@@ -140,26 +170,24 @@ export interface OrderEconomics {
 
 export function orderEconomics(
   order: Order,
-  purchases: Purchase[],
-  payments: Payment[],
-  shipment?: Shipment,
+  index: LedgerIndex,
 ): OrderEconomics {
   const revenue = orderRevenue(order);
-  const cost = orderCost(order, purchases, shipment);
-  const grossProfitAfn = revenue.totalAfn - cost.totalAfn;
-  const paidAfn = payments
-    .filter((p) => p.orderId === order.id)
-    .reduce((sum, p) => sum + p.amountAfn, 0);
+  const cost = orderCost(order, index);
+  const profitAfn = revenue.totalAfn - cost.totalAfn;
+  const paidAfn = (index.paymentsByOrder.get(order.id) ?? EMPTY).reduce(
+    (sum, p) => sum + p.amountAfn,
+    0,
+  );
 
-  const billable = isBillable(order);
-  const invoiced = billable ? revenue.totalAfn : 0;
+  const invoiced = isBillable(order) ? revenue.totalAfn : 0;
 
   return {
     revenue,
     cost,
-    grossProfitAfn,
+    profitAfn,
     marginPercent:
-      revenue.totalAfn > 0 ? (grossProfitAfn / revenue.totalAfn) * 100 : 0,
+      revenue.totalAfn > 0 ? (profitAfn / revenue.totalAfn) * 100 : 0,
     paidAfn,
     balanceAfn: invoiced - paidAfn,
     settled: invoiced - paidAfn <= 0,
@@ -167,7 +195,9 @@ export function orderEconomics(
 }
 
 export function isBillable(order: Order): boolean {
-  return BILLABLE_ORDER_STATUSES.includes(order.status) && order.status !== "refunded";
+  return (
+    BILLABLE_ORDER_STATUSES.includes(order.status) && order.status !== "refunded"
+  );
 }
 
 export function isActive(order: Order): boolean {
@@ -196,34 +226,32 @@ export interface ClientSummary {
 
 export function clientSummary(
   clientId: ID,
-  orders: Order[],
-  purchases: Purchase[],
-  payments: Payment[],
-  shipments: Shipment[],
+  index: LedgerIndex,
   today: Date,
 ): ClientSummary {
-  const own = orders.filter((o) => o.clientId === clientId);
-  const ownPayments = payments.filter((p) => p.clientId === clientId);
+  const own = index.ordersByClient.get(clientId) ?? EMPTY;
 
   let lifetimeRevenueAfn = 0;
   let lifetimeProfitAfn = 0;
   let oldestDebtDays = 0;
+  let billableCount = 0;
 
   own.forEach((order) => {
-    const shipment = shipments.find((s) => s.orderId === order.id);
-    const econ = orderEconomics(order, purchases, ownPayments, shipment);
-    if (isBillable(order)) {
-      lifetimeRevenueAfn += econ.revenue.totalAfn;
-      lifetimeProfitAfn += econ.grossProfitAfn;
-      if (econ.balanceAfn > 0) {
-        const age = daysBetween(order.requestedAt, today);
-        if (age > oldestDebtDays) oldestDebtDays = age;
-      }
+    const econ = orderEconomics(order, index);
+    if (!isBillable(order)) return;
+    billableCount += 1;
+    lifetimeRevenueAfn += econ.revenue.totalAfn;
+    lifetimeProfitAfn += econ.profitAfn;
+    if (econ.balanceAfn > 0) {
+      const age = daysBetween(order.requestedAt, today);
+      if (age > oldestDebtDays) oldestDebtDays = age;
     }
   });
 
-  const paidAfn = ownPayments.reduce((sum, p) => sum + p.amountAfn, 0);
-  const billableCount = own.filter(isBillable).length;
+  const paidAfn = (index.paymentsByClient.get(clientId) ?? EMPTY).reduce(
+    (sum, p) => sum + p.amountAfn,
+    0,
+  );
 
   return {
     clientId,
@@ -233,7 +261,8 @@ export function clientSummary(
     lifetimeProfitAfn,
     paidAfn,
     balanceAfn: lifetimeRevenueAfn - paidAfn,
-    avgOrderAfn: billableCount > 0 ? Math.round(lifetimeRevenueAfn / billableCount) : 0,
+    avgOrderAfn:
+      billableCount > 0 ? Math.round(lifetimeRevenueAfn / billableCount) : 0,
     lastOrderAt: own
       .map((o) => o.requestedAt)
       .sort((a, b) => b.localeCompare(a))[0],
@@ -242,16 +271,8 @@ export function clientSummary(
 }
 
 /* -------------------------------------------------------------------------- */
-/* Period P&L                                                                  */
+/* Period profit & loss                                                        */
 /* -------------------------------------------------------------------------- */
-
-export interface ExpenseBreakdownRow {
-  categoryId: ID;
-  name: string;
-  color: string;
-  amountAfn: number;
-  share: number;
-}
 
 export interface PeriodPnL {
   from: Date;
@@ -260,12 +281,14 @@ export interface PeriodPnL {
   revenueAfn: number;
   /** Direct cost of goods + freight + duty. */
   cogsAfn: number;
-  grossProfitAfn: number;
-  grossMarginPercent: number;
-  expensesAfn: number;
-  expenseBreakdown: ExpenseBreakdownRow[];
-  netProfitAfn: number;
-  netMarginPercent: number;
+  /** The three parts of `cogsAfn`, so the screen can show where cost lands. */
+  goodsAfn: number;
+  freightAfn: number;
+  customsAfn: number;
+  /** Service fee charged on top of goods — the part of revenue we actually earn. */
+  serviceFeeAfn: number;
+  profitAfn: number;
+  marginPercent: number;
 }
 
 function within(date: ISODate, from: Date, to: Date): boolean {
@@ -282,61 +305,42 @@ export function periodPnL(
   from: Date,
   to: Date,
   orders: Order[],
-  purchases: Purchase[],
-  shipments: Shipment[],
-  expenses: Expense[],
-  categories: ExpenseCategory[],
+  index: LedgerIndex,
 ): PeriodPnL {
-  const inPeriod = orders.filter(
-    (o) => isBillable(o) && within(o.requestedAt, from, to),
-  );
-
   let revenueAfn = 0;
-  let cogsAfn = 0;
+  let serviceFeeAfn = 0;
+  let goodsAfn = 0;
+  let freightAfn = 0;
+  let customsAfn = 0;
+  let orderCount = 0;
 
-  inPeriod.forEach((order) => {
-    const shipment = shipments.find((s) => s.orderId === order.id);
-    revenueAfn += orderRevenue(order).totalAfn;
-    cogsAfn += orderCost(order, purchases, shipment).totalAfn;
+  orders.forEach((order) => {
+    if (!isBillable(order) || !within(order.requestedAt, from, to)) return;
+    orderCount += 1;
+    const revenue = orderRevenue(order);
+    const cost = orderCost(order, index);
+    revenueAfn += revenue.totalAfn;
+    serviceFeeAfn += revenue.serviceFeeAfn;
+    goodsAfn += cost.goodsAfn;
+    freightAfn += cost.freightAfn;
+    customsAfn += cost.customsAfn;
   });
 
-  const periodExpenses = expenses.filter((e) => within(e.at, from, to));
-  const expensesAfn = periodExpenses.reduce((sum, e) => sum + e.amountAfn, 0);
-
-  const byCategory = new Map<ID, number>();
-  periodExpenses.forEach((e) => {
-    byCategory.set(e.categoryId, (byCategory.get(e.categoryId) ?? 0) + e.amountAfn);
-  });
-
-  const expenseBreakdown: ExpenseBreakdownRow[] = categories
-    .map((category) => {
-      const amountAfn = byCategory.get(category.id) ?? 0;
-      return {
-        categoryId: category.id,
-        name: category.name,
-        color: category.color,
-        amountAfn,
-        share: expensesAfn > 0 ? (amountAfn / expensesAfn) * 100 : 0,
-      };
-    })
-    .filter((row) => row.amountAfn > 0)
-    .sort((a, b) => b.amountAfn - a.amountAfn);
-
-  const grossProfitAfn = revenueAfn - cogsAfn;
-  const netProfitAfn = grossProfitAfn - expensesAfn;
+  const cogsAfn = goodsAfn + freightAfn + customsAfn;
+  const profitAfn = revenueAfn - cogsAfn;
 
   return {
     from,
     to,
-    orderCount: inPeriod.length,
+    orderCount,
     revenueAfn,
     cogsAfn,
-    grossProfitAfn,
-    grossMarginPercent: revenueAfn > 0 ? (grossProfitAfn / revenueAfn) * 100 : 0,
-    expensesAfn,
-    expenseBreakdown,
-    netProfitAfn,
-    netMarginPercent: revenueAfn > 0 ? (netProfitAfn / revenueAfn) * 100 : 0,
+    goodsAfn,
+    freightAfn,
+    customsAfn,
+    serviceFeeAfn,
+    profitAfn,
+    marginPercent: revenueAfn > 0 ? (profitAfn / revenueAfn) * 100 : 0,
   };
 }
 
@@ -353,18 +357,14 @@ export interface MonthlyPoint {
   orders: number;
   revenueAfn: number;
   cogsAfn: number;
-  grossProfitAfn: number;
-  expensesAfn: number;
-  netProfitAfn: number;
+  profitAfn: number;
 }
 
 export function monthlySeries(
   months: number,
   today: Date,
   orders: Order[],
-  purchases: Purchase[],
-  shipments: Shipment[],
-  expenses: Expense[],
+  index: LedgerIndex,
 ): MonthlyPoint[] {
   const points: MonthlyPoint[] = [];
 
@@ -384,21 +384,7 @@ export function monthlySeries(
       ),
     );
 
-    const inPeriod = orders.filter(
-      (o) => isBillable(o) && within(o.requestedAt, monthStart, monthEnd),
-    );
-
-    let revenueAfn = 0;
-    let cogsAfn = 0;
-    inPeriod.forEach((order) => {
-      const shipment = shipments.find((s) => s.orderId === order.id);
-      revenueAfn += orderRevenue(order).totalAfn;
-      cogsAfn += orderCost(order, purchases, shipment).totalAfn;
-    });
-
-    const expensesAfn = expenses
-      .filter((e) => within(e.at, monthStart, monthEnd))
-      .reduce((sum, e) => sum + e.amountAfn, 0);
+    const pnl = periodPnL(monthStart, monthEnd, orders, index);
 
     points.push({
       key: `${monthStart.getUTCFullYear()}-${String(monthStart.getUTCMonth() + 1).padStart(2, "0")}`,
@@ -407,12 +393,10 @@ export function monthlySeries(
         timeZone: "UTC",
       }),
       monthStart,
-      orders: inPeriod.length,
-      revenueAfn,
-      cogsAfn,
-      grossProfitAfn: revenueAfn - cogsAfn,
-      expensesAfn,
-      netProfitAfn: revenueAfn - cogsAfn - expensesAfn,
+      orders: pnl.orderCount,
+      revenueAfn: pnl.revenueAfn,
+      cogsAfn: pnl.cogsAfn,
+      profitAfn: pnl.profitAfn,
     });
   }
 
@@ -454,10 +438,7 @@ const PAYMENT_TERM_DAYS = 14;
 
 export function receivablesAging(
   clients: Client[],
-  orders: Order[],
-  purchases: Purchase[],
-  payments: Payment[],
-  shipments: Shipment[],
+  index: LedgerIndex,
   today: Date,
 ): AgingRow[] {
   return clients
@@ -469,29 +450,20 @@ export function receivablesAging(
         d60_plus: 0,
       };
 
-      orders
-        .filter((o) => o.clientId === client.id && isBillable(o))
-        .forEach((order) => {
-          const shipment = shipments.find((s) => s.orderId === order.id);
-          const econ = orderEconomics(order, purchases, payments, shipment);
-          if (econ.balanceAfn <= 0) return;
-          const overdueDays =
-            daysBetween(order.requestedAt, today) - PAYMENT_TERM_DAYS;
-          buckets[bucketFor(overdueDays)] += econ.balanceAfn;
-        });
+      (index.ordersByClient.get(client.id) ?? EMPTY).forEach((order) => {
+        if (!isBillable(order)) return;
+        const econ = orderEconomics(order, index);
+        if (econ.balanceAfn <= 0) return;
+        const overdueDays =
+          daysBetween(order.requestedAt, today) - PAYMENT_TERM_DAYS;
+        buckets[bucketFor(overdueDays)] += econ.balanceAfn;
+      });
 
       const totalAfn = Object.values(buckets).reduce((a, b) => a + b, 0);
 
       return {
         client,
-        summary: clientSummary(
-          client.id,
-          orders,
-          purchases,
-          payments,
-          shipments,
-          today,
-        ),
+        summary: clientSummary(client.id, index, today),
         buckets,
         totalAfn,
       };
@@ -505,10 +477,7 @@ export function receivablesAging(
 /* -------------------------------------------------------------------------- */
 
 /** Percentage change from `previous` to `current`; null when there is no base. */
-export function deltaPercent(
-  current: number,
-  previous: number,
-): number | null {
+export function deltaPercent(current: number, previous: number): number | null {
   if (previous === 0) return current === 0 ? 0 : null;
   return ((current - previous) / Math.abs(previous)) * 100;
 }
@@ -520,11 +489,5 @@ export function startOfMonth(date: Date): Date {
 export function endOfMonth(date: Date): Date {
   return new Date(
     Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + 1, 0, 23, 59, 59, 999),
-  );
-}
-
-export function addMonths(date: Date, months: number): Date {
-  return new Date(
-    Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + months, date.getUTCDate()),
   );
 }

@@ -254,13 +254,6 @@ export const DOCUMENT_KIND_TONE: Record<DocumentKind, BadgeTone> = {
 };
 
 /**
- * Fallback AFN/USD rate used to estimate the cost of an order that has not been
- * purchased yet. Settings carries the editable value; this is the constant the
- * pure finance functions default to.
- */
-export const DEFAULT_FX_RATE = 70.5;
-
-/**
  * Share of the shipping we charge a client that we expect to pay out in freight
  * once the parcel actually moves. Used to estimate margin before booking.
  */

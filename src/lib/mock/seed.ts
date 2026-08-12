@@ -3,7 +3,6 @@ import { clients } from "@/lib/mock/clients";
 import { settings } from "@/lib/mock/settings";
 import { ORDER_PIPELINE } from "@/lib/constants";
 import type {
-  Expense,
   Order,
   OrderEvent,
   OrderItem,
@@ -30,9 +29,10 @@ import type {
 export const TODAY = new Date("2026-08-11T09:00:00.000Z");
 
 /**
- * Multiplier applied to the FX rate when quoting a product to a client. Covers
- * the store's sales tax, domestic shipping to the forwarder, and FX drift
- * between quoting and buying — roughly 15% in practice.
+ * Multiplier applied to the store cost when quoting a product to a client.
+ * Covers the store's own tax, domestic shipping to the forwarder and price drift
+ * between quoting and buying — roughly 15% in practice. The order's service fee
+ * is the margin on top of that.
  */
 const QUOTE_MARKUP = 1.15;
 
@@ -66,7 +66,7 @@ const shift = (from: Date, days: number, hours = 0) =>
   new Date(from.getTime() + days * DAY + hours * 3_600_000);
 
 /* -------------------------------------------------------------------------- */
-/* FX — the AFN/USD rate drifts across the period                              */
+/* Volume                                                                      */
 /* -------------------------------------------------------------------------- */
 
 /** Months covered by the dataset, oldest first: Oct 2025 … Aug 2026. */
@@ -83,13 +83,6 @@ const MONTHS: Array<{ year: number; month: number; orders: number }> = [
   { year: 2026, month: 6, orders: 21 },
   { year: 2026, month: 7, orders: 12 },
 ];
-
-function fxRateAt(date: Date): number {
-  const monthsElapsed =
-    (date.getUTCFullYear() - 2025) * 12 + (date.getUTCMonth() - 9);
-  const base = 68.4 + monthsElapsed * 0.36;
-  return Math.round((base + (rand() * 2 - 1) * 0.5) * 100) / 100;
-}
 
 /* -------------------------------------------------------------------------- */
 /* Client weighting — a few regulars drive most of the volume                  */
@@ -173,17 +166,12 @@ const orders: Order[] = [];
 const purchases: Purchase[] = [];
 const shipments: Shipment[] = [];
 const payments: Payment[] = [];
-const expenses: Expense[] = [];
 
 let orderSeq = 0;
 let purchaseSeq = 0;
 let receiptSeq = 0;
 
-function buildItems(
-  orderId: string,
-  fxRate: number,
-  count: number,
-): OrderItem[] {
+function buildItems(orderId: string, count: number): OrderItem[] {
   const chosen: CatalogProduct[] = [];
   while (chosen.length < count) {
     const product = pick(catalog);
@@ -192,17 +180,19 @@ function buildItems(
 
   return chosen.map((product, index) => {
     const qty =
-      product.costUsd > 400 ? 1 : chance(0.72) ? 1 : int(2, product.costUsd < 60 ? 6 : 3);
-    const unitCostUsd = Math.round(product.costUsd * jitter(0.04) * 100) / 100;
+      product.costAfn > 28_000
+        ? 1
+        : chance(0.72)
+          ? 1
+          : int(2, product.costAfn < 4_200 ? 6 : 3);
+    const unitCostAfn = Math.round((product.costAfn * jitter(0.04)) / 50) * 50;
     /*
-     * The quoted product price is the *landed* price, not the sticker price:
-     * on top of the FX rate it absorbs the store's sales tax, the domestic
-     * shipping to the forwarder, and a buffer for the rate moving between the
-     * quote and the day we actually buy. The service fee on the order is the
-     * margin on top of that.
+     * The quoted price is the *landed* price, not the sticker price: it absorbs
+     * the store's own tax, the domestic shipping to the forwarder and a buffer
+     * for the price moving between the quote and the day we actually buy. The
+     * order's service fee is the margin on top of that.
      */
-    const quotedRate = fxRate * QUOTE_MARKUP;
-    const unitPriceAfn = Math.round((unitCostUsd * quotedRate) / 50) * 50;
+    const unitPriceAfn = Math.round((unitCostAfn * QUOTE_MARKUP) / 50) * 50;
 
     return {
       id: `${orderId}-item-${index + 1}`,
@@ -213,7 +203,7 @@ function buildItems(
       variant: product.variants ? pick(product.variants) : undefined,
       qty,
       unitPriceAfn,
-      unitCostUsd,
+      unitCostAfn,
       weightKg: Math.round(product.weightKg * qty * 100) / 100,
       notes: chance(0.12) ? "Client asked for the exact colour in the link." : undefined,
     } satisfies OrderItem;
@@ -301,7 +291,7 @@ function buildTimeline(
   return events;
 }
 
-function buildPurchases(order: Order, fxRate: number): Purchase[] {
+function buildPurchases(order: Order): Purchase[] {
   // Items are grouped by store — one store order per store, like real life.
   const byStore = new Map<string, OrderItem[]>();
   order.items.forEach((item) => {
@@ -327,18 +317,19 @@ function buildPurchases(order: Order, fxRate: number): Purchase[] {
 
   return Array.from(byStore.entries()).map(([storeId, items]) => {
     purchaseSeq += 1;
-    const itemsCostUsd =
+    /*
+     * What actually left the account for this store order: the goods plus the
+     * store's tax and domestic shipping, all in Afghani. Sometimes the price
+     * moved between quoting and buying.
+     */
+    const totalCostAfn =
       Math.round(
-        items.reduce((sum, i) => sum + i.unitCostUsd * i.qty, 0) *
-          // Sometimes the price moved between quote and purchase.
+        (items.reduce((sum, i) => sum + i.unitCostAfn * i.qty, 0) *
           jitter(0.035) *
-          100,
-      ) / 100;
-    const taxUsd = Math.round(itemsCostUsd * (chance(0.5) ? 0.07 : 0) * 100) / 100;
-    const domesticShippingUsd = chance(0.45)
-      ? Math.round(int(5, 24) * 100) / 100
-      : 0;
-    const otherCostUsd = chance(0.18) ? Math.round(int(3, 15) * 100) / 100 : 0;
+          (chance(0.5) ? 1.07 : 1) +
+          (chance(0.45) ? int(350, 1_700) : 0)) /
+          10,
+      ) * 10;
     const store = storeById.get(storeId);
 
     return {
@@ -352,11 +343,7 @@ function buildPurchases(order: Order, fxRate: number): Purchase[] {
       purchasedAt: iso(purchasedAt),
       purchasedBy: pick(OPERATORS),
       paymentMethodId: chance(0.72) ? "pm-visa" : "pm-hawala",
-      itemsCostUsd,
-      taxUsd,
-      domesticShippingUsd,
-      otherCostUsd,
-      fxRate,
+      totalCostAfn,
       invoiceRef: `${store?.name.split(" ")[0] ?? "STORE"}-${int(100000, 999999)}`,
       notes:
         status === "refunded"
@@ -591,11 +578,10 @@ draft.forEach(({ requestedAt, clientId }) => {
   const orderNo = `AS-${requestedAt.getUTCFullYear()}-${String(orderSeq).padStart(4, "0")}`;
   const ageDays = Math.floor((TODAY.getTime() - requestedAt.getTime()) / DAY);
   const status = statusForAge(ageDays);
-  const fxRate = fxRateAt(requestedAt);
   const client = clientById.get(clientId);
 
   const itemCount = client?.type === "business" ? int(1, 4) : chance(0.62) ? 1 : int(2, 3);
-  const items = buildItems(id, fxRate, itemCount);
+  const items = buildItems(id, itemCount);
 
   const itemsAfn = items.reduce((s, i) => s + i.unitPriceAfn * i.qty, 0);
   const totalWeight = items.reduce((s, i) => s + (i.weightKg ?? 0.5), 0);
@@ -636,7 +622,7 @@ draft.forEach(({ requestedAt, clientId }) => {
 
   /* --- purchases --------------------------------------------------------- */
   if (stage >= stageIndex("purchasing")) {
-    purchases.push(...buildPurchases(order, fxRate));
+    purchases.push(...buildPurchases(order));
   }
 
   /* --- shipment ---------------------------------------------------------- */
@@ -713,112 +699,10 @@ draft.forEach(({ requestedAt, clientId }) => {
 });
 
 /* -------------------------------------------------------------------------- */
-/* Operating expenses — monthly run rate plus ad-hoc costs                     */
-/* -------------------------------------------------------------------------- */
-
-let expenseSeq = 0;
-
-function addExpense(
-  at: Date,
-  categoryId: string,
-  description: string,
-  amountAfn: number,
-  methodId: string,
-  vendor?: string,
-) {
-  expenseSeq += 1;
-  expenses.push({
-    id: `expense-${String(expenseSeq).padStart(4, "0")}`,
-    at: iso(at),
-    categoryId,
-    description,
-    amountAfn,
-    methodId,
-    vendor,
-    receiptRef: chance(0.55) ? `EXP-${int(10000, 99999)}` : undefined,
-    recordedBy: "Yalda Sediqi",
-  });
-}
-
-MONTHS.forEach(({ year, month }) => {
-  const monthStart = new Date(Date.UTC(year, month, 1, 8, 0));
-  if (monthStart.getTime() > TODAY.getTime()) return;
-  const label = monthStart.toLocaleDateString("en-US", {
-    month: "long",
-    year: "numeric",
-    timeZone: "UTC",
-  });
-
-  addExpense(
-    new Date(Date.UTC(year, month, 3, 9, 0)),
-    "exp-rent",
-    `Shop rent — ${label}`,
-    25000,
-    "pm-cash",
-    "Zarnegar Plaza management",
-  );
-  addExpense(
-    new Date(Date.UTC(year, month, 28, 15, 0)),
-    "exp-salaries",
-    `Team salaries — ${label}`,
-    int(38, 46) * 1000,
-    "pm-cash",
-  );
-  addExpense(
-    new Date(Date.UTC(year, month, 6, 11, 0)),
-    "exp-utilities",
-    `Electricity, generator fuel and internet — ${label}`,
-    int(4200, 6800),
-    "pm-cash",
-    "DABS / Etisalat",
-  );
-  addExpense(
-    new Date(Date.UTC(year, month, int(8, 22), 13, 0)),
-    "exp-marketing",
-    chance(0.5)
-      ? "Facebook page promotion"
-      : "Printed flyers and shop banner",
-    int(3500, 14000),
-    chance(0.5) ? "pm-visa" : "pm-cash",
-    chance(0.5) ? "Meta Platforms" : "Kabul Print House",
-  );
-  addExpense(
-    new Date(Date.UTC(year, month, int(10, 26), 10, 0)),
-    "exp-bank",
-    "Hawala commission and card FX fees",
-    int(2200, 7400),
-    "pm-hawala",
-  );
-  addExpense(
-    new Date(Date.UTC(year, month, int(5, 25), 12, 0)),
-    "exp-misc",
-    pick([
-      "Packaging materials and bubble wrap",
-      "Shop transport and taxi fares",
-      "Stationery and printer toner",
-      "Tea, water and shop supplies",
-    ]),
-    int(1200, 5200),
-    "pm-cash",
-  );
-  if (chance(0.55)) {
-    addExpense(
-      new Date(Date.UTC(year, month, int(6, 24), 14, 0)),
-      "exp-freight",
-      "Consolidation and warehouse fees not billed to a client",
-      int(4000, 16000),
-      "pm-hawala",
-      "Dubai forwarder",
-    );
-  }
-});
-
-/* -------------------------------------------------------------------------- */
 
 orders.sort((a, b) => b.requestedAt.localeCompare(a.requestedAt));
 purchases.sort((a, b) => b.purchasedAt.localeCompare(a.purchasedAt));
 payments.sort((a, b) => b.at.localeCompare(a.at));
-expenses.sort((a, b) => b.at.localeCompare(a.at));
 shipments.sort((a, b) => (b.shippedAt ?? "").localeCompare(a.shippedAt ?? ""));
 
 export const seedData = {
@@ -827,7 +711,6 @@ export const seedData = {
   purchases,
   shipments,
   payments,
-  expenses,
   settings,
 };
 

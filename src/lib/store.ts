@@ -5,7 +5,6 @@ import { create } from "zustand";
 import { seedData, TODAY } from "@/lib/mock/seed";
 import type {
   Client,
-  Expense,
   Order,
   Payment,
   Purchase,
@@ -32,7 +31,6 @@ export interface DataState {
   purchases: Purchase[];
   shipments: Shipment[];
   payments: Payment[];
-  expenses: Expense[];
   settings: Settings;
   /** Frozen "now" so derived figures stay stable between server and client. */
   today: Date;
@@ -48,7 +46,6 @@ export interface DataState {
   updateShipment: (id: string, patch: Partial<Shipment>) => void;
 
   addPayment: (payment: Payment) => void;
-  addExpense: (expense: Expense) => void;
 
   updateSettings: (patch: Partial<Settings>) => void;
 
@@ -62,7 +59,6 @@ const initial = () => ({
   purchases: seedData.purchases,
   shipments: seedData.shipments,
   payments: seedData.payments,
-  expenses: seedData.expenses,
   settings: seedData.settings,
   today: TODAY,
 });
@@ -100,9 +96,6 @@ export const useDataStore = create<DataState>((set) => ({
 
   addPayment: (payment) =>
     set((state) => ({ payments: [payment, ...state.payments] })),
-
-  addExpense: (expense) =>
-    set((state) => ({ expenses: [expense, ...state.expenses] })),
 
   updateSettings: (patch) =>
     set((state) => ({ settings: { ...state.settings, ...patch } })),

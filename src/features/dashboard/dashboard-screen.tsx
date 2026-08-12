@@ -69,7 +69,7 @@ export function DashboardScreen() {
   // Progress bars compare this month against the best month in the last year.
   const peakRevenue = Math.max(...data.monthly.map((m) => m.revenueAfn), 1);
   const peakOrders = Math.max(...data.monthly.map((m) => m.orders), 1);
-  const peakProfit = Math.max(...data.monthly.map((m) => m.grossProfitAfn), 1);
+  const peakProfit = Math.max(...data.monthly.map((m) => m.profitAfn), 1);
 
   const maxStoreRevenue = Math.max(
     ...data.salesByStore.map((s) => s.revenueAfn),
@@ -100,11 +100,11 @@ export function DashboardScreen() {
           accent="gold"
         />
         <StatCard
-          label="Gross profit"
-          value={formatAfn(thisMonth.grossProfitAfn, { unit: "suffix" })}
-          delta={deltaPercent(thisMonth.grossProfitAfn, lastMonth.grossProfitAfn)}
-          caption={`${formatPercent(thisMonth.grossMarginPercent)} margin`}
-          progress={(thisMonth.grossProfitAfn / peakProfit) * 100}
+          label="Profit"
+          value={formatAfn(thisMonth.profitAfn, { unit: "suffix" })}
+          delta={deltaPercent(thisMonth.profitAfn, lastMonth.profitAfn)}
+          caption={`${formatPercent(thisMonth.marginPercent)} margin`}
+          progress={(thisMonth.profitAfn / peakProfit) * 100}
           icon={WalletIcon}
           accent="success"
         />
@@ -130,7 +130,7 @@ export function DashboardScreen() {
               <div>
                 <CardTitle className="text-base">Revenue overview</CardTitle>
                 <p className="text-muted-foreground text-xs">
-                  Revenue, direct cost and gross profit by month, in AFN
+                  Revenue, direct cost and profit by month, in AFN
                 </p>
               </div>
               <Select value={range} onValueChange={setRange}>
@@ -181,22 +181,22 @@ export function DashboardScreen() {
             <ProfitRow
               accent="bg-brand-700/10 text-brand-700 dark:bg-brand-400/15 dark:text-brand-300"
               icon={TrendingUpIcon}
-              value={yearToDate.grossProfitAfn}
-              label={`Gross profit ${today.getUTCFullYear()}`}
+              value={yearToDate.profitAfn}
+              label={`Profit ${today.getUTCFullYear()}`}
               href="/finance"
             />
             <ProfitRow
               accent="bg-gold-500/15 text-gold-700 dark:text-gold-400"
               icon={WalletIcon}
-              value={thisMonth.grossProfitAfn}
-              label={`Gross profit ${formatMonth(today.toISOString())}`}
+              value={thisMonth.profitAfn}
+              label={`Profit ${formatMonth(today.toISOString())}`}
               href="/finance"
             />
             <ProfitRow
               accent="bg-info/12 text-info"
               icon={ClockIcon}
               value={data.weekProfitAfn}
-              label="Gross profit last 7 days"
+              label="Profit last 7 days"
               href="/finance"
             />
 
@@ -205,17 +205,17 @@ export function DashboardScreen() {
             <div className="space-y-1.5">
               <div className="flex items-center justify-between text-sm">
                 <span className="text-muted-foreground">
-                  Net profit this month
+                  Margin this month
                 </span>
-                <Money
-                  value={thisMonth.netProfitAfn}
-                  tone="signed"
-                  unit="suffix"
-                  className="font-semibold"
-                />
+                <span className="tabular font-semibold">
+                  {formatPercent(thisMonth.marginPercent)}
+                </span>
               </div>
               <p className="text-muted-foreground text-xs">
-                After {formatAfn(thisMonth.expensesAfn, { unit: "suffix" })} of operating expenses
+                On {formatAfn(thisMonth.revenueAfn, { unit: "suffix" })} of
+                revenue against{" "}
+                {formatAfn(thisMonth.cogsAfn, { unit: "suffix" })} of goods,
+                freight and duty.
               </p>
             </div>
           </CardContent>

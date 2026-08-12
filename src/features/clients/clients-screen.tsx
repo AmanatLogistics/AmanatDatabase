@@ -317,7 +317,6 @@ export function ClientsScreen() {
   return (
     <>
       <PageHeader
-        title="Clients"
         description="Who buys from us, what they have ordered, and what they still owe."
         meta={
           <span className="text-muted-foreground text-sm">

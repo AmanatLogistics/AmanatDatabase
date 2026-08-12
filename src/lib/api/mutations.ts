@@ -4,7 +4,6 @@ import { orderRevenue } from "@/lib/finance";
 import { useDataStore } from "@/lib/store";
 import type {
   Client,
-  Expense,
   ID,
   Order,
   OrderEvent,
@@ -129,7 +128,7 @@ export interface CreateOrderItemInput {
   variant?: string;
   qty: number;
   unitPriceAfn: number;
-  unitCostUsd: number;
+  unitCostAfn: number;
   weightKg?: number;
   notes?: string;
 }
@@ -254,11 +253,8 @@ export interface CreatePurchaseInput {
   storeId: ID;
   externalOrderNumber: string;
   paymentMethodId: ID;
-  itemsCostUsd: number;
-  taxUsd: number;
-  domesticShippingUsd: number;
-  otherCostUsd: number;
-  fxRate: number;
+  /** One figure: everything the store charged, in AFN. */
+  totalCostAfn: number;
   status: PurchaseStatus;
   invoiceRef?: string;
   notes?: string;
@@ -460,35 +456,6 @@ export async function createPayment(
 }
 
 /* -------------------------------------------------------------------------- */
-/* Expenses — POST /api/expenses                                               */
-/* -------------------------------------------------------------------------- */
-
-export interface CreateExpenseInput {
-  categoryId: ID;
-  description: string;
-  amountAfn: number;
-  methodId: ID;
-  vendor?: string;
-  receiptRef?: string;
-}
-
-export async function createExpense(
-  input: CreateExpenseInput,
-): Promise<Expense> {
-  const { addExpense } = state();
-
-  const expense: Expense = {
-    id: `expense-new-${Date.now()}`,
-    at: now().toISOString(),
-    recordedBy: "Yalda Sediqi",
-    ...input,
-  };
-
-  addExpense(expense);
-  return delay(expense);
-}
-
-/* -------------------------------------------------------------------------- */
 /* Settings — PATCH /api/settings                                              */
 /* -------------------------------------------------------------------------- */
 
@@ -522,21 +489,6 @@ export async function upsertPaymentMethod(
     paymentMethods: exists
       ? settings.paymentMethods.map((m) => (m.id === method.id ? method : m))
       : [...settings.paymentMethods, method],
-  });
-  return delay(undefined);
-}
-
-export async function upsertExpenseCategory(
-  category: import("@/lib/types").ExpenseCategory,
-): Promise<void> {
-  const { settings, updateSettings } = state();
-  const exists = settings.expenseCategories.some((c) => c.id === category.id);
-  updateSettings({
-    expenseCategories: exists
-      ? settings.expenseCategories.map((c) =>
-          c.id === category.id ? category : c,
-        )
-      : [...settings.expenseCategories, category],
   });
   return delay(undefined);
 }

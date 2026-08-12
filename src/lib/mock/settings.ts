@@ -1,6 +1,5 @@
 import type {
   CompanyProfile,
-  ExpenseCategory,
   PaymentMethod,
   Settings,
   Store,
@@ -24,7 +23,6 @@ export const company: CompanyProfile = {
   orderPrefix: "AS",
   defaultServiceFeePercent: 14,
   currency: "AFN",
-  referenceFxRate: 70.5,
   invoiceFooter:
     "Thank you for shopping with Amanat. Goods remain the property of Amanat Shopping until paid in full.",
   termsAndConditions:
@@ -133,51 +131,6 @@ export const paymentMethods: PaymentMethod[] = [
   },
 ];
 
-export const expenseCategories: ExpenseCategory[] = [
-  {
-    id: "exp-rent",
-    name: "Shop rent",
-    color: "var(--color-chart-1)",
-    description: "Monthly rent for the Zarnegar Plaza shop",
-  },
-  {
-    id: "exp-salaries",
-    name: "Salaries",
-    color: "var(--color-chart-2)",
-    description: "Team salaries and bonuses",
-  },
-  {
-    id: "exp-freight",
-    name: "Freight & customs",
-    color: "var(--color-chart-3)",
-    description: "Consolidation, air freight and duty not billed to a client",
-  },
-  {
-    id: "exp-marketing",
-    name: "Marketing",
-    color: "var(--color-chart-4)",
-    description: "Facebook ads, printing, promotions",
-  },
-  {
-    id: "exp-utilities",
-    name: "Utilities & internet",
-    color: "var(--color-chart-5)",
-    description: "Power, generator fuel, internet",
-  },
-  {
-    id: "exp-bank",
-    name: "Bank & transfer fees",
-    color: "var(--color-chart-6)",
-    description: "Hawala commission, card FX fees",
-  },
-  {
-    id: "exp-misc",
-    name: "Office & misc",
-    color: "var(--color-chart-1)",
-    description: "Packaging, stationery, transport",
-  },
-];
-
 export const team: TeamMember[] = [
   {
     id: "user-owner",
@@ -225,6 +178,5 @@ export const settings: Settings = {
   company,
   stores,
   paymentMethods,
-  expenseCategories,
   team,
 };

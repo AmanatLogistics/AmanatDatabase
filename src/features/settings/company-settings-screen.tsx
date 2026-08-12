@@ -149,20 +149,9 @@ export function CompanySettingsScreen() {
             <Label htmlFor="setting-currency">Reporting currency</Label>
             <Input id="setting-currency" value={draft.currency} disabled />
             <p className="text-muted-foreground text-xs">
-              Purchases stay in USD with their own FX rate.
+              Every figure in the system — quotes, purchases and payments — is in
+              Afghani.
             </p>
-          </div>
-          <div className="grid gap-2">
-            <Label htmlFor="setting-fx">Reference FX (AFN/USD)</Label>
-            <Input
-              id="setting-fx"
-              inputMode="decimal"
-              value={draft.referenceFxRate}
-              onChange={(e) =>
-                set("referenceFxRate", Number(e.target.value.replace(/[^\d.]/g, "")))
-              }
-              className="tabular"
-            />
           </div>
           <div className="grid gap-2">
             <Label htmlFor="setting-fee">Default service fee %</Label>

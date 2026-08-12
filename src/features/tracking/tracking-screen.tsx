@@ -277,7 +277,6 @@ export function TrackingScreen() {
   return (
     <>
       <PageHeader
-        title="Tracking"
         description="Where every parcel is between the store and the client's hands."
         meta={
           <span className="text-muted-foreground text-sm">

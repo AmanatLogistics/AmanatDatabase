@@ -4,7 +4,6 @@ import * as React from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import {
-  ArrowLeftIcon,
   BanknoteIcon,
   CreditCardIcon,
   MailIcon,
@@ -109,20 +108,6 @@ export function ClientDetailScreen({ clientId }: { clientId: string }) {
   return (
     <>
       <PageHeader
-        breadcrumbs={[
-          { label: "Clients", href: "/clients" },
-          { label: client.name },
-        ]}
-        title={
-          <span className="flex items-center gap-3">
-            <Button variant="ghost" size="icon-sm" asChild className="-ml-2">
-              <Link href="/clients" aria-label="Back to clients">
-                <ArrowLeftIcon />
-              </Link>
-            </Button>
-            {client.name}
-          </span>
-        }
         meta={<StatusBadge kind="client" value={client.status} />}
         description={
           <>
@@ -155,7 +140,7 @@ export function ClientDetailScreen({ clientId }: { clientId: string }) {
           accent="brand"
         />
         <StatCard
-          label="Gross profit earned"
+          label="Profit earned"
           value={formatAfn(summary.lifetimeProfitAfn, { unit: "suffix" })}
           caption={
             summary.lifetimeRevenueAfn > 0

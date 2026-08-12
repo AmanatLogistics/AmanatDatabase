@@ -4,7 +4,7 @@ import * as React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { ArrowLeftIcon, PlusIcon, Trash2Icon } from "lucide-react";
+import { PlusIcon, Trash2Icon } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -55,7 +55,7 @@ function emptyItem(storeId: string): DraftItem {
     variant: "",
     qty: 1,
     unitPriceAfn: 0,
-    unitCostUsd: 0,
+    unitCostAfn: 0,
     weightKg: 0,
   };
 }
@@ -108,7 +108,7 @@ export function NewOrderScreen() {
   const totalAfn = itemsAfn + serviceFeeAfn + shippingAfn - discountAfn;
 
   const estimatedCostAfn = items.reduce(
-    (sum, item) => sum + item.unitCostUsd * item.qty * company.referenceFxRate,
+    (sum, item) => sum + item.unitCostAfn * item.qty,
     0,
   );
   const estimatedProfit = totalAfn - estimatedCostAfn - shippingAfn * 0.75;
@@ -131,7 +131,7 @@ export function NewOrderScreen() {
           category: item.category,
           qty: item.qty,
           unitPriceAfn: item.unitPriceAfn,
-          unitCostUsd: item.unitCostUsd,
+          unitCostAfn: item.unitCostAfn,
           productUrl: item.productUrl?.trim() || undefined,
           variant: item.variant?.trim() || undefined,
           weightKg: item.weightKg || undefined,
@@ -153,20 +153,7 @@ export function NewOrderScreen() {
 
   return (
     <>
-      <PageHeader
-        breadcrumbs={[{ label: "Orders", href: "/orders" }, { label: "New order" }]}
-        title={
-          <span className="flex items-center gap-3">
-            <Button variant="ghost" size="icon-sm" asChild className="-ml-2">
-              <Link href="/orders" aria-label="Back to orders">
-                <ArrowLeftIcon />
-              </Link>
-            </Button>
-            Create new order
-          </span>
-        }
-        description="Capture a client request — the links, quantities and the price you quoted."
-      />
+      <PageHeader description="Capture a client request — the links, quantities and the price you quoted." />
 
       <div className="grid items-start gap-4 xl:grid-cols-[1fr_340px]">
         <div className="min-w-0 space-y-5">
@@ -234,7 +221,6 @@ export function NewOrderScreen() {
                   item={item}
                   index={index}
                   stores={stores}
-                  referenceFxRate={company.referenceFxRate}
                   canRemove={items.length > 1}
                   onPatch={(patch) => patchItem(item.key, patch)}
                   onRemove={() =>
@@ -401,7 +387,6 @@ function ItemFields({
   item,
   index,
   stores,
-  referenceFxRate,
   canRemove,
   onPatch,
   onRemove,
@@ -409,7 +394,6 @@ function ItemFields({
   item: DraftItem;
   index: number;
   stores: Array<{ id: string; name: string }>;
-  referenceFxRate: number;
   canRemove: boolean;
   onPatch: (patch: Partial<DraftItem>) => void;
   onRemove: () => void;
@@ -543,27 +527,27 @@ function ItemFields({
           </div>
 
           <div className="grid gap-2">
-            <Label htmlFor={field("cost")}>Store cost ($/unit)</Label>
+            <Label htmlFor={field("cost")}>Store cost (AFN/unit)</Label>
             <Input
               id={field("cost")}
-              inputMode="decimal"
-              value={item.unitCostUsd || ""}
+              inputMode="numeric"
+              value={item.unitCostAfn || ""}
               onChange={(e) => {
-                const cost = Number(e.target.value.replace(/[^\d.]/g, ""));
+                const cost = Number(e.target.value.replace(/[^\d]/g, ""));
                 /*
-                 * Suggest the landed price: the FX rate plus the ~15% that store
-                 * tax, domestic shipping and FX drift typically add before the
-                 * item reaches us.
+                 * Suggest a client price straight away: the store cost plus the
+                 * ~15% that store tax and domestic shipping typically add before
+                 * the item reaches us, rounded to the nearest 50 AFN the way the
+                 * team quotes.
                  */
-                const suggested =
-                  Math.round((cost * referenceFxRate * 1.15) / 50) * 50;
+                const suggested = Math.round((cost * 1.15) / 50) * 50;
                 onPatch({
-                  unitCostUsd: cost,
+                  unitCostAfn: cost,
                   unitPriceAfn: item.unitPriceAfn || suggested,
                 });
               }}
               className="tabular"
-              placeholder="199.00"
+              placeholder="14000"
             />
           </div>
 

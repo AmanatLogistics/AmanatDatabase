@@ -24,7 +24,7 @@ import type { MonthlyPoint } from "@/lib/finance";
 const config = {
   revenueAfn: { label: "Revenue", color: "var(--color-chart-1)" },
   cogsAfn: { label: "Direct cost", color: "var(--color-chart-3)" },
-  grossProfitAfn: { label: "Gross profit", color: "var(--color-chart-2)" },
+  profitAfn: { label: "Profit", color: "var(--color-chart-2)" },
 } satisfies ChartConfig;
 
 export function RevenueChart({
@@ -94,7 +94,7 @@ export function RevenueChart({
         />
         <Line
           type="monotone"
-          dataKey="grossProfitAfn"
+          dataKey="profitAfn"
           stroke="var(--color-chart-2)"
           strokeWidth={2}
           dot={false}

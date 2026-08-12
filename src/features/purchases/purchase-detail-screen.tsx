@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeftIcon, ExternalLinkIcon } from "lucide-react";
+import { ExternalLinkIcon } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -15,7 +15,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Money, MoneyUsd } from "@/components/shared/money";
+import { Money } from "@/components/shared/money";
 import { PageHeader } from "@/components/shared/page-header";
 import { ProductThumb } from "@/components/shared/product-thumb";
 import { StatusBadge } from "@/components/shared/status-badge";
@@ -29,7 +29,7 @@ export function PurchaseDetailScreen({ purchaseId }: { purchaseId: string }) {
 
   if (!row) notFound();
 
-  const { purchase, order, client, store, totalUsd, totalAfn } = row;
+  const { purchase, order, client, store } = row;
   const method = methodOf(purchase.paymentMethodId);
   const coveredItems =
     order?.items.filter((item) => purchase.orderItemIds.includes(item.id)) ??
@@ -38,20 +38,6 @@ export function PurchaseDetailScreen({ purchaseId }: { purchaseId: string }) {
   return (
     <>
       <PageHeader
-        breadcrumbs={[
-          { label: "Purchases", href: "/purchases" },
-          { label: purchase.purchaseNo },
-        ]}
-        title={
-          <span className="flex items-center gap-3">
-            <Button variant="ghost" size="icon-sm" asChild className="-ml-2">
-              <Link href="/purchases" aria-label="Back to purchases">
-                <ArrowLeftIcon />
-              </Link>
-            </Button>
-            <span className="tabular">{purchase.purchaseNo}</span>
-          </span>
-        }
         meta={<StatusBadge kind="purchase" value={purchase.status} />}
         description={
           <>
@@ -130,33 +116,20 @@ export function PurchaseDetailScreen({ purchaseId }: { purchaseId: string }) {
         <div className="space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle className="text-sm">Cost breakdown</CardTitle>
+              <CardTitle className="text-sm">What we paid</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-2 text-sm">
-              <CostLine label="Items" value={purchase.itemsCostUsd} />
-              <CostLine label="Tax" value={purchase.taxUsd} />
-              <CostLine
-                label="Domestic shipping"
-                value={purchase.domesticShippingUsd}
-              />
-              <CostLine label="Other charges" value={purchase.otherCostUsd} />
-              <Separator className="my-2" />
-              <div className="flex items-center justify-between font-semibold">
-                <span>Total paid</span>
-                <MoneyUsd value={totalUsd} />
-              </div>
-              <Separator className="my-2" />
-              <div className="text-muted-foreground flex items-center justify-between text-xs">
-                <span>FX rate used</span>
-                <span className="tabular">{purchase.fxRate} AFN / USD</span>
-              </div>
+            <CardContent className="space-y-3 text-sm">
+              <p className="tabular text-2xl font-semibold">
+                <Money value={purchase.totalCostAfn} unit="suffix" />
+              </p>
+              <p className="text-muted-foreground text-xs">
+                Everything the store charged for this purchase — goods, tax and
+                any local delivery — as a single amount paid out.
+              </p>
+              <Separator />
               <div className="flex items-center justify-between">
-                <span className="font-medium">Cost in Afghani</span>
-                <Money
-                  value={totalAfn}
-                  unit="suffix"
-                  className="font-semibold"
-                />
+                <span className="text-muted-foreground">Order lines covered</span>
+                <span className="tabular">{purchase.orderItemIds.length}</span>
               </div>
             </CardContent>
           </Card>
@@ -199,7 +172,7 @@ export function PurchaseDetailScreen({ purchaseId }: { purchaseId: string }) {
               <TableRow className="hover:bg-transparent">
                 <TableHead>Product</TableHead>
                 <TableHead className="text-right">Qty</TableHead>
-                <TableHead className="text-right">Est. unit cost (USD)</TableHead>
+                <TableHead className="text-right">Quoted cost (AFN)</TableHead>
                 <TableHead className="text-right">Charged client (AFN)</TableHead>
               </TableRow>
             </TableHeader>
@@ -227,8 +200,8 @@ export function PurchaseDetailScreen({ purchaseId }: { purchaseId: string }) {
                     {item.qty}
                   </TableCell>
                   <TableCell className="text-right">
-                    <MoneyUsd
-                      value={item.unitCostUsd}
+                    <Money
+                      value={item.unitCostAfn * item.qty}
                       className="text-muted-foreground text-[13px]"
                     />
                   </TableCell>
@@ -253,15 +226,6 @@ function Field({ label, value }: { label: string; value: React.ReactNode }) {
     <div>
       <dt className="text-muted-foreground text-xs">{label}</dt>
       <dd className="text-[13px]">{value}</dd>
-    </div>
-  );
-}
-
-function CostLine({ label, value }: { label: string; value: number }) {
-  return (
-    <div className="flex items-center justify-between">
-      <span className="text-muted-foreground">{label}</span>
-      <MoneyUsd value={value} />
     </div>
   );
 }

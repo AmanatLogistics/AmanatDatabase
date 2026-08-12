@@ -13,6 +13,7 @@ export function StatCard({
   caption,
   delta,
   deltaSuffix,
+  deltaGoodWhenDown,
   progress,
   accent = "brand",
   icon: Icon,
@@ -23,6 +24,8 @@ export function StatCard({
   caption?: React.ReactNode;
   delta?: number | null;
   deltaSuffix?: string;
+  /** Set for cost-like metrics, where a rise is bad news. */
+  deltaGoodWhenDown?: boolean;
   /** 0-100 */
   progress?: number;
   accent?: "brand" | "gold" | "info" | "success" | "destructive";
@@ -64,7 +67,11 @@ export function StatCard({
           </span>
         </div>
         {delta !== undefined && (
-          <DeltaPill value={delta} suffix={deltaSuffix ?? "vs last month"} />
+          <DeltaPill
+            value={delta}
+            suffix={deltaSuffix ?? "vs last month"}
+            goodWhenDown={deltaGoodWhenDown}
+          />
         )}
       </div>
 

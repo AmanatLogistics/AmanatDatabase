@@ -7,10 +7,8 @@ import {
   LayoutDashboardIcon,
   type LucideIcon,
   PackageIcon,
-  ReceiptTextIcon,
   SettingsIcon,
   ShoppingCartIcon,
-  TagsIcon,
   TruckIcon,
   UsersIcon,
   UsersRoundIcon,
@@ -66,7 +64,6 @@ export const navigation: NavSection[] = [
         icon: CalculatorIcon,
         children: [
           { label: "Profit & loss", href: "/finance", icon: CalculatorIcon },
-          { label: "Expenses", href: "/finance/expenses", icon: ReceiptTextIcon },
           {
             label: "Client balances",
             href: "/finance/balances",
@@ -101,11 +98,6 @@ export const settingsPages = [
     label: "Payment methods",
     href: "/settings/payment-methods",
     icon: CreditCardIcon,
-  },
-  {
-    label: "Expense categories",
-    href: "/settings/expense-categories",
-    icon: TagsIcon,
   },
   { label: "Team", href: "/settings/team", icon: UsersRoundIcon },
 ];

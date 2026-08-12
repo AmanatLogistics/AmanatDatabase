@@ -5,7 +5,6 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { toast } from "sonner";
 import {
-  ArrowLeftIcon,
   CheckCircle2Icon,
   ExternalLinkIcon,
   PrinterIcon,
@@ -64,20 +63,6 @@ export function ShipmentDetailScreen({ shipmentId }: { shipmentId: string }) {
   return (
     <>
       <PageHeader
-        breadcrumbs={[
-          { label: "Tracking", href: "/tracking" },
-          { label: shipment.trackingNumber },
-        ]}
-        title={
-          <span className="flex items-center gap-3">
-            <Button variant="ghost" size="icon-sm" asChild className="-ml-2">
-              <Link href="/tracking" aria-label="Back to tracking">
-                <ArrowLeftIcon />
-              </Link>
-            </Button>
-            <span className="tabular">{shipment.trackingNumber}</span>
-          </span>
-        }
         meta={<StatusBadge kind="shipment" value={shipment.status} />}
         description={
           <>

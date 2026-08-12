@@ -36,9 +36,9 @@ import {
 import { Money } from "@/components/shared/money";
 import {
   upsertPaymentMethod,
-  useExpenseRows,
   usePaymentMethods,
   usePaymentRows,
+  usePurchases,
 } from "@/lib/api";
 import { PAYMENT_METHOD_KIND_LABEL } from "@/lib/constants";
 import type { PaymentMethod, PaymentMethodKind } from "@/lib/types";
@@ -52,7 +52,7 @@ const USE_LABEL: Record<PaymentMethod["usedFor"], string> = {
 export function PaymentMethodsSettingsScreen() {
   const methods = usePaymentMethods();
   const payments = usePaymentRows();
-  const expenses = useExpenseRows();
+  const purchases = usePurchases();
 
   const [editing, setEditing] = React.useState<PaymentMethod | null>(null);
   const [creating, setCreating] = React.useState(false);
@@ -65,14 +65,14 @@ export function PaymentMethodsSettingsScreen() {
         (map.get(row.payment.methodId) ?? 0) + row.payment.amountAfn,
       ),
     );
-    expenses.forEach((row) =>
+    purchases.forEach((purchase) =>
       map.set(
-        row.expense.methodId,
-        (map.get(row.expense.methodId) ?? 0) + row.expense.amountAfn,
+        purchase.paymentMethodId,
+        (map.get(purchase.paymentMethodId) ?? 0) + purchase.totalCostAfn,
       ),
     );
     return map;
-  }, [payments, expenses]);
+  }, [payments, purchases]);
 
   async function toggleActive(method: PaymentMethod, active: boolean) {
     await upsertPaymentMethod({ ...method, active });
@@ -103,7 +103,7 @@ export function PaymentMethodsSettingsScreen() {
                 <TableHead>Method</TableHead>
                 <TableHead>Kind</TableHead>
                 <TableHead>Used for</TableHead>
-                <TableHead className="text-right">Volume</TableHead>
+                <TableHead className="text-right">Volume (AFN)</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead />
               </TableRow>

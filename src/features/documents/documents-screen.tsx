@@ -180,7 +180,6 @@ export function DocumentsScreen() {
   return (
     <>
       <PageHeader
-        title="Documents"
         description="Generated on demand from live order data. Opening one renders a print-ready A4 sheet in a new tab."
         meta={
           <span className="text-muted-foreground text-sm">

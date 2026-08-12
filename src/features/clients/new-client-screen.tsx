@@ -4,7 +4,6 @@ import * as React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { ArrowLeftIcon } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -86,23 +85,7 @@ export function NewClientScreen() {
 
   return (
     <>
-      <PageHeader
-        breadcrumbs={[
-          { label: "Clients", href: "/clients" },
-          { label: "New client" },
-        ]}
-        title={
-          <span className="flex items-center gap-3">
-            <Button variant="ghost" size="icon-sm" asChild className="-ml-2">
-              <Link href="/clients" aria-label="Back to clients">
-                <ArrowLeftIcon />
-              </Link>
-            </Button>
-            Add a client
-          </span>
-        }
-        description="The minimum we need is a name and a phone number."
-      />
+      <PageHeader description="The minimum we need is a name and a phone number." />
 
       <div className="max-w-3xl space-y-5">
         <Card>

@@ -1,4 +1,4 @@
-import { formatAfn, formatUsd } from "@/lib/format";
+import { formatAfn } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 /**
@@ -48,32 +48,21 @@ export function Money({
   );
 }
 
-/** A USD amount — what we actually paid a store or forwarder. */
-export function MoneyUsd({
-  value,
-  className,
-  symbol = true,
-}: {
-  value: number;
-  className?: string;
-  symbol?: boolean;
-}) {
-  return (
-    <span className={cn("tabular whitespace-nowrap", className)}>
-      {symbol ? formatUsd(value) : formatUsd(value).replace("$", "")}
-    </span>
-  );
-}
-
 /** Percentage-change pill used on KPI cards. */
 export function DeltaPill({
   value,
   className,
   suffix = "vs last month",
+  goodWhenDown = false,
 }: {
   value: number | null;
   className?: string;
   suffix?: string;
+  /**
+   * For metrics where growth is bad news — cost, money owed to us — a rise must
+   * not be painted green just because the number went up.
+   */
+  goodWhenDown?: boolean;
 }) {
   if (value === null) {
     return (
@@ -88,20 +77,20 @@ export function DeltaPill({
     );
   }
 
-  const positive = value >= 0;
+  const good = goodWhenDown ? value <= 0 : value >= 0;
 
   return (
     <span
       className={cn(
         "tabular rounded-full px-2 py-0.5 text-[11px] font-medium",
-        positive
+        good
           ? "bg-success/12 text-success"
           : "bg-destructive/10 text-destructive",
         className,
       )}
       title={`${value >= 0 ? "+" : ""}${value.toFixed(1)}% ${suffix}`}
     >
-      {positive ? "+" : "−"}
+      {value >= 0 ? "+" : "−"}
       {Math.abs(value).toFixed(1)}%
     </span>
   );

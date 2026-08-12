@@ -10,22 +10,15 @@ const afnFormatter = new Intl.NumberFormat("en-US", {
   maximumFractionDigits: 0,
 });
 
-const usdFormatter = new Intl.NumberFormat("en-US", {
-  minimumFractionDigits: 2,
-  maximumFractionDigits: 2,
-});
-
 /**
- * Afghani amounts.
+ * Afghani amounts — the only currency in the app.
  *
- * The Afghani sign (؋, U+060B) is an Arabic-script glyph: next to Latin digits
- * it renders small and off-baseline, and repeating it in every table cell reads
- * as a rendering artifact. So amounts are formatted as bare grouped digits and
- * the unit is carried by the column header — "Total (AFN)" — the way finance
- * software normally does it.
+ * The unit is written as the letters "AFN", never the ؋ sign: that glyph is
+ * Arabic-script and renders small and off-baseline beside Latin digits.
  *
- * Pass `unit: "suffix"` for standalone figures (KPI tiles, invoice totals) that
- * have no column header to lean on: "148,500 AFN".
+ * Amounts are bare grouped digits by default, with the unit carried by the
+ * column header ("Total (AFN)"). Pass `unit: "suffix"` for standalone figures
+ * such as KPI tiles and invoice totals that have no header to lean on.
  */
 export function formatAfn(
   amount: number,
@@ -36,13 +29,6 @@ export function formatAfn(
   const body = afnFormatter.format(abs);
   const prefix = amount < 0 ? "−" : sign ? "+" : "";
   return unit === "suffix" ? `${prefix}${body} AFN` : `${prefix}${body}`;
-}
-
-/** "$1,249.99" — what we actually paid the store. */
-export function formatUsd(amount: number, opts: { sign?: boolean } = {}): string {
-  const abs = Math.abs(amount);
-  const prefix = amount < 0 ? "−" : opts.sign ? "+" : "";
-  return `${prefix}$${usdFormatter.format(abs)}`;
 }
 
 /** Compact axis/KPI form: "1.2M", "840k". Unit-less — axes carry it in the title. */

@@ -4,6 +4,7 @@ import { useMemo } from "react";
 
 import {
   AGING_BUCKET_LABEL,
+  buildLedgerIndex,
   clientSummary,
   deltaPercent,
   isActive,
@@ -12,12 +13,11 @@ import {
   orderEconomics,
   orderRevenue,
   periodPnL,
-  purchaseTotalAfn,
-  purchaseTotalUsd,
   receivablesAging,
   startOfMonth,
   type AgingRow,
   type ClientSummary,
+  type LedgerIndex,
   type MonthlyPoint,
   type OrderEconomics,
   type PeriodPnL,
@@ -27,8 +27,6 @@ import { DOCUMENT_KIND_LABEL, ORDER_STATUS } from "@/lib/constants";
 import type {
   BusinessDocument,
   Client,
-  Expense,
-  ExpenseCategory,
   ID,
   Order,
   Payment,
@@ -69,10 +67,6 @@ export function usePaymentMethods(): PaymentMethod[] {
   return useDataStore((s) => s.settings.paymentMethods);
 }
 
-export function useExpenseCategories(): ExpenseCategory[] {
-  return useDataStore((s) => s.settings.expenseCategories);
-}
-
 export function useTeam() {
   return useDataStore((s) => s.settings.team);
 }
@@ -80,6 +74,29 @@ export function useTeam() {
 /** Frozen "now". Keeps ageing and ETA maths identical on server and client. */
 export function useToday(): Date {
   return useDataStore((s) => s.today);
+}
+
+/* -------------------------------------------------------------------------- */
+/* Ledger index                                                                */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * One set of order-keyed lookups shared by every derivation on the screen.
+ *
+ * Without it, each of the ~150 orders re-scans all payments, purchases and
+ * shipments to find its own — quadratic work repeated on every render. Building
+ * the index once per data change makes those lookups constant time.
+ */
+export function useLedgerIndex(): LedgerIndex {
+  const orders = useDataStore((s) => s.orders);
+  const purchases = useDataStore((s) => s.purchases);
+  const payments = useDataStore((s) => s.payments);
+  const shipments = useDataStore((s) => s.shipments);
+
+  return useMemo(
+    () => buildLedgerIndex(orders, purchases, payments, shipments),
+    [orders, purchases, payments, shipments],
+  );
 }
 
 /* -------------------------------------------------------------------------- */
@@ -100,16 +117,6 @@ export function usePaymentMethodLookup(): (id: ID) => PaymentMethod | undefined 
     const map = new Map(methods.map((m) => [m.id, m]));
     return (id: ID) => map.get(id);
   }, [methods]);
-}
-
-export function useExpenseCategoryLookup(): (
-  id: ID,
-) => ExpenseCategory | undefined {
-  const categories = useExpenseCategories();
-  return useMemo(() => {
-    const map = new Map(categories.map((c) => [c.id, c]));
-    return (id: ID) => map.get(id);
-  }, [categories]);
 }
 
 export function useClientLookup(): (id: ID) => Client | undefined {
@@ -135,33 +142,30 @@ export function useClients(): Client[] {
 
 export function useClientRows(): ClientRow[] {
   const clients = useDataStore((s) => s.clients);
-  const orders = useDataStore((s) => s.orders);
-  const purchases = useDataStore((s) => s.purchases);
-  const payments = useDataStore((s) => s.payments);
-  const shipments = useDataStore((s) => s.shipments);
+  const index = useLedgerIndex();
   const today = useToday();
 
   return useMemo(
     () =>
       clients.map((client) => ({
         client,
-        summary: clientSummary(
-          client.id,
-          orders,
-          purchases,
-          payments,
-          shipments,
-          today,
-        ),
+        summary: clientSummary(client.id, index, today),
       })),
-    [clients, orders, purchases, payments, shipments, today],
+    [clients, index, today],
   );
 }
 
 /** GET /api/clients/:id */
 export function useClient(id: ID): ClientRow | undefined {
-  const rows = useClientRows();
-  return useMemo(() => rows.find((r) => r.client.id === id), [rows, id]);
+  const clients = useDataStore((s) => s.clients);
+  const index = useLedgerIndex();
+  const today = useToday();
+
+  return useMemo(() => {
+    const client = clients.find((c) => c.id === id);
+    if (!client) return undefined;
+    return { client, summary: clientSummary(client.id, index, today) };
+  }, [clients, id, index, today]);
 }
 
 /* -------------------------------------------------------------------------- */
@@ -184,34 +188,43 @@ export function useOrders(): Order[] {
 
 export function useOrderRows(): OrderRow[] {
   const orders = useDataStore((s) => s.orders);
-  const purchases = useDataStore((s) => s.purchases);
-  const payments = useDataStore((s) => s.payments);
-  const shipments = useDataStore((s) => s.shipments);
+  const index = useLedgerIndex();
   const clientOf = useClientLookup();
 
   return useMemo(
     () =>
-      orders.map((order) => {
-        const shipment = shipments.find((s) => s.orderId === order.id);
-        const linkedPurchases = purchases.filter((p) => p.orderId === order.id);
-        return {
-          order,
-          client: clientOf(order.clientId),
-          economics: orderEconomics(order, purchases, payments, shipment),
-          shipment,
-          purchases: linkedPurchases,
-          itemCount: order.items.length,
-          unitCount: order.items.reduce((sum, i) => sum + i.qty, 0),
-        };
-      }),
-    [orders, purchases, payments, shipments, clientOf],
+      orders.map((order) => ({
+        order,
+        client: clientOf(order.clientId),
+        economics: orderEconomics(order, index),
+        shipment: index.shipmentByOrder.get(order.id),
+        purchases: index.purchasesByOrder.get(order.id) ?? [],
+        itemCount: order.items.length,
+        unitCount: order.items.reduce((sum, i) => sum + i.qty, 0),
+      })),
+    [orders, index, clientOf],
   );
 }
 
 /** GET /api/orders/:id */
 export function useOrder(id: ID): OrderRow | undefined {
-  const rows = useOrderRows();
-  return useMemo(() => rows.find((r) => r.order.id === id), [rows, id]);
+  const orders = useDataStore((s) => s.orders);
+  const index = useLedgerIndex();
+  const clientOf = useClientLookup();
+
+  return useMemo(() => {
+    const order = orders.find((o) => o.id === id);
+    if (!order) return undefined;
+    return {
+      order,
+      client: clientOf(order.clientId),
+      economics: orderEconomics(order, index),
+      shipment: index.shipmentByOrder.get(order.id),
+      purchases: index.purchasesByOrder.get(order.id) ?? [],
+      itemCount: order.items.length,
+      unitCount: order.items.reduce((sum, i) => sum + i.qty, 0),
+    };
+  }, [orders, id, index, clientOf]);
 }
 
 /** GET /api/clients/:id/orders */
@@ -232,8 +245,10 @@ export interface PurchaseRow {
   order?: Order;
   client?: Client;
   store?: Store;
-  totalUsd: number;
-  totalAfn: number;
+}
+
+export function usePurchases(): Purchase[] {
+  return useDataStore((s) => s.purchases);
 }
 
 export function usePurchaseRows(): PurchaseRow[] {
@@ -251,8 +266,6 @@ export function usePurchaseRows(): PurchaseRow[] {
         order,
         client: order ? clientOf(order.clientId) : undefined,
         store: storeOf(purchase.storeId),
-        totalUsd: purchaseTotalUsd(purchase),
-        totalAfn: purchaseTotalAfn(purchase),
       };
     });
   }, [purchases, orders, clientOf, storeOf]);
@@ -274,6 +287,10 @@ export interface ShipmentRow {
   client?: Client;
   /** Days until ETA; negative when the ETA has passed. */
   daysToEta: number | null;
+}
+
+export function useShipments(): Shipment[] {
+  return useDataStore((s) => s.shipments);
 }
 
 export function useShipmentRows(): ShipmentRow[] {
@@ -345,44 +362,32 @@ export function useClientPayments(clientId: ID): PaymentRow[] {
 }
 
 /* -------------------------------------------------------------------------- */
-/* Expenses — GET /api/expenses                                                */
+/* Navigation counters — GET /api/nav-counts                                   */
 /* -------------------------------------------------------------------------- */
 
-export interface ExpenseRow {
-  expense: Expense;
-  category?: ExpenseCategory;
-  method?: PaymentMethod;
+export interface NavCounts {
+  activeOrders: number;
+  customsHolds: number;
+  outstandingAfn: number;
+  attention: AttentionItem[];
 }
 
-export function useExpenseRows(): ExpenseRow[] {
-  const expenses = useDataStore((s) => s.expenses);
-  const categoryOf = useExpenseCategoryLookup();
-  const methodOf = usePaymentMethodLookup();
+/**
+ * Deliberately narrow. The sidebar and topbar render on every route and only
+ * need a few counters — calling `useDashboard()` here would rebuild the twelve
+ * month series, the period P&L and the ageing report on every page.
+ */
+export function useNavCounts(): NavCounts {
+  const orders = useDataStore((s) => s.orders);
+  const shipments = useDataStore((s) => s.shipments);
+  const index = useLedgerIndex();
+  const clientOf = useClientLookup();
+  const today = useToday();
 
   return useMemo(
-    () =>
-      expenses.map((expense) => ({
-        expense,
-        category: categoryOf(expense.categoryId),
-        method: methodOf(expense.methodId),
-      })),
-    [expenses, categoryOf, methodOf],
+    () => buildAttention(orders, shipments, index, clientOf, today),
+    [orders, shipments, index, clientOf, today],
   );
-}
-
-/* -------------------------------------------------------------------------- */
-/* Dashboard — GET /api/dashboard                                              */
-/* -------------------------------------------------------------------------- */
-
-export interface DashboardKpi {
-  label: string;
-  value: number;
-  /** Rendered form; the card does not re-format. */
-  display: string;
-  deltaPercent: number | null;
-  /** 0-100, used by the thin progress bar under each KPI. */
-  progress: number;
-  caption: string;
 }
 
 export interface AttentionItem {
@@ -393,6 +398,99 @@ export interface AttentionItem {
   href: string;
   amountAfn?: number;
 }
+
+function buildAttention(
+  orders: Order[],
+  shipments: Shipment[],
+  index: LedgerIndex,
+  clientOf: (id: ID) => Client | undefined,
+  today: Date,
+): NavCounts {
+  const attention: AttentionItem[] = [];
+  const orderMap = new Map(orders.map((o) => [o.id, o]));
+  let outstandingAfn = 0;
+  let activeOrders = 0;
+
+  orders.forEach((order) => {
+    if (isActive(order)) activeOrders += 1;
+    const econ = orderEconomics(order, index);
+    if (econ.balanceAfn > 0) outstandingAfn += econ.balanceAfn;
+  });
+
+  const customs = shipments.filter((s) => s.status === "customs");
+  customs.slice(0, 3).forEach((shipment) => {
+    const order = orderMap.get(shipment.orderId);
+    attention.push({
+      id: `customs-${shipment.id}`,
+      kind: "customs",
+      title: `${order?.orderNo ?? "Order"} held in customs`,
+      description: `${shipment.carrier} · ${shipment.trackingNumber} — clearance documents requested.`,
+      href: `/tracking/${shipment.id}`,
+    });
+  });
+
+  shipments
+    .filter((s) => s.status === "exception")
+    .slice(0, 2)
+    .forEach((shipment) => {
+      const order = orderMap.get(shipment.orderId);
+      attention.push({
+        id: `exception-${shipment.id}`,
+        kind: "exception",
+        title: `Delivery exception on ${order?.orderNo ?? "an order"}`,
+        description: `${shipment.carrier} could not complete delivery — contact the client.`,
+        href: `/tracking/${shipment.id}`,
+      });
+    });
+
+  orders
+    .filter(
+      (order) =>
+        order.status === "delivered" &&
+        (today.getTime() - new Date(order.requestedAt).getTime()) / 86_400_000 >
+          45 &&
+        orderEconomics(order, index).balanceAfn > 0,
+    )
+    .slice(0, 3)
+    .forEach((order) => {
+      attention.push({
+        id: `overdue-${order.id}`,
+        kind: "overdue",
+        title: `${clientOf(order.clientId)?.name ?? "Client"} is overdue`,
+        description: `${order.orderNo} delivered but not settled.`,
+        href: `/orders/${order.id}`,
+        amountAfn: orderEconomics(order, index).balanceAfn,
+      });
+    });
+
+  orders
+    .filter(
+      (order) =>
+        order.status === "confirmed" &&
+        (index.purchasesByOrder.get(order.id) ?? []).length === 0,
+    )
+    .slice(0, 3)
+    .forEach((order) => {
+      attention.push({
+        id: `unpurchased-${order.id}`,
+        kind: "unpurchased",
+        title: `${order.orderNo} confirmed but not purchased`,
+        description: `${clientOf(order.clientId)?.name ?? "Client"} paid an advance — place the store order.`,
+        href: `/orders/${order.id}`,
+      });
+    });
+
+  return {
+    activeOrders,
+    customsHolds: customs.length,
+    outstandingAfn,
+    attention: attention.slice(0, 6),
+  };
+}
+
+/* -------------------------------------------------------------------------- */
+/* Dashboard — GET /api/dashboard                                              */
+/* -------------------------------------------------------------------------- */
 
 export interface DashboardData {
   monthly: MonthlyPoint[];
@@ -410,26 +508,16 @@ export interface DashboardData {
 
 export function useDashboard(): DashboardData {
   const orders = useDataStore((s) => s.orders);
-  const purchases = useDataStore((s) => s.purchases);
-  const shipments = useDataStore((s) => s.shipments);
-  const expenses = useDataStore((s) => s.expenses);
-  const categories = useExpenseCategories();
   const stores = useStores();
+  const index = useLedgerIndex();
   const today = useToday();
   const rows = useOrderRows();
+  const nav = useNavCounts();
 
   return useMemo(() => {
-    const monthly = monthlySeries(12, today, orders, purchases, shipments, expenses);
+    const monthly = monthlySeries(12, today, orders, index);
 
-    const thisMonth = periodPnL(
-      startOfMonth(today),
-      today,
-      orders,
-      purchases,
-      shipments,
-      expenses,
-      categories,
-    );
+    const thisMonth = periodPnL(startOfMonth(today), today, orders, index);
 
     /*
      * The current month is only partly elapsed, so comparing it against a whole
@@ -450,20 +538,14 @@ export function useDashboard(): DashboardData {
         ),
       ),
       orders,
-      purchases,
-      shipments,
-      expenses,
-      categories,
+      index,
     );
 
     const yearToDate = periodPnL(
       new Date(Date.UTC(today.getUTCFullYear(), 0, 1)),
       today,
       orders,
-      purchases,
-      shipments,
-      expenses,
-      categories,
+      index,
     );
 
     /* Orders by status ---------------------------------------------------- */
@@ -509,89 +591,8 @@ export function useDashboard(): DashboardData {
       .filter((s) => s.revenueAfn > 0)
       .sort((a, b) => b.revenueAfn - a.revenueAfn);
 
-    /* Money owed ---------------------------------------------------------- */
-    const outstandingAfn = rows.reduce(
-      (sum, row) => sum + Math.max(0, row.economics.balanceAfn),
-      0,
-    );
-
-    /* Needs attention ----------------------------------------------------- */
-    const attention: AttentionItem[] = [];
-
-    shipments
-      .filter((s) => s.status === "customs")
-      .slice(0, 3)
-      .forEach((shipment) => {
-        const row = rows.find((r) => r.order.id === shipment.orderId);
-        attention.push({
-          id: `customs-${shipment.id}`,
-          kind: "customs",
-          title: `${row?.order.orderNo ?? "Order"} held in customs`,
-          description: `${shipment.carrier} · ${shipment.trackingNumber} — clearance documents requested.`,
-          href: `/tracking/${shipment.id}`,
-        });
-      });
-
-    shipments
-      .filter((s) => s.status === "exception")
-      .slice(0, 2)
-      .forEach((shipment) => {
-        const row = rows.find((r) => r.order.id === shipment.orderId);
-        attention.push({
-          id: `exception-${shipment.id}`,
-          kind: "exception",
-          title: `Delivery exception on ${row?.order.orderNo ?? "an order"}`,
-          description: `${shipment.carrier} could not complete delivery — contact the client.`,
-          href: `/tracking/${shipment.id}`,
-        });
-      });
-
-    rows
-      .filter(
-        (r) =>
-          r.order.status === "delivered" &&
-          r.economics.balanceAfn > 0 &&
-          (today.getTime() - new Date(r.order.requestedAt).getTime()) /
-            86_400_000 >
-            45,
-      )
-      .sort((a, b) => b.economics.balanceAfn - a.economics.balanceAfn)
-      .slice(0, 3)
-      .forEach((row) => {
-        attention.push({
-          id: `overdue-${row.order.id}`,
-          kind: "overdue",
-          title: `${row.client?.name ?? "Client"} is overdue`,
-          description: `${row.order.orderNo} delivered but not settled.`,
-          href: `/orders/${row.order.id}`,
-          amountAfn: row.economics.balanceAfn,
-        });
-      });
-
-    rows
-      .filter((r) => r.order.status === "confirmed" && r.purchases.length === 0)
-      .slice(0, 3)
-      .forEach((row) => {
-        attention.push({
-          id: `unpurchased-${row.order.id}`,
-          kind: "unpurchased",
-          title: `${row.order.orderNo} confirmed but not purchased`,
-          description: `${row.client?.name ?? "Client"} paid an advance — place the store order.`,
-          href: `/orders/${row.order.id}`,
-        });
-      });
-
-    /* Rolling 7-day profit ------------------------------------------------ */
     const weekAgo = new Date(today.getTime() - 7 * 86_400_000);
-    const weekPnl = periodPnL(
-      weekAgo,
-      today,
-      orders,
-      purchases,
-      shipments,
-      expenses,
-      categories,
-    );
+    const weekPnl = periodPnL(weekAgo, today, orders, index);
 
     return {
       monthly,
@@ -601,12 +602,12 @@ export function useDashboard(): DashboardData {
       ordersByStatus,
       salesByStore,
       recentOrders: rows.slice(0, 6),
-      outstandingAfn,
-      activeOrders: orders.filter(isActive).length,
-      attention: attention.slice(0, 6),
-      weekProfitAfn: weekPnl.grossProfitAfn,
+      outstandingAfn: nav.outstandingAfn,
+      activeOrders: nav.activeOrders,
+      attention: nav.attention,
+      weekProfitAfn: weekPnl.profitAfn,
     };
-  }, [orders, purchases, shipments, expenses, categories, stores, today, rows]);
+  }, [orders, stores, index, today, rows, nav]);
 }
 
 /* -------------------------------------------------------------------------- */
@@ -615,28 +616,22 @@ export function useDashboard(): DashboardData {
 
 export function usePnL(from: Date, to: Date): PeriodPnL {
   const orders = useDataStore((s) => s.orders);
-  const purchases = useDataStore((s) => s.purchases);
-  const shipments = useDataStore((s) => s.shipments);
-  const expenses = useDataStore((s) => s.expenses);
-  const categories = useExpenseCategories();
+  const index = useLedgerIndex();
 
   return useMemo(
-    () =>
-      periodPnL(from, to, orders, purchases, shipments, expenses, categories),
-    [from, to, orders, purchases, shipments, expenses, categories],
+    () => periodPnL(from, to, orders, index),
+    [from, to, orders, index],
   );
 }
 
 export function useMonthlySeries(months = 12): MonthlyPoint[] {
   const orders = useDataStore((s) => s.orders);
-  const purchases = useDataStore((s) => s.purchases);
-  const shipments = useDataStore((s) => s.shipments);
-  const expenses = useDataStore((s) => s.expenses);
+  const index = useLedgerIndex();
   const today = useToday();
 
   return useMemo(
-    () => monthlySeries(months, today, orders, purchases, shipments, expenses),
-    [months, today, orders, purchases, shipments, expenses],
+    () => monthlySeries(months, today, orders, index),
+    [months, today, orders, index],
   );
 }
 
@@ -647,21 +642,11 @@ export function useReceivablesAging(): {
   grandTotal: number;
 } {
   const clients = useDataStore((s) => s.clients);
-  const orders = useDataStore((s) => s.orders);
-  const purchases = useDataStore((s) => s.purchases);
-  const payments = useDataStore((s) => s.payments);
-  const shipments = useDataStore((s) => s.shipments);
+  const index = useLedgerIndex();
   const today = useToday();
 
   return useMemo(() => {
-    const rows = receivablesAging(
-      clients,
-      orders,
-      purchases,
-      payments,
-      shipments,
-      today,
-    );
+    const rows = receivablesAging(clients, index, today);
     const totals: Record<string, number> = {};
     Object.keys(AGING_BUCKET_LABEL).forEach((bucket) => {
       totals[bucket] = rows.reduce(
@@ -674,7 +659,7 @@ export function useReceivablesAging(): {
       totals,
       grandTotal: rows.reduce((sum, row) => sum + row.totalAfn, 0),
     };
-  }, [clients, orders, purchases, payments, shipments, today]);
+  }, [clients, index, today]);
 }
 
 /* -------------------------------------------------------------------------- */
@@ -782,17 +767,19 @@ export interface SearchResult {
 }
 
 export function useSearch(query: string): SearchResult[] {
-  const orderRows = useOrderRows();
-  const clientRows = useClientRows();
+  const orders = useDataStore((s) => s.orders);
+  const clients = useDataStore((s) => s.clients);
   const shipmentRows = useShipmentRows();
   const purchaseRows = usePurchaseRows();
+  const clientOf = useClientLookup();
 
   return useMemo(() => {
     const q = query.trim().toLowerCase();
     if (q.length < 1) return [];
     const results: SearchResult[] = [];
 
-    orderRows.forEach(({ order, client }) => {
+    orders.forEach((order) => {
+      const client = clientOf(order.clientId);
       const haystack = `${order.orderNo} ${client?.name ?? ""} ${order.items
         .map((i) => i.name)
         .join(" ")}`.toLowerCase();
@@ -807,8 +794,9 @@ export function useSearch(query: string): SearchResult[] {
       }
     });
 
-    clientRows.forEach(({ client }) => {
-      const haystack = `${client.name} ${client.code} ${client.phone} ${client.city}`.toLowerCase();
+    clients.forEach((client) => {
+      const haystack =
+        `${client.name} ${client.code} ${client.phone} ${client.city}`.toLowerCase();
       if (haystack.includes(q)) {
         results.push({
           id: client.id,
@@ -821,7 +809,9 @@ export function useSearch(query: string): SearchResult[] {
     });
 
     shipmentRows.forEach(({ shipment, client }) => {
-      if (`${shipment.trackingNumber} ${shipment.carrier}`.toLowerCase().includes(q)) {
+      if (
+        `${shipment.trackingNumber} ${shipment.carrier}`.toLowerCase().includes(q)
+      ) {
         results.push({
           id: shipment.id,
           group: "Shipments",
@@ -849,7 +839,7 @@ export function useSearch(query: string): SearchResult[] {
     });
 
     return results.slice(0, 24);
-  }, [query, orderRows, clientRows, shipmentRows, purchaseRows]);
+  }, [query, orders, clients, shipmentRows, purchaseRows, clientOf]);
 }
 
 export { deltaPercent, DOCUMENT_KIND_LABEL };

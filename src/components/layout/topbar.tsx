@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   BellIcon,
+  ChevronRightIcon,
   MenuIcon,
   MessageSquareIcon,
   PlusIcon,
@@ -19,7 +20,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { useDashboard, useTeam, useToday } from "@/lib/api";
+import { usePageMeta } from "@/components/layout/use-page-meta";
+import { useNavCounts, useTeam, useToday } from "@/lib/api";
 import { formatAfn, initials } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
@@ -39,14 +41,22 @@ export function Topbar({
   const pathname = usePathname();
   const team = useTeam();
   const today = useToday();
-  const dashboard = useDashboard();
+  const nav = useNavCounts();
+  const meta = usePageMeta();
   const owner = team[0];
 
-  // Every screen renders its own <h1> through PageHeader, so the topbar must not
-  // repeat it. It only carries the dashboard greeting plus global controls.
+  /*
+   * The bar carries the page identity for the whole app — the trail on top, the
+   * page name as the <h1> below it. Screens no longer print their own heading,
+   * which keeps the title visible while the content scrolls and gives every page
+   * back ~60px of vertical space.
+   *
+   * The dashboard is the one exception: "Dashboard" tells the owner nothing they
+   * cannot see from the sidebar, so it greets them and states the day's position.
+   */
   const isDashboard = pathname === "/";
 
-  const notifications = dashboard.attention.length;
+  const notifications = nav.attention.length;
 
   return (
     <header className="bg-background/85 supports-[backdrop-filter]:bg-background/70 sticky top-0 z-30 flex h-16 shrink-0 items-center gap-3 border-b px-4 backdrop-blur-md sm:px-6">
@@ -61,15 +71,45 @@ export function Topbar({
       </Button>
 
       <div className="min-w-0 flex-1">
-        {isDashboard && (
+        {isDashboard ? (
           <>
             <h1 className="truncate text-[17px] leading-tight font-semibold tracking-tight">
-              {greeting(today.getUTCHours())}, {owner?.name.split(" ")[0] ?? "there"}
+              {greeting(today.getUTCHours())},{" "}
+              {owner?.name.split(" ")[0] ?? "there"}
             </h1>
             <p className="text-muted-foreground truncate text-xs">
-              {dashboard.activeOrders} orders in progress ·{" "}
-              {formatAfn(dashboard.outstandingAfn, { unit: "suffix" })} outstanding
+              {nav.activeOrders} orders in progress ·{" "}
+              {formatAfn(nav.outstandingAfn, { unit: "suffix" })} outstanding
             </p>
+          </>
+        ) : (
+          <>
+            <nav
+              aria-label="Breadcrumb"
+              className="text-muted-foreground flex items-center gap-1 text-[11px] leading-none"
+            >
+              <Link href="/" className="hover:text-foreground transition-colors">
+                Home
+              </Link>
+              {meta.parents.map((crumb) => (
+                <span key={crumb.label} className="flex items-center gap-1">
+                  <ChevronRightIcon className="size-3 opacity-60" />
+                  {crumb.href ? (
+                    <Link
+                      href={crumb.href}
+                      className="hover:text-foreground transition-colors"
+                    >
+                      {crumb.label}
+                    </Link>
+                  ) : (
+                    crumb.label
+                  )}
+                </span>
+              ))}
+            </nav>
+            <h1 className="mt-1 truncate text-[17px] leading-tight font-semibold tracking-tight">
+              {meta.title}
+            </h1>
           </>
         )}
       </div>
@@ -118,12 +158,12 @@ export function Topbar({
         <DropdownMenuContent align="end" className="w-80">
           <DropdownMenuLabel>Needs attention</DropdownMenuLabel>
           <DropdownMenuSeparator />
-          {dashboard.attention.length === 0 ? (
+          {nav.attention.length === 0 ? (
             <div className="text-muted-foreground px-2 py-6 text-center text-sm">
               Everything is under control.
             </div>
           ) : (
-            dashboard.attention.map((item) => (
+            nav.attention.map((item) => (
               <DropdownMenuItem key={item.id} asChild>
                 <Link href={item.href} className="flex-col items-start gap-0.5">
                   <span className="text-[13px] font-medium">{item.title}</span>

@@ -52,11 +52,6 @@ export function BalancesScreen() {
   return (
     <>
       <PageHeader
-        breadcrumbs={[
-          { label: "Finance", href: "/finance" },
-          { label: "Client balances" },
-        ]}
-        title="Client balances"
         description="Who owes us money and how long it has been outstanding."
         meta={
           <span className="text-muted-foreground text-sm">
