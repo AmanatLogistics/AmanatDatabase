@@ -11,6 +11,7 @@ import {
   ExternalLinkIcon,
   MessageSquarePlusIcon,
   PackagePlusIcon,
+  PencilIcon,
   PhoneIcon,
   PrinterIcon,
   TruckIcon,
@@ -39,6 +40,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -63,6 +65,7 @@ import { RecordPaymentDialog } from "@/features/payments/record-payment-dialog";
 import { AddTrackingDialog } from "@/features/tracking/add-tracking-dialog";
 import {
   addOrderNote,
+  setOrderTrackingNumber,
   updateOrderStatus,
   useClientPayments,
   useOrder,
@@ -101,6 +104,10 @@ export function OrderDetailScreen({ orderId }: { orderId: string }) {
   );
   const [statusNote, setStatusNote] = React.useState("");
   const [savingStatus, setSavingStatus] = React.useState(false);
+  const [trackingEditOpen, setTrackingEditOpen] = React.useState(false);
+  const [trackingDraft, setTrackingDraft] = React.useState("");
+  const [trackingError, setTrackingError] = React.useState<string | null>(null);
+  const [savingTracking, setSavingTracking] = React.useState(false);
 
   if (!row) notFound();
 
@@ -125,6 +132,24 @@ export function OrderDetailScreen({ orderId }: { orderId: string }) {
     }
   }
 
+  async function handleTrackingSave() {
+    setSavingTracking(true);
+    setTrackingError(null);
+    try {
+      await setOrderTrackingNumber(order.id, trackingDraft);
+      toast.success("Tracking number updated");
+      setTrackingEditOpen(false);
+    } catch (error) {
+      // Shown inline rather than as a toast: the operator needs it next to the
+      // field they must correct.
+      setTrackingError(
+        error instanceof Error ? error.message : "Could not save that number.",
+      );
+    } finally {
+      setSavingTracking(false);
+    }
+  }
+
   async function handleAddNote() {
     if (!note.trim()) return;
     setSavingNote(true);
@@ -144,6 +169,19 @@ export function OrderDetailScreen({ orderId }: { orderId: string }) {
           <>
             <StatusBadge kind="order" value={order.status} />
             <TrackingNumberChip value={order.trackingNumber} />
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 px-2 text-xs"
+              onClick={() => {
+                setTrackingDraft(order.trackingNumber);
+                setTrackingError(null);
+                setTrackingEditOpen(true);
+              }}
+            >
+              <PencilIcon className="size-3.5" />
+              Edit
+            </Button>
           </>
         }
         description={
@@ -858,6 +896,62 @@ export function OrderDetailScreen({ orderId }: { orderId: string }) {
             </Button>
             <Button size="sm" onClick={handleStatusChange} disabled={savingStatus}>
               {savingStatus ? "Saving…" : "Change status"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={trackingEditOpen} onOpenChange={setTrackingEditOpen}>
+        <DialogContent className="sm:max-w-[440px]">
+          <DialogHeader>
+            <DialogTitle>Edit tracking number</DialogTitle>
+            <DialogDescription>
+              This is the only number the client can look the order up with.
+              Changing it makes any copy they already have stop working.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="grid gap-1.5">
+            <Label htmlFor="tracking-number-input">Tracking number</Label>
+            <Input
+              id="tracking-number-input"
+              value={trackingDraft}
+              onChange={(e) => {
+                setTrackingDraft(e.target.value.toUpperCase());
+                setTrackingError(null);
+              }}
+              className="tabular"
+              aria-invalid={trackingError !== null}
+            />
+            {trackingError ? (
+              <p className="text-destructive text-xs" role="alert">
+                {trackingError}
+              </p>
+            ) : (
+              <p className="text-muted-foreground text-xs">
+                Format AS-YYYY-XXXXXX. The letters I, L, O and U are not used.
+              </p>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setTrackingEditOpen(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              size="sm"
+              onClick={handleTrackingSave}
+              disabled={
+                savingTracking ||
+                !trackingDraft.trim() ||
+                trackingDraft.trim().toUpperCase() === order.trackingNumber
+              }
+            >
+              {savingTracking ? "Saving…" : "Save"}
             </Button>
           </DialogFooter>
         </DialogContent>
