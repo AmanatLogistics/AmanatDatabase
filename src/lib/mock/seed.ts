@@ -648,9 +648,13 @@ draft.forEach(({ requestedAt, clientId }) => {
     purchases.push(...buildPurchases(order));
   }
 
-  /* --- shipment ---------------------------------------------------------- */
+  /* --- freight & duty ----------------------------------------------------- */
   if (stage >= stageIndex("in_transit") && status !== "cancelled") {
-    shipments.push(buildShipment(order, itemsAfn));
+    const shipment = buildShipment(order, itemsAfn);
+    shipments.push(shipment);
+    // What we actually paid now lives on the order, not on a carrier record.
+    order.freightCostAfn = shipment.freightCostAfn;
+    order.customsDutyAfn = shipment.customsDutyAfn;
   }
 
   /* --- payments ---------------------------------------------------------- */

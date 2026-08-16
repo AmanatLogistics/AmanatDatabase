@@ -298,9 +298,15 @@ export const DOCUMENT_KIND_TONE: Record<DocumentKind, BadgeTone> = {
 
 /**
  * Share of the shipping we charge a client that we expect to pay out in freight
- * once the parcel actually moves. Used to estimate margin before booking.
+ * once the parcel actually moves — three quarters. Used to estimate margin
+ * before the real figure is known.
+ *
+ * Expressed as a fraction rather than 0.75 so no float enters the money path:
+ * every `*Afn` value is a whole number of Afghani, and the only operations
+ * allowed on one are integer arithmetic and a `Math.round` at the boundary.
  */
-export const FREIGHT_COST_RATIO = 0.75;
+export const FREIGHT_COST_NUMERATOR = 3;
+export const FREIGHT_COST_DENOMINATOR = 4;
 
 /** Categorical colours used across charts; mirrors --chart-N in globals.css. */
 export const CHART_COLORS = [

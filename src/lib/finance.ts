@@ -1,7 +1,8 @@
 import {
   ACTIVE_ORDER_STATUSES,
   BILLABLE_ORDER_STATUSES,
-  FREIGHT_COST_RATIO,
+  FREIGHT_COST_DENOMINATOR,
+  FREIGHT_COST_NUMERATOR,
 } from "@/lib/constants";
 import { daysBetween } from "@/lib/format";
 import type {
@@ -11,7 +12,6 @@ import type {
   Order,
   Payment,
   Purchase,
-  Shipment,
 } from "@/lib/types";
 
 /**
@@ -37,7 +37,6 @@ export interface LedgerIndex {
   purchasesByOrder: Map<ID, Purchase[]>;
   paymentsByOrder: Map<ID, Payment[]>;
   paymentsByClient: Map<ID, Payment[]>;
-  shipmentByOrder: Map<ID, Shipment>;
   ordersByClient: Map<ID, Order[]>;
 }
 
@@ -52,13 +51,11 @@ export function buildLedgerIndex(
   orders: Order[],
   purchases: Purchase[],
   payments: Payment[],
-  shipments: Shipment[],
 ): LedgerIndex {
   const index: LedgerIndex = {
     purchasesByOrder: new Map(),
     paymentsByOrder: new Map(),
     paymentsByClient: new Map(),
-    shipmentByOrder: new Map(),
     ordersByClient: new Map(),
   };
 
@@ -67,7 +64,6 @@ export function buildLedgerIndex(
     if (p.orderId) push(index.paymentsByOrder, p.orderId, p);
     push(index.paymentsByClient, p.clientId, p);
   });
-  shipments.forEach((s) => index.shipmentByOrder.set(s.orderId, s));
   orders.forEach((o) => push(index.ordersByClient, o.clientId, o));
 
   return index;
@@ -134,7 +130,6 @@ export function orderCost(
   const linked = (index.purchasesByOrder.get(order.id) ?? EMPTY).filter(
     (p) => p.status !== "cancelled",
   );
-  const shipment = index.shipmentByOrder.get(order.id);
 
   const estimated = linked.length === 0;
 
@@ -142,10 +137,16 @@ export function orderCost(
     ? order.items.reduce((sum, item) => sum + item.unitCostAfn * item.qty, 0)
     : linked.reduce((sum, p) => sum + p.totalCostAfn, 0);
 
+  /*
+   * Freight and duty are recorded on the order itself. Until an operator enters
+   * the real freight, project it from what we charged the client so a young
+   * order does not read as pure margin.
+   */
   const freightAfn =
-    shipment?.freightCostAfn ??
-    Math.round(order.shippingChargedAfn * FREIGHT_COST_RATIO);
-  const customsAfn = shipment?.customsDutyAfn ?? 0;
+    order.freightCostAfn ??
+    Math.round((order.shippingChargedAfn * FREIGHT_COST_NUMERATOR) /
+      FREIGHT_COST_DENOMINATOR);
+  const customsAfn = order.customsDutyAfn ?? 0;
 
   return {
     goodsAfn,

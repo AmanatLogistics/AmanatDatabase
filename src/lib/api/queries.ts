@@ -97,11 +97,9 @@ export function useLedgerIndex(): LedgerIndex {
   const orders = useDataStore((s) => s.orders);
   const purchases = useDataStore((s) => s.purchases);
   const payments = useDataStore((s) => s.payments);
-  const shipments = useDataStore((s) => s.shipments);
-
   return useMemo(
-    () => buildLedgerIndex(orders, purchases, payments, shipments),
-    [orders, purchases, payments, shipments],
+    () => buildLedgerIndex(orders, purchases, payments),
+    [orders, purchases, payments],
   );
 }
 
@@ -192,10 +190,21 @@ export function useOrders(): Order[] {
   return useDataStore((s) => s.orders);
 }
 
+/** Temporary bridge while Shipment is being removed. */
+function useShipmentLookup(): (orderId: ID) => Shipment | undefined {
+  const shipments = useDataStore((s) => s.shipments);
+  return useMemo(() => {
+    const byOrder = new Map<ID, Shipment>();
+    shipments.forEach((s) => byOrder.set(s.orderId, s));
+    return (orderId: ID) => byOrder.get(orderId);
+  }, [shipments]);
+}
+
 export function useOrderRows(): OrderRow[] {
   const orders = useDataStore((s) => s.orders);
   const index = useLedgerIndex();
   const clientOf = useClientLookup();
+  const shipmentOf = useShipmentLookup();
 
   return useMemo(
     () =>
@@ -203,7 +212,7 @@ export function useOrderRows(): OrderRow[] {
         order,
         client: clientOf(order.clientId),
         economics: orderEconomics(order, index),
-        shipment: index.shipmentByOrder.get(order.id),
+        shipment: shipmentOf(order.id),
         purchases: index.purchasesByOrder.get(order.id) ?? [],
         itemCount: order.items.length,
         unitCount: order.items.reduce((sum, i) => sum + i.qty, 0),
@@ -217,6 +226,7 @@ export function useOrder(id: ID): OrderRow | undefined {
   const orders = useDataStore((s) => s.orders);
   const index = useLedgerIndex();
   const clientOf = useClientLookup();
+  const shipmentOf = useShipmentLookup();
 
   return useMemo(() => {
     const order = orders.find((o) => o.id === id);
@@ -225,7 +235,7 @@ export function useOrder(id: ID): OrderRow | undefined {
       order,
       client: clientOf(order.clientId),
       economics: orderEconomics(order, index),
-      shipment: index.shipmentByOrder.get(order.id),
+      shipment: shipmentOf(order.id),
       purchases: index.purchasesByOrder.get(order.id) ?? [],
       itemCount: order.items.length,
       unitCount: order.items.reduce((sum, i) => sum + i.qty, 0),

@@ -132,6 +132,14 @@ export interface Order {
   serviceFeeValue: number;
   /** Shipping we re-bill to the client, AFN. */
   shippingChargedAfn: number;
+  /**
+   * What the freight actually cost us, AFN. Typed in by an operator once the
+   * parcel has moved. Left unset until then, when the margin falls back to an
+   * estimate from `shippingChargedAfn`.
+   */
+  freightCostAfn?: number;
+  /** Import duty we paid, AFN. Unset until the parcel clears. */
+  customsDutyAfn?: number;
   /** Goodwill discount, AFN. */
   discountAfn: number;
   notes?: string;
