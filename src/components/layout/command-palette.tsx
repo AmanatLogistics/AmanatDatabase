@@ -6,7 +6,6 @@ import {
   PackageIcon,
   PlusIcon,
   ShoppingCartIcon,
-  TruckIcon,
   UsersIcon,
 } from "lucide-react";
 
@@ -22,12 +21,10 @@ import {
 } from "@/components/ui/command";
 import { allNavLinks } from "@/components/layout/nav-config";
 import { useSearch } from "@/lib/api";
-import { CARRIER_TRACKING_ENABLED } from "@/lib/constants";
 
 const GROUP_ICON = {
   Orders: ShoppingCartIcon,
   Clients: UsersIcon,
-  Shipments: TruckIcon,
   Purchases: PackageIcon,
 } as const;
 
@@ -73,9 +70,7 @@ export function CommandPalette({
         <CommandEmpty>
           {query
             ? `No results for “${query}”.`
-            : CARRIER_TRACKING_ENABLED
-              ? "Type to search across orders, clients and shipments."
-              : "Type to search across orders, clients and purchases."}
+            : "Type to search across orders, clients and purchases."}
         </CommandEmpty>
 
         {grouped.map(([group, items]) => {

@@ -9,8 +9,6 @@ import {
   PrinterIcon,
   ReceiptTextIcon,
   ScrollTextIcon,
-  StickyNoteIcon,
-  TagIcon,
 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
@@ -32,8 +30,6 @@ const KIND_ICON: Record<DocumentKind, React.ComponentType<{ className?: string }
   invoice: FileTextIcon,
   quotation: ScrollTextIcon,
   receipt: ReceiptTextIcon,
-  packing_list: StickyNoteIcon,
-  shipping_label: TagIcon,
 };
 
 interface DocRow {
@@ -139,9 +135,6 @@ export function DocumentsScreen() {
         header: "Amount (AFN)",
         cell: ({ row }) => {
           const { doc } = row.original;
-          if (doc.kind === "shipping_label") {
-            return <span className="text-muted-foreground text-xs">—</span>;
-          }
           return <Money value={doc.totalAfn} className="text-[13px]" />;
         },
       },

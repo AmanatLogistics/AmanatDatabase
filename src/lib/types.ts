@@ -104,7 +104,7 @@ export interface OrderItem {
 export interface OrderEvent {
   id: ID;
   at: ISODate;
-  status: OrderStatus | "note" | "payment" | "purchase" | "shipment";
+  status: OrderStatus | "note" | "payment" | "purchase";
   title: string;
   description?: string;
   actor: string;
@@ -176,47 +176,6 @@ export interface Purchase {
   totalCostAfn: number;
   invoiceRef?: string;
   notes?: string;
-}
-
-/* -------------------------------------------------------------------------- */
-/* Shipments                                                                   */
-/* -------------------------------------------------------------------------- */
-
-export type ShipmentStatus =
-  | "label_created"
-  | "picked_up"
-  | "in_transit"
-  | "customs"
-  | "out_for_delivery"
-  | "delivered"
-  | "exception";
-
-export interface ShipmentEvent {
-  id: ID;
-  at: ISODate;
-  status: ShipmentStatus;
-  location: string;
-  description: string;
-}
-
-export interface Shipment {
-  id: ID;
-  orderId: ID;
-  carrier: string;
-  trackingNumber: string;
-  trackingUrl?: string;
-  status: ShipmentStatus;
-  origin: string;
-  destination: string;
-  shippedAt?: ISODate;
-  etaAt?: ISODate;
-  deliveredAt?: ISODate;
-  weightKg: number;
-  /** Freight we pay the carrier, AFN. */
-  freightCostAfn: number;
-  /** Import duty we pay, AFN. */
-  customsDutyAfn: number;
-  events: ShipmentEvent[];
 }
 
 /* -------------------------------------------------------------------------- */
@@ -319,12 +278,7 @@ export interface Settings {
 /* Documents                                                                   */
 /* -------------------------------------------------------------------------- */
 
-export type DocumentKind =
-  | "invoice"
-  | "quotation"
-  | "receipt"
-  | "packing_list"
-  | "shipping_label";
+export type DocumentKind = "invoice" | "quotation" | "receipt";
 
 export interface BusinessDocument {
   id: ID;
@@ -334,7 +288,6 @@ export interface BusinessDocument {
   /** Whichever entity the document renders from. */
   orderId?: ID;
   paymentId?: ID;
-  shipmentId?: ID;
   clientId: ID;
   issuedAt: ISODate;
   /** AFN total the document shows, for the register view. */

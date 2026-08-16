@@ -14,7 +14,6 @@ import {
   PencilIcon,
   PhoneIcon,
   PrinterIcon,
-  TruckIcon,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -62,7 +61,6 @@ import { OrderStatusStepper } from "@/components/shared/status-stepper";
 import { Timeline } from "@/components/shared/timeline";
 import { LogPurchaseDialog } from "@/features/purchases/log-purchase-dialog";
 import { RecordPaymentDialog } from "@/features/payments/record-payment-dialog";
-import { AddTrackingDialog } from "@/features/tracking/add-tracking-dialog";
 import {
   addOrderNote,
   setOrderTrackingNumber,
@@ -72,7 +70,6 @@ import {
   useStoreLookup,
 } from "@/lib/api";
 import {
-  CARRIER_TRACKING_ENABLED,
   ORDER_HOLD,
   ORDER_PIPELINE,
   ORDER_SOURCE_LABEL,
@@ -96,7 +93,6 @@ export function OrderDetailScreen({ orderId }: { orderId: string }) {
 
   const [paymentOpen, setPaymentOpen] = React.useState(false);
   const [purchaseOpen, setPurchaseOpen] = React.useState(false);
-  const [trackingOpen, setTrackingOpen] = React.useState(false);
   const [note, setNote] = React.useState("");
   const [savingNote, setSavingNote] = React.useState(false);
   /** The status the operator picked, held until they confirm with a note. */
@@ -112,7 +108,7 @@ export function OrderDetailScreen({ orderId }: { orderId: string }) {
 
   if (!row) notFound();
 
-  const { order, client, economics, shipment, purchases } = row;
+  const { order, client, economics, purchases } = row;
   const orderPayments = clientPayments.filter(
     (p) => p.payment.orderId === order.id,
   );
@@ -290,9 +286,6 @@ export function OrderDetailScreen({ orderId }: { orderId: string }) {
                   {purchases.length}
                 </span>
               </TabsTrigger>
-              {CARRIER_TRACKING_ENABLED && (
-                <TabsTrigger value="tracking">Tracking</TabsTrigger>
-              )}
               <TabsTrigger value="payments">
                 Payments
                 <span className="text-muted-foreground text-xs">
@@ -481,70 +474,6 @@ export function OrderDetailScreen({ orderId }: { orderId: string }) {
                 </div>
               )}
             </TabsContent>
-
-            {/* ---- Tracking ----------------------------------------- */}
-            {CARRIER_TRACKING_ENABLED && (
-            <TabsContent value="tracking">
-              {!shipment ? (
-                <Card>
-                  <EmptyState
-                    icon={TruckIcon}
-                    title="No shipment booked"
-                    description="Add the carrier and tracking number once the forwarder hands the parcel over."
-                    action={
-                      <Button size="sm" onClick={() => setTrackingOpen(true)}>
-                        <TruckIcon />
-                        Add tracking
-                      </Button>
-                    }
-                  />
-                </Card>
-              ) : (
-                <Card>
-                  <CardHeader>
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <div>
-                        <CardTitle className="text-sm">
-                          {shipment.carrier}
-                        </CardTitle>
-                        <p className="text-muted-foreground tabular text-xs">
-                          {shipment.trackingNumber}
-                        </p>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <StatusBadge kind="shipment" value={shipment.status} />
-                        <Button variant="outline" size="xs" asChild>
-                          <Link href={`/tracking/${shipment.id}`}>
-                            Open shipment
-                          </Link>
-                        </Button>
-                      </div>
-                    </div>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <dl className="grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
-                      <Field label="Route" value={`${shipment.origin.split(",")[0]} → ${shipment.destination.split(",")[0]}`} />
-                      <Field label="Shipped" value={formatDate(shipment.shippedAt)} />
-                      <Field label="ETA" value={formatDate(shipment.etaAt)} />
-                      <Field label="Weight" value={`${shipment.weightKg} kg`} />
-                    </dl>
-                    <Separator />
-                    <Timeline
-                      entries={shipment.events
-                        .slice()
-                        .reverse()
-                        .map((event) => ({
-                          id: event.id,
-                          at: event.at,
-                          title: event.description,
-                          description: event.location,
-                        }))}
-                    />
-                  </CardContent>
-                </Card>
-              )}
-            </TabsContent>
-            )}
 
             {/* ---- Payments ----------------------------------------- */}
             <TabsContent value="payments">
@@ -810,44 +739,12 @@ export function OrderDetailScreen({ orderId }: { orderId: string }) {
                 <PackagePlusIcon />
                 Log purchase
               </Button>
-              {CARRIER_TRACKING_ENABLED &&
-                (shipment ? (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="justify-start"
-                    asChild
-                  >
-                    <Link href={`/tracking/${shipment.id}`}>
-                      <TruckIcon />
-                      View tracking
-                    </Link>
-                  </Button>
-                ) : (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="justify-start"
-                    onClick={() => setTrackingOpen(true)}
-                  >
-                    <TruckIcon />
-                    Add tracking
-                  </Button>
-                ))}
               <Button variant="outline" size="sm" className="justify-start" asChild>
                 <Link href={`/print/quotation/${order.id}`} target="_blank">
                   <PrinterIcon />
                   Print quotation
                 </Link>
               </Button>
-              {CARRIER_TRACKING_ENABLED && shipment && (
-                <Button variant="outline" size="sm" className="justify-start" asChild>
-                  <Link href={`/print/packing-list/${shipment.id}`} target="_blank">
-                    <PrinterIcon />
-                    Print packing list
-                  </Link>
-                </Button>
-              )}
             </CardContent>
           </Card>
 
@@ -973,11 +870,6 @@ export function OrderDetailScreen({ orderId }: { orderId: string }) {
         onOpenChange={setPurchaseOpen}
         order={row}
       />
-      <AddTrackingDialog
-        open={trackingOpen}
-        onOpenChange={setTrackingOpen}
-        order={row}
-      />
     </>
   );
 }
@@ -1036,11 +928,3 @@ function SummaryLine({
   );
 }
 
-function Field({ label, value }: { label: string; value: React.ReactNode }) {
-  return (
-    <div>
-      <dt className="text-muted-foreground text-xs">{label}</dt>
-      <dd className="text-[13px]">{value}</dd>
-    </div>
-  );
-}

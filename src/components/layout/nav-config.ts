@@ -9,20 +9,17 @@ import {
   PackageIcon,
   SettingsIcon,
   ShoppingCartIcon,
-  TruckIcon,
   UsersIcon,
   UsersRoundIcon,
   WalletIcon,
 } from "lucide-react";
-
-import { CARRIER_TRACKING_ENABLED } from "@/lib/constants";
 
 export interface NavItem {
   label: string;
   href: string;
   icon: LucideIcon;
   /** Which store counter feeds the badge, if any. */
-  badge?: "activeOrders" | "customsHolds" | "overdueClients";
+  badge?: "activeOrders" | "overdueClients";
   children?: Array<{ label: string; href: string; icon?: LucideIcon }>;
 }
 
@@ -32,7 +29,7 @@ export interface NavSection {
 }
 
 /** Single source of truth for the sidebar and the command palette. */
-const allNavigation: NavSection[] = [
+export const navigation: NavSection[] = [
   {
     caption: "Overview",
     items: [{ label: "Dashboard", href: "/", icon: LayoutDashboardIcon }],
@@ -48,12 +45,6 @@ const allNavigation: NavSection[] = [
       },
       { label: "Clients", href: "/clients", icon: UsersIcon },
       { label: "Purchases", href: "/purchases", icon: PackageIcon },
-      {
-        label: "Tracking",
-        href: "/tracking",
-        icon: TruckIcon,
-        badge: "customsHolds",
-      },
     ],
   },
   {
@@ -103,20 +94,6 @@ export const settingsPages = [
   },
   { label: "Team", href: "/settings/team", icon: UsersRoundIcon },
 ];
-
-/**
- * The navigation the app actually renders.
- *
- * With carrier tracking off (the default) the Tracking section disappears from
- * the sidebar and the palette. The route itself still exists — this hides the
- * way in, it does not delete the feature. See SPEC.md §2.5.
- */
-export const navigation: NavSection[] = CARRIER_TRACKING_ENABLED
-  ? allNavigation
-  : allNavigation.map((section) => ({
-      ...section,
-      items: section.items.filter((item) => item.href !== "/tracking"),
-    }));
 
 /** Flat list of every navigable page, used by the ⌘K palette. */
 const sidebarLinks = navigation.flatMap((section) =>

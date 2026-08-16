@@ -7,7 +7,6 @@ import {
   useClientLookup,
   useOrders,
   usePurchases,
-  useShipments,
 } from "@/lib/api";
 
 /**
@@ -49,7 +48,6 @@ const STATIC: Record<string, PageMeta> = {
     title: "New client",
   },
   "/purchases": { parents: [], title: "Purchases" },
-  "/tracking": { parents: [], title: "Tracking" },
   "/payments": { parents: [], title: "Payments" },
   "/finance": { parents: [], title: "Finance & accounting" },
   "/finance/balances": {
@@ -77,7 +75,6 @@ const SECTION: Record<string, { label: string; href: string }> = {
   orders: { label: "Orders", href: "/orders" },
   clients: { label: "Clients", href: "/clients" },
   purchases: { label: "Purchases", href: "/purchases" },
-  tracking: { label: "Tracking", href: "/tracking" },
 };
 
 export function usePageMeta(): PageMeta {
@@ -85,7 +82,6 @@ export function usePageMeta(): PageMeta {
   const orders = useOrders();
   const clientOf = useClientLookup();
   const purchases = usePurchases();
-  const shipments = useShipments();
 
   return useMemo(() => {
     const known = STATIC[pathname];
@@ -115,12 +111,8 @@ export function usePageMeta(): PageMeta {
       case "purchases":
         title = purchases.find((p) => p.id === id)?.purchaseNo ?? "Purchase";
         break;
-      case "tracking":
-        title =
-          shipments.find((s) => s.id === id)?.trackingNumber ?? "Shipment";
-        break;
     }
 
     return { parents: [section], title };
-  }, [pathname, orders, clientOf, purchases, shipments]);
+  }, [pathname, orders, clientOf, purchases]);
 }

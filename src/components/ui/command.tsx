@@ -31,7 +31,7 @@ function Command({
 
 function CommandDialog({
   title = "Command Palette",
-  description = "Search for a client, order, shipment or page",
+  description = "Search for a client, order or page",
   children,
   className,
   showCloseButton = false,
