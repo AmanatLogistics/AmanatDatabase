@@ -54,6 +54,17 @@ function mulberry32(seed: number) {
 
 const rand = mulberry32(20260811);
 
+/**
+ * A second, independent stream for tracking numbers.
+ *
+ * Minting them from `rand` would consume draws inside the order loop and shift
+ * every later value — freight, customs duty, payments, sources, statuses — so
+ * the seeded P&L would silently differ from what it was before tracking
+ * numbers existed. Kept separate so adding a tracking number changes nothing
+ * but the tracking number.
+ */
+const trackingRand = mulberry32(20260812);
+
 const int = (min: number, max: number) =>
   Math.floor(rand() * (max - min + 1)) + min;
 const pick = <T,>(list: readonly T[]): T => list[Math.floor(rand() * list.length)];
@@ -597,7 +608,7 @@ draft.forEach(({ requestedAt, clientId }) => {
   const trackingNumber = generateUniqueTrackingNumber(
     requestedAt.getUTCFullYear(),
     trackingNumbersUsed,
-    rand,
+    trackingRand,
   );
   trackingNumbersUsed.add(trackingNumber);
 

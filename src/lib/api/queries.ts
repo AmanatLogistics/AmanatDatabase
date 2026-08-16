@@ -508,7 +508,11 @@ function buildAttention(
     if (econ.balanceAfn > 0) outstandingAfn += econ.balanceAfn;
   });
 
-  const customs = shipments.filter((s) => s.status === "customs");
+  // Both of these name a carrier and link into /tracking, so they stay out of
+  // the dashboard while carrier tracking is off (SPEC.md §2.5).
+  const customs = CARRIER_TRACKING_ENABLED
+    ? shipments.filter((s) => s.status === "customs")
+    : [];
   customs.slice(0, 3).forEach((shipment) => {
     const order = orderMap.get(shipment.orderId);
     attention.push({
@@ -520,7 +524,7 @@ function buildAttention(
     });
   });
 
-  shipments
+  (CARRIER_TRACKING_ENABLED ? shipments : [])
     .filter((s) => s.status === "exception")
     .slice(0, 2)
     .forEach((shipment) => {

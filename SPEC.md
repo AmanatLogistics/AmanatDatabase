@@ -117,6 +117,13 @@ cancelled · refunded                               ← ORDER_TERMINAL
 - a new export `ORDER_HOLD: OrderStatus[] = ["on_hold"]` so the status dropdown
   in `order-detail-screen.tsx:129-165` can render it as a third group between
   the pipeline group and the destructive terminal group
+- **a branch in `OrderStatusStepper`** (`src/components/shared/status-stepper.tsx`).
+  *Added after implementation review — this spec originally missed it.* Because
+  `on_hold` is deliberately not in `ORDER_PIPELINE`, `ORDER_PIPELINE.indexOf()`
+  returns `-1`, and the rail renders all nine stages as pending: the detail page
+  would assert that nothing had happened yet on an order that may be halfway
+  through. The stepper already short-circuits for `cancelled`/`refunded`;
+  `on_hold` needs the same treatment.
 
 Every status change already writes a timestamped, optionally-noted timeline
 entry via `updateOrderStatus(id, status, note?)`
@@ -286,6 +293,12 @@ chooses isolation and explains why, as required.
    `order-detail-screen.tsx`, hide the `Tracking` row action in
    `orders-screen.tsx:364-366`, and hide the shipment entries from the command
    palette.
+   **Also — added after implementation review, this list was incomplete —** the
+   dashboard: the `Track shipments` quick link (`dashboard-screen.tsx:438-442`)
+   and the `customs` / `exception` items from `buildAttention()`
+   (`queries.ts:511-535`), which name the carrier and link into `/tracking`.
+   The dashboard is the landing page, so leaving these made the isolation
+   cosmetic in practice.
 3. **Leave `Shipment`, `finance.ts`, the seed generator and the `/tracking`
    routes completely untouched**, so freight, customs duty, margin and the P&L
    keep producing identical numbers.
