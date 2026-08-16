@@ -28,7 +28,9 @@ import type {
   BusinessDocument,
   Client,
   ID,
+  ISODate,
   Order,
+  OrderStatus,
   Payment,
   PaymentMethod,
   Purchase,
@@ -234,6 +236,91 @@ export function useClientOrders(clientId: ID): OrderRow[] {
     () => rows.filter((r) => r.order.clientId === clientId),
     [rows, clientId],
   );
+}
+
+/* -------------------------------------------------------------------------- */
+/* Public tracking — GET /api/track/:trackingNumber                            */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Everything a client is allowed to see, and nothing else.
+ *
+ * This type is the security boundary. It exists so the allowlist is one object
+ * a reviewer can read top to bottom, rather than a property of how the public
+ * page happens to be written — a page that received the whole `Order` would
+ * leak the moment someone added a field to a JSX block.
+ *
+ * Deliberately absent: the client in any form (no name, no phone even partial,
+ * no address, no city, no code), `orderNo`, `notes`, every `*Afn` figure,
+ * `unitCostAfn`, `unitPriceAfn`, `productUrl`, `storeId`, purchases and
+ * shipments. See SPEC.md §2.4 for the full list and the reasoning.
+ *
+ * `OrderEvent.title`, `.description` and `.actor` are excluded on purpose: they
+ * are free text typed by staff, so the timeline below carries the status label
+ * from the registry instead of anything stored.
+ *
+ * NOTE (SPEC.md §2.4, risk R1): while the app is frontend-only this projection
+ * controls what is *rendered*, not what is *shipped* — the whole dataset is
+ * already in the browser. It becomes a real boundary when this is served by
+ * `GET /api/track/:trackingNumber`.
+ */
+export interface PublicTrackingItem {
+  name: string;
+  qty: number;
+  imageUrl?: string;
+}
+
+export interface PublicTrackingEvent {
+  at: ISODate;
+  /** From ORDER_STATUS, never stored free text. */
+  statusLabel: string;
+}
+
+export interface PublicTrackingResult {
+  trackingNumber: string;
+  statusLabel: string;
+  /** Has it reached the office the client collects from? */
+  arrivedAtOffice: boolean;
+  items: PublicTrackingItem[];
+  timeline: PublicTrackingEvent[];
+}
+
+/** The stages at which the parcel is physically with us in Kabul. */
+const ARRIVED_STATUSES: OrderStatus[] = [
+  "arrived",
+  "ready_for_pickup",
+  "delivered",
+];
+
+export function usePublicTracking(
+  trackingNumber: string,
+): PublicTrackingResult | null {
+  const orders = useDataStore((s) => s.orders);
+
+  return useMemo(() => {
+    const wanted = trackingNumber.trim().toUpperCase();
+    if (!wanted) return null;
+
+    const order = orders.find((o) => o.trackingNumber === wanted);
+    if (!order) return null;
+
+    return {
+      trackingNumber: order.trackingNumber,
+      statusLabel: ORDER_STATUS[order.status].label,
+      arrivedAtOffice: ARRIVED_STATUSES.includes(order.status),
+      items: order.items.map((item) => ({
+        name: item.name,
+        qty: item.qty,
+        imageUrl: item.imageUrl,
+      })),
+      timeline: order.timeline
+        .filter((event) => event.status in ORDER_STATUS)
+        .map((event) => ({
+          at: event.at,
+          statusLabel: ORDER_STATUS[event.status as OrderStatus].label,
+        })),
+    };
+  }, [orders, trackingNumber]);
 }
 
 /* -------------------------------------------------------------------------- */
