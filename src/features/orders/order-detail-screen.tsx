@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, useRouter } from "next/navigation";
 import { toast } from "sonner";
 import {
   CheckIcon,
@@ -14,6 +14,7 @@ import {
   PencilIcon,
   PhoneIcon,
   PrinterIcon,
+  Trash2Icon,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -56,6 +57,7 @@ import { EmptyState } from "@/components/shared/empty-state";
 import { Money } from "@/components/shared/money";
 import { PageHeader } from "@/components/shared/page-header";
 import { ProductThumb } from "@/components/shared/product-thumb";
+import { ConfirmDeleteDialog } from "@/components/shared/confirm-delete-dialog";
 import { StatusBadge } from "@/components/shared/status-badge";
 import { OrderStatusStepper } from "@/components/shared/status-stepper";
 import { Timeline } from "@/components/shared/timeline";
@@ -63,6 +65,8 @@ import { LogPurchaseDialog } from "@/features/purchases/log-purchase-dialog";
 import { RecordPaymentDialog } from "@/features/payments/record-payment-dialog";
 import {
   addOrderNote,
+  deleteOrder,
+  orderDeletionImpact,
   setOrderTrackingNumber,
   updateOrderStatus,
   useClientPayments,
@@ -87,6 +91,7 @@ import type { OrderStatus } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 export function OrderDetailScreen({ orderId }: { orderId: string }) {
+  const router = useRouter();
   const row = useOrder(orderId);
   const storeOf = useStoreLookup();
   const clientPayments = useClientPayments(row?.order.clientId ?? "");
@@ -105,6 +110,7 @@ export function OrderDetailScreen({ orderId }: { orderId: string }) {
   const [trackingDraft, setTrackingDraft] = React.useState("");
   const [trackingError, setTrackingError] = React.useState<string | null>(null);
   const [savingTracking, setSavingTracking] = React.useState(false);
+  const [deleteOpen, setDeleteOpen] = React.useState(false);
 
   if (!row) notFound();
 
@@ -258,6 +264,15 @@ export function OrderDetailScreen({ orderId }: { orderId: string }) {
             <Button size="sm" onClick={() => setPaymentOpen(true)}>
               <CreditCardIcon />
               Record payment
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setDeleteOpen(true)}
+              className="text-destructive hover:text-destructive"
+            >
+              <Trash2Icon />
+              Delete
             </Button>
           </>
         }
@@ -859,6 +874,30 @@ export function OrderDetailScreen({ orderId }: { orderId: string }) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <ConfirmDeleteDialog
+        open={deleteOpen}
+        onOpenChange={setDeleteOpen}
+        title="Delete this order?"
+        subject={`${order.orderNo} · ${order.trackingNumber}`}
+        consequences={(() => {
+          const { purchases: p, payments: pay, paidAfn } =
+            orderDeletionImpact(order.id);
+          const lines: string[] = [];
+          if (p > 0) lines.push(`${p} logged purchase${p > 1 ? "s" : ""} and their cost`);
+          if (pay > 0)
+            lines.push(
+              `${pay} recorded payment${pay > 1 ? "s" : ""} totalling ${Math.round(paidAfn).toLocaleString()} AFN`,
+            );
+          return lines;
+        })()}
+        confirmLabel="Delete order"
+        successMessage={`Order ${order.orderNo} deleted`}
+        onConfirm={async () => {
+          await deleteOrder(order.id);
+          router.push("/orders");
+        }}
+      />
 
       <RecordPaymentDialog
         open={paymentOpen}

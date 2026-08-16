@@ -4,10 +4,21 @@ import * as React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { ColumnDef } from "@tanstack/react-table";
-import { PackageIcon, PackagePlusIcon } from "lucide-react";
+import {
+  MoreHorizontalIcon,
+  PackageIcon,
+  PackagePlusIcon,
+  Trash2Icon,
+} from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { DataTable } from "@/components/shared/data-table";
 import {
   CountTabs,
@@ -18,9 +29,15 @@ import {
 import { Money } from "@/components/shared/money";
 import { PageHeader } from "@/components/shared/page-header";
 import { ProductThumb } from "@/components/shared/product-thumb";
+import { ConfirmDeleteDialog } from "@/components/shared/confirm-delete-dialog";
 import { StatusBadge } from "@/components/shared/status-badge";
 import { LogPurchaseDialog } from "@/features/purchases/log-purchase-dialog";
-import { usePurchaseRows, useStores, type PurchaseRow } from "@/lib/api";
+import {
+  deletePurchase,
+  usePurchaseRows,
+  useStores,
+  type PurchaseRow,
+} from "@/lib/api";
 import { formatDateShort, truncate } from "@/lib/format";
 
 /** The order lines a purchase paid for, resolved off its parent order. */
@@ -41,6 +58,7 @@ export function PurchasesScreen() {
   const [search, setSearch] = React.useState("");
   const [store, setStore] = React.useState("all");
   const [logOpen, setLogOpen] = React.useState(false);
+  const [deleting, setDeleting] = React.useState<PurchaseRow | null>(null);
 
   const chips = React.useMemo(() => {
     const count = (status: string) =>
@@ -191,6 +209,32 @@ export function PurchasesScreen() {
         ),
       },
       {
+        id: "actions",
+        header: "",
+        enableSorting: false,
+        enableHiding: false,
+        cell: ({ row }) => (
+          <div className="flex justify-end" onClick={(e) => e.stopPropagation()}>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon-sm" aria-label="Row actions">
+                  <MoreHorizontalIcon />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-48">
+                <DropdownMenuItem
+                  variant="destructive"
+                  onSelect={() => setDeleting(row.original)}
+                >
+                  <Trash2Icon />
+                  Delete purchase
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        ),
+      },
+      {
         id: "purchasedAt",
         meta: "Date",
         accessorFn: (row) => row.purchase.purchasedAt,
@@ -288,6 +332,21 @@ export function PurchasesScreen() {
           </>
         }
       />
+
+      {deleting && (
+        <ConfirmDeleteDialog
+          open
+          onOpenChange={(open) => !open && setDeleting(null)}
+          title="Delete this purchase?"
+          subject={`${deleting.purchase.purchaseNo} · ${Math.round(deleting.purchase.totalCostAfn).toLocaleString()} AFN`}
+          consequences={[
+            "The cost it recorded, so the order's margin and the P&L change",
+          ]}
+          confirmLabel="Delete purchase"
+          successMessage={`Purchase ${deleting.purchase.purchaseNo} deleted`}
+          onConfirm={() => deletePurchase(deleting.purchase.id)}
+        />
+      )}
 
       <LogPurchaseDialog open={logOpen} onOpenChange={setLogOpen} />
     </>

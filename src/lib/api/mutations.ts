@@ -118,6 +118,37 @@ export async function updateClient(
   return delay(undefined);
 }
 
+/**
+ * DELETE /api/clients/:id
+ *
+ * Takes the client's orders with them, and the purchases and payments on those
+ * orders. Leaving them behind would strand rows pointing at a client that no
+ * longer exists, and the finance screens would keep counting money against
+ * nobody. Returns what was removed so the confirmation can say so plainly.
+ */
+export interface ClientDeletionImpact {
+  orders: number;
+  purchases: number;
+  payments: number;
+}
+
+export function clientDeletionImpact(id: ID): ClientDeletionImpact {
+  const { orders, purchases, payments } = state();
+  const orderIds = new Set(
+    orders.filter((o) => o.clientId === id).map((o) => o.id),
+  );
+  return {
+    orders: orderIds.size,
+    purchases: purchases.filter((p) => orderIds.has(p.orderId)).length,
+    payments: payments.filter((p) => p.clientId === id).length,
+  };
+}
+
+export async function deleteClient(id: ID): Promise<void> {
+  state().removeClient(id);
+  return delay(undefined);
+}
+
 /* -------------------------------------------------------------------------- */
 /* Orders — POST /api/orders                                                   */
 /* -------------------------------------------------------------------------- */
@@ -288,6 +319,40 @@ export async function setOrderTrackingNumber(
   }
 
   updateOrder(id, { trackingNumber: value });
+  return delay(undefined);
+}
+
+/**
+ * DELETE /api/orders/:id
+ *
+ * Removes the purchases and payments logged against the order too. A purchase
+ * records money paid out *for this order*; keeping it would leave a cost with
+ * nothing to attribute it to and quietly distort the P&L.
+ */
+export interface OrderDeletionImpact {
+  purchases: number;
+  payments: number;
+  paidAfn: number;
+}
+
+export function orderDeletionImpact(id: ID): OrderDeletionImpact {
+  const { purchases, payments } = state();
+  const linked = payments.filter((p) => p.orderId === id);
+  return {
+    purchases: purchases.filter((p) => p.orderId === id).length,
+    payments: linked.length,
+    paidAfn: linked.reduce((sum, p) => sum + p.amountAfn, 0),
+  };
+}
+
+export async function deleteOrder(id: ID): Promise<void> {
+  state().removeOrder(id);
+  return delay(undefined);
+}
+
+/** DELETE /api/purchases/:id */
+export async function deletePurchase(id: ID): Promise<void> {
+  state().removePurchase(id);
   return delay(undefined);
 }
 

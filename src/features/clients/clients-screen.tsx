@@ -9,6 +9,7 @@ import {
   EyeIcon,
   MessageCircleIcon,
   MoreHorizontalIcon,
+  Trash2Icon,
   PhoneIcon,
   PlusIcon,
   ShoppingCartIcon,
@@ -31,9 +32,15 @@ import {
 } from "@/components/shared/filter-bar";
 import { Money } from "@/components/shared/money";
 import { PageHeader } from "@/components/shared/page-header";
+import { ConfirmDeleteDialog } from "@/components/shared/confirm-delete-dialog";
 import { StatusBadge } from "@/components/shared/status-badge";
 import { RecordPaymentDialog } from "@/features/payments/record-payment-dialog";
-import { useClientRows, type ClientRow } from "@/lib/api";
+import {
+  clientDeletionImpact,
+  deleteClient,
+  useClientRows,
+  type ClientRow,
+} from "@/lib/api";
 import { CLIENT_TYPE_LABEL, CONTACT_CHANNEL_LABEL } from "@/lib/constants";
 import { formatDateShort, initials } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -47,6 +54,7 @@ export function ClientsScreen() {
   const [city, setCity] = React.useState("all");
   const [type, setType] = React.useState("all");
   const [payingClient, setPayingClient] = React.useState<ClientRow | null>(null);
+  const [deleting, setDeleting] = React.useState<ClientRow | null>(null);
 
   const cities = React.useMemo(
     () => Array.from(new Set(rows.map((r) => r.client.city))).sort(),
@@ -281,6 +289,13 @@ export function ClientsScreen() {
                     <CreditCardIcon />
                     Record payment
                   </DropdownMenuItem>
+                  <DropdownMenuItem
+                    variant="destructive"
+                    onSelect={() => setDeleting(row.original)}
+                  >
+                    <Trash2Icon />
+                    Delete client
+                  </DropdownMenuItem>
                   <DropdownMenuItem asChild>
                     <a href={`tel:${client.phone}`}>
                       <PhoneIcon />
@@ -384,6 +399,19 @@ export function ClientsScreen() {
         }
       />
 
+      {deleting && (
+        <ConfirmDeleteDialog
+          open
+          onOpenChange={(open) => !open && setDeleting(null)}
+          title="Delete this client?"
+          subject={`${deleting.client.name} · ${deleting.client.code}`}
+          consequences={describeClientDeletion(deleting.client.id)}
+          confirmLabel="Delete client"
+          successMessage={`${deleting.client.name} deleted`}
+          onConfirm={() => deleteClient(deleting.client.id)}
+        />
+      )}
+
       <RecordPaymentDialog
         open={!!payingClient}
         onOpenChange={(open) => !open && setPayingClient(null)}
@@ -391,4 +419,20 @@ export function ClientsScreen() {
       />
     </>
   );
+}
+
+/**
+ * A client rarely stands alone — their orders, the purchases made for those
+ * orders and every payment they made all go with them. Naming the counts is the
+ * difference between an informed decision and a nasty surprise.
+ */
+function describeClientDeletion(clientId: string): string[] {
+  const { orders, purchases, payments } = clientDeletionImpact(clientId);
+  const lines: string[] = [];
+  if (orders > 0) lines.push(`${orders} order${orders > 1 ? "s" : ""}`);
+  if (purchases > 0)
+    lines.push(`${purchases} logged purchase${purchases > 1 ? "s" : ""}`);
+  if (payments > 0)
+    lines.push(`${payments} recorded payment${payments > 1 ? "s" : ""}`);
+  return lines;
 }
