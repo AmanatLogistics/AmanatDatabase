@@ -11,6 +11,8 @@ import {
 import type {
   AppNotification,
   Client,
+  StoreProduct,
+  WebOrder,
   ID,
   Order,
   OrderEvent,
@@ -113,6 +115,236 @@ export async function markNotificationsRead(): Promise<void> {
 /** DELETE /api/notifications */
 export async function clearNotifications(): Promise<void> {
   state().clearNotifications();
+}
+
+/* -------------------------------------------------------------------------- */
+/* Shop — the storefront catalogue                                             */
+/* -------------------------------------------------------------------------- */
+
+export interface SaveProductInput {
+  name: string;
+  description: string;
+  category: StoreProduct["category"];
+  priceAfn: number;
+  costAfn: number;
+  storeId: ID;
+  imageUrl?: string;
+  active: boolean;
+}
+
+/** Turn a name into a URL segment, kept unique against the catalogue. */
+function slugify(name: string, taken: Set<string>): string {
+  const base =
+    name
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "")
+      .slice(0, 60) || "product";
+  let slug = base;
+  let n = 2;
+  while (taken.has(slug)) slug = `${base}-${n++}`;
+  return slug;
+}
+
+/** POST /api/shop/products */
+export async function createStoreProduct(
+  input: SaveProductInput,
+): Promise<StoreProduct> {
+  const { storeProducts, addStoreProduct } = state();
+  const product: StoreProduct = {
+    id: `sp-new-${Date.now()}`,
+    slug: slugify(input.name, new Set(storeProducts.map((p) => p.slug))),
+    createdAt: new Date().toISOString(),
+    ...input,
+  };
+  addStoreProduct(product);
+  return delay(product);
+}
+
+/** PATCH /api/shop/products/:id */
+export async function updateStoreProduct(
+  id: ID,
+  patch: Partial<StoreProduct>,
+): Promise<void> {
+  state().updateStoreProduct(id, patch);
+  return delay(undefined);
+}
+
+/** DELETE /api/shop/products/:id */
+export async function deleteStoreProduct(id: ID): Promise<void> {
+  state().removeStoreProduct(id);
+  return delay(undefined);
+}
+
+/* -------------------------------------------------------------------------- */
+/* Shop — the basket (browser-local, never leaves the customer)                */
+/* -------------------------------------------------------------------------- */
+
+export function addToCart(productId: ID, qty = 1): void {
+  state().addToCart(productId, qty);
+}
+
+export function setCartQty(productId: ID, qty: number): void {
+  state().setCartQty(productId, qty);
+}
+
+export function clearCart(): void {
+  state().clearCart();
+}
+
+/* -------------------------------------------------------------------------- */
+/* Shop — checkout                                                             */
+/* -------------------------------------------------------------------------- */
+
+export interface PlaceWebOrderInput {
+  customerName: string;
+  customerPhone: string;
+  customerCity: string;
+  customerAddress?: string;
+  note?: string;
+}
+
+/**
+ * POST /api/shop/orders
+ *
+ * What the storefront's checkout produces. Deliberately a `WebOrder` and not an
+ * `Order`: the person may not be a client yet, and nothing has been bought.
+ * Staff decide whether it becomes real, and that decision is what mints the
+ * client record and the tracking number.
+ */
+export async function placeWebOrder(
+  input: PlaceWebOrderInput,
+): Promise<WebOrder> {
+  const { cart, storeProducts, webOrders, addWebOrder, clearCart } = state();
+  const byId = new Map(storeProducts.map((p) => [p.id, p]));
+
+  const lines = cart.flatMap((line) => {
+    const product = byId.get(line.productId);
+    if (!product) return [];
+    return [
+      {
+        productId: product.id,
+        // Copied, not referenced: a later price change must not rewrite an
+        // order the customer already placed.
+        name: product.name,
+        qty: line.qty,
+        priceAfn: product.priceAfn,
+      },
+    ];
+  });
+
+  if (lines.length === 0) throw new Error("Your basket is empty.");
+
+  const at = new Date();
+  const seq = nextSequence(
+    webOrders.map((o) => o.reference),
+    "WEB",
+  );
+
+  const order: WebOrder = {
+    id: `web-${Date.now()}`,
+    reference: `WEB-${at.getUTCFullYear()}-${pad(seq)}`,
+    placedAt: at.toISOString(),
+    customerName: input.customerName.trim(),
+    customerPhone: input.customerPhone.trim(),
+    customerCity: input.customerCity.trim(),
+    customerAddress: input.customerAddress?.trim() || undefined,
+    note: input.note?.trim() || undefined,
+    lines,
+    totalAfn: lines.reduce((sum, l) => sum + l.priceAfn * l.qty, 0),
+    status: "new",
+  };
+
+  addWebOrder(order);
+  clearCart();
+  notify(
+    "web_order",
+    `New website order ${order.reference}`,
+    `${order.customerName} · ${lines.length} product${lines.length > 1 ? "s" : ""} · ${Math.round(order.totalAfn).toLocaleString()} AFN`,
+    `/shop/orders/${order.id}`,
+  );
+  return delay(order);
+}
+
+/** PATCH /api/shop/orders/:id — set aside without converting. */
+export async function dismissWebOrder(id: ID): Promise<void> {
+  state().updateWebOrder(id, { status: "dismissed" });
+  return delay(undefined);
+}
+
+export async function deleteWebOrder(id: ID): Promise<void> {
+  state().removeWebOrder(id);
+  return delay(undefined);
+}
+
+/**
+ * POST /api/shop/orders/:id/convert
+ *
+ * The moment a website request becomes real work: it creates the client if we
+ * have not met them, then an ordinary `Order` that carries a tracking number
+ * and moves through the same status lifecycle as everything else. There is no
+ * separate pipeline for web orders — that is the whole point of converting.
+ *
+ * The client is matched on phone number, digits only, because the same person
+ * typing "0700 12 34 56" and "070012 3456" is still the same person.
+ */
+export async function convertWebOrder(id: ID): Promise<Order> {
+  const { webOrders, clients } = state();
+  const webOrder = webOrders.find((o) => o.id === id);
+  if (!webOrder) throw new Error("That website order no longer exists.");
+  if (webOrder.status === "converted") {
+    throw new Error(`${webOrder.reference} has already been converted.`);
+  }
+
+  const digits = (value: string) => value.replace(/\D/g, "");
+  const existing = clients.find(
+    (c) => digits(c.phone) === digits(webOrder.customerPhone),
+  );
+
+  const client =
+    existing ??
+    (await createClient({
+      name: webOrder.customerName,
+      type: "individual",
+      phone: webOrder.customerPhone,
+      city: webOrder.customerCity,
+      address: webOrder.customerAddress,
+      preferredContact: "phone",
+      notes: `Created from website order ${webOrder.reference}.`,
+    }));
+
+  const productById = new Map(state().storeProducts.map((p) => [p.id, p]));
+
+  const order = await createOrder({
+    clientId: client.id,
+    source: "facebook",
+    items: webOrder.lines.map((line) => {
+      const product = productById.get(line.productId);
+      return {
+        name: line.name,
+        storeId: product?.storeId ?? state().settings.stores[0]?.id ?? "",
+        category: product?.category ?? "other",
+        qty: line.qty,
+        // What the customer agreed to on the website is what we bill.
+        unitPriceAfn: line.priceAfn,
+        unitCostAfn: product?.costAfn ?? 0,
+      };
+    }),
+    serviceFeeAfn: 0,
+    shippingChargedAfn: 0,
+    discountAfn: 0,
+    notes: webOrder.note
+      ? `From website order ${webOrder.reference}. Customer note: ${webOrder.note}`
+      : `From website order ${webOrder.reference}.`,
+  });
+
+  state().updateWebOrder(id, {
+    status: "converted",
+    convertedOrderId: order.id,
+    trackingNumber: order.trackingNumber,
+  });
+
+  return order;
 }
 
 /* -------------------------------------------------------------------------- */

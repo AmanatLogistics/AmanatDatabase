@@ -42,6 +42,8 @@ import type {
   Purchase,
   Settings,
   Store,
+  StoreProduct,
+  WebOrder,
 } from "@/lib/types";
 
 /**
@@ -366,6 +368,78 @@ export function usePublicTracking(
         })),
     };
   }, [orders, trackingNumber]);
+}
+
+/* -------------------------------------------------------------------------- */
+/* Shop — GET /api/shop/products, /api/shop/orders                             */
+/* -------------------------------------------------------------------------- */
+
+/** Everything in the catalogue, published or not. Staff only. */
+export function useStoreProducts(): StoreProduct[] {
+  return useDataStore((s) => s.storeProducts);
+}
+
+/** Only what a customer may see. The storefront reads this, never the above. */
+export function usePublishedProducts(): StoreProduct[] {
+  const products = useDataStore((s) => s.storeProducts);
+  return useMemo(() => products.filter((p) => p.active), [products]);
+}
+
+export function useStoreProductBySlug(slug: string): StoreProduct | undefined {
+  const products = useDataStore((s) => s.storeProducts);
+  return useMemo(
+    () => products.find((p) => p.slug === slug && p.active),
+    [products, slug],
+  );
+}
+
+export interface CartRow {
+  product: StoreProduct;
+  qty: number;
+  lineTotalAfn: number;
+}
+
+export function useCart(): { lines: CartRow[]; totalAfn: number; count: number } {
+  const cart = useDataStore((s) => s.cart);
+  const products = useDataStore((s) => s.storeProducts);
+
+  return useMemo(() => {
+    const byId = new Map(products.map((p) => [p.id, p]));
+    const lines: CartRow[] = [];
+    cart.forEach((line) => {
+      const product = byId.get(line.productId);
+      // A product deleted since it was added simply drops out of the basket.
+      if (!product) return;
+      lines.push({
+        product,
+        qty: line.qty,
+        lineTotalAfn: product.priceAfn * line.qty,
+      });
+    });
+    return {
+      lines,
+      totalAfn: lines.reduce((sum, l) => sum + l.lineTotalAfn, 0),
+      count: lines.reduce((sum, l) => sum + l.qty, 0),
+    };
+  }, [cart, products]);
+}
+
+export function useWebOrders(): WebOrder[] {
+  return useDataStore((s) => s.webOrders);
+}
+
+export function useWebOrder(id: ID): WebOrder | undefined {
+  const webOrders = useDataStore((s) => s.webOrders);
+  return useMemo(() => webOrders.find((o) => o.id === id), [webOrders, id]);
+}
+
+/** Web orders nobody has dealt with yet — the shop admin's inbox count. */
+export function useNewWebOrderCount(): number {
+  const webOrders = useDataStore((s) => s.webOrders);
+  return useMemo(
+    () => webOrders.filter((o) => o.status === "new").length,
+    [webOrders],
+  );
 }
 
 /* -------------------------------------------------------------------------- */
