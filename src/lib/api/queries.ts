@@ -780,7 +780,7 @@ export function useSearch(query: string): SearchResult[] {
 
     orders.forEach((order) => {
       const client = clientOf(order.clientId);
-      const haystack = `${order.orderNo} ${client?.name ?? ""} ${order.items
+      const haystack = `${order.orderNo} ${order.trackingNumber} ${client?.name ?? ""} ${order.items
         .map((i) => i.name)
         .join(" ")}`.toLowerCase();
       if (haystack.includes(q)) {

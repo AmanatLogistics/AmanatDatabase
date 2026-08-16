@@ -148,7 +148,7 @@ export function OrdersScreen() {
       }
 
       if (query) {
-        const haystack = `${order.orderNo} ${client?.name ?? ""} ${client?.phone ?? ""} ${order.items
+        const haystack = `${order.orderNo} ${order.trackingNumber} ${client?.name ?? ""} ${client?.phone ?? ""} ${order.items
           .map((i) => i.name)
           .join(" ")}`.toLowerCase();
         if (!haystack.includes(query)) return false;
@@ -181,6 +181,17 @@ export function OrdersScreen() {
             </div>
           );
         },
+      },
+      {
+        id: "tracking",
+        meta: "Tracking",
+        accessorFn: (row) => row.order.trackingNumber,
+        header: "Tracking",
+        cell: ({ row }) => (
+          <span className="tabular text-muted-foreground text-xs whitespace-nowrap">
+            {row.original.order.trackingNumber}
+          </span>
+        ),
       },
       {
         id: "client",
@@ -433,7 +444,7 @@ export function OrdersScreen() {
             <SearchInput
               value={search}
               onChange={setSearch}
-              placeholder="Search order no, client or product…"
+              placeholder="Search tracking no, order no, client or product…"
               className="w-full sm:w-72"
             />
             <FilterSelect
