@@ -62,6 +62,15 @@ screens exist, the data layer behind them does not.
 task" cannot produce a green result, so no Phase 1 task can be verified to the
 standard required. Repairing it is **TASK 0** and must happen first.
 
+> **RESOLVED.** This was already fixed by PR #1 ("Fix the build on main, add a
+> header regression test and CLAUDE.md"), which was open but unmerged at the
+> time this spec was written. Merged as `55e7018`. It deletes the four orphaned
+> expense files — per its own root-cause note, they "came back when a zip was
+> extracted over the repository: an extract adds and overwrites, it cannot
+> delete" — and adds the `typecheck` and `test` npm scripts plus a four-case
+> Playwright regression suite. **The "no tests exist" statement in the table
+> above is therefore also out of date**, as is risk R6.
+
 ---
 
 ## 1. Decisions taken

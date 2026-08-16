@@ -10,40 +10,42 @@ Written against `SPEC.md` at commit `69716d4`. Section references (§) point int
 counts as done:
 
 ```bash
-npx tsc --noEmit     # expect: no output
+npm run typecheck    # expect: exit 0, no output
 npm run lint         # expect: 0 errors (1 pre-existing warning in data-table.tsx is OK)
 npm run build        # expect: exit 0
+npm test             # expect: # pass 4, # fail 0
 ```
 
-There are no tests in this repo (`SPEC.md` §0), so there is nothing to run
-beyond these three.
+`SPEC.md` §0 recorded that no tests existed. That is no longer true: PR #1
+added a Playwright header regression suite and the `typecheck` / `test` npm
+scripts, so all four commands above apply from TASK 0 onwards.
 
 ---
 
-## TASK 0 — Repair the baseline (BLOCKS EVERYTHING)
+## TASK 0 — Repair the baseline — ✅ DONE (via PR #1)
 
-`main` does not typecheck and does not build (`SPEC.md` §0.2). Until this is
-fixed, no task below can be verified.
+`main` did not typecheck and did not build (`SPEC.md` §0.2).
 
-- [ ] **0.1 — Decide and apply the repair for the expense-categories feature**
+This turned out to be already fixed by an open, unmerged pull request —
+**PR #1, "Fix the build on main, add a header regression test and CLAUDE.md"**
+(branch `fix/persistent-header`). Its root-cause note: the orphaned expense
+screens "came back when a zip was extracted over the repository: an extract
+adds and overwrites, it cannot delete."
 
-  **Needs an owner decision first** (`SPEC.md` §8, open question 4): build the
-  missing data layer, or revert the two screens.
+So the answer was neither of the two options originally posed here (build the
+missing data layer / revert the screens) — it was *merge the fix that already
+existed*. PR #1 deletes the four orphaned files and additionally adds the
+`typecheck` and `test` npm scripts plus a 4-case Playwright header regression
+test, which is the harness the per-task verification below relies on.
 
-  Missing identifiers, referenced but defined nowhere:
-  - from `@/lib/api`: `createExpense`, `useExpenseCategories`, `useExpenseRows`,
-    `upsertExpenseCategory`, `ExpenseRow`
-  - from `@/lib/types`: `ExpenseCategory`
+- [x] **0.1 — Merge PR #1** — merged as `55e7018`.
 
-  Files: `src/features/finance/expenses-screen.tsx`,
-  `src/features/settings/expense-categories-screen.tsx`, and — if building —
-  `src/lib/types.ts`, `src/lib/api/queries.ts`, `src/lib/api/mutations.ts`,
-  `src/lib/api/index.ts`, `src/lib/store.ts`, `src/lib/mock/seed.ts`.
-
-  Also fix `expenses-screen.tsx:192`, which passes a `breadcrumbs` prop that
-  `PageHeader` does not accept.
-
-  **Verify:** `npx tsc --noEmit && npm run build` → both exit 0, zero errors.
+  **Verified:**
+  ```
+  npm run typecheck   → exit 0   (was: 24 errors)
+  npm run build       → succeeds (was: failing)
+  npm test            → # pass 4  # fail 0  (was: no tests at all)
+  ```
 
 ---
 
@@ -51,7 +53,7 @@ fixed, no task below can be verified.
 
 ### 1.1 — Add the `on_hold` order status
 
-- [ ] Add `"on_hold"` to the `OrderStatus` union in `src/lib/types.ts:51-62`.
+- [x] Add `"on_hold"` to the `OrderStatus` union in `src/lib/types.ts:51-62`.
       In `src/lib/constants.ts`: add the `ORDER_STATUS` entry
       (`meta("on_hold", "On hold", "warning", "bg-warning")`), add `on_hold` to
       `ACTIVE_ORDER_STATUSES`, leave `ORDER_PIPELINE`, `ORDER_TERMINAL` and
@@ -66,7 +68,7 @@ fixed, no task below can be verified.
 
 ### 1.2 — Show `on_hold` in the status-change dropdown
 
-- [ ] Render `ORDER_HOLD` as a third group in the `Change status` dropdown,
+- [x] Render `ORDER_HOLD` as a third group in the `Change status` dropdown,
       between the `ORDER_PIPELINE` group and the destructive `ORDER_TERMINAL`
       group.
 
@@ -79,7 +81,7 @@ fixed, no task below can be verified.
 
 ### 1.3 — Add a note field to the status change
 
-- [ ] The dropdown currently calls `updateOrderStatus(order.id, next)` with no
+- [x] The dropdown currently calls `updateOrderStatus(order.id, next)` with no
       note, so every timeline entry reads the default
       `"Updated from the order page."` (`src/lib/api/mutations.ts:209`). Add an
       optional note captured at status-change time and pass it as the third
@@ -93,7 +95,7 @@ fixed, no task below can be verified.
 
 ### 1.4 — Add `trackingNumber` to the domain model
 
-- [ ] Add required `trackingNumber: string` to `Order` (`src/lib/types.ts:112-132`).
+- [x] Add required `trackingNumber: string` to `Order` (`src/lib/types.ts:112-132`).
       Add a generator producing `AS-YYYY-XXXXXX` over the
       `0123456789ABCDEFGHJKMNPQRSTVWXYZ` alphabet (`SPEC.md` §2.2), used by
       `createOrder()` with regeneration on collision against the existing
@@ -107,7 +109,7 @@ fixed, no task below can be verified.
 
 ### 1.5 — Show the tracking number on the order detail screen
 
-- [ ] Display `order.trackingNumber` prominently in the `PageHeader` area,
+- [x] Display `order.trackingNumber` prominently in the `PageHeader` area,
       alongside `orderNo`, with a copy-to-clipboard affordance.
 
   Files: `src/features/orders/order-detail-screen.tsx`.
@@ -117,7 +119,7 @@ fixed, no task below can be verified.
 
 ### 1.6 — Let the admin override the tracking number
 
-- [ ] Add an edit affordance that calls the existing
+- [x] Add an edit affordance that calls the existing
       `updateOrder(id, { trackingNumber })` (`src/lib/api/mutations.ts:222-229`).
       Reject a value already used by another order, and reject one that does not
       match `^AS-\d{4}-[0123456789ABCDEFGHJKMNPQRSTVWXYZ]{6}$`.
@@ -131,7 +133,7 @@ fixed, no task below can be verified.
 
 ### 1.7 — Search orders by tracking number
 
-- [ ] Add `order.trackingNumber` to the search haystack at
+- [x] Add `order.trackingNumber` to the search haystack at
       `src/features/orders/orders-screen.tsx:151-153`, update the `SearchInput`
       placeholder from `"Search order no, client or product…"`, and add the same
       to the command-palette index at `src/lib/api/queries.ts:813`.
@@ -143,7 +145,7 @@ fixed, no task below can be verified.
 
 ### 1.8 — Add a `Tracking` column to the orders list
 
-- [ ] Add a visible `trackingNumber` column to the `columns` memo
+- [x] Add a visible `trackingNumber` column to the `columns` memo
       (`src/features/orders/orders-screen.tsx:164-388`).
 
   **Verify:** load `/orders` → the Tracking column renders a value for every
@@ -151,7 +153,7 @@ fixed, no task below can be verified.
 
 ### 1.9 — Public tracking projection (data layer only, no UI)
 
-- [ ] Add `PublicTrackingResult` and `usePublicTracking(trackingNumber)` to
+- [x] Add `PublicTrackingResult` and `usePublicTracking(trackingNumber)` to
       `src/lib/api/queries.ts`, exported from `src/lib/api/index.ts`. The result
       object must contain **only** the allowlist in `SPEC.md` §2.4. The timeline
       maps each `OrderEvent` to `{ at, statusLabel }` using
@@ -166,7 +168,7 @@ fixed, no task below can be verified.
 
 ### 1.10 — Public tracking page
 
-- [ ] Create the route group and page: `src/app/(public)/layout.tsx` (no
+- [x] Create the route group and page: `src/app/(public)/layout.tsx` (no
       `AppShell`, mirroring `src/app/(print)/layout.tsx`) and
       `src/app/(public)/track/page.tsx`, plus the screen component under
       `src/features/tracking/` (or a new `src/features/public/`). Input for the
@@ -182,7 +184,7 @@ fixed, no task below can be verified.
 
 ### 1.11 — Isolate carrier tracking behind a flag
 
-- [ ] Add `CARRIER_TRACKING_ENABLED` to `src/lib/constants.ts` (reading
+- [x] Add `CARRIER_TRACKING_ENABLED` to `src/lib/constants.ts` (reading
       `NEXT_PUBLIC_CARRIER_TRACKING_ENABLED`, defaulting to `false`). When
       disabled, hide: the `Tracking` nav item
       (`src/components/layout/nav-config.ts`), the `Tracking` tab and the
