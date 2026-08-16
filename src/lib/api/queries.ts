@@ -25,6 +25,7 @@ import {
 import { useDataStore } from "@/lib/store";
 import { DOCUMENT_KIND_LABEL, ORDER_STATUS } from "@/lib/constants";
 import type {
+  AppNotification,
   BusinessDocument,
   Client,
   ID,
@@ -315,6 +316,22 @@ export function usePublicTracking(
         })),
     };
   }, [orders, trackingNumber]);
+}
+
+/* -------------------------------------------------------------------------- */
+/* Notifications — GET /api/notifications                                      */
+/* -------------------------------------------------------------------------- */
+
+export function useNotifications(): AppNotification[] {
+  return useDataStore((s) => s.notifications);
+}
+
+export function useUnreadNotificationCount(): number {
+  const notifications = useDataStore((s) => s.notifications);
+  return useMemo(
+    () => notifications.filter((n) => !n.read).length,
+    [notifications],
+  );
 }
 
 /* -------------------------------------------------------------------------- */

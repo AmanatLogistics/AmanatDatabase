@@ -4,6 +4,7 @@ import Link from "next/link";
 import { ArrowLeftIcon, PrinterIcon } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { StoreGate } from "@/components/shared/store-gate";
 import { LogoMark } from "@/components/brand/logo";
 import { useCompany } from "@/lib/api";
 import { cn } from "@/lib/utils";
@@ -55,7 +56,7 @@ export function PrintShell({
             : "w-full max-w-[148mm] p-[10mm]",
         )}
       >
-        {children}
+        <StoreGate>{children}</StoreGate>
       </div>
     </>
   );

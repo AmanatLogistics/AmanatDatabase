@@ -1,5 +1,6 @@
 "use client";
 
+import { ORDER_STATUS } from "@/lib/constants";
 import { orderRevenue } from "@/lib/finance";
 import { useDataStore } from "@/lib/store";
 import {
@@ -8,6 +9,7 @@ import {
   normaliseTrackingNumber,
 } from "@/lib/tracking";
 import type {
+  AppNotification,
   Client,
   ID,
   Order,
@@ -39,6 +41,32 @@ function delay<T>(value: T): Promise<T> {
 
 function state() {
   return useDataStore.getState();
+}
+
+/**
+ * Record that something happened.
+ *
+ * Written here rather than in the screens so an event is logged wherever the
+ * action is triggered from — the orders list, the detail page or a dialog all
+ * produce the same notification.
+ */
+let notificationSeq = 0;
+function notify(
+  kind: AppNotification["kind"],
+  title: string,
+  description: string,
+  href?: string,
+): void {
+  notificationSeq += 1;
+  state().pushNotification({
+    id: `ntf-${Date.now()}-${notificationSeq}`,
+    at: new Date().toISOString(),
+    kind,
+    title,
+    description,
+    href,
+    read: false,
+  });
 }
 
 function nextSequence(existing: string[], prefix: string): number {
@@ -75,6 +103,16 @@ function event(
     description,
     actor,
   };
+}
+
+/** PATCH /api/notifications/read */
+export async function markNotificationsRead(): Promise<void> {
+  state().markNotificationsRead();
+}
+
+/** DELETE /api/notifications */
+export async function clearNotifications(): Promise<void> {
+  state().clearNotifications();
 }
 
 /* -------------------------------------------------------------------------- */
@@ -115,6 +153,41 @@ export async function updateClient(
   patch: Partial<Client>,
 ): Promise<void> {
   state().updateClient(id, patch);
+  return delay(undefined);
+}
+
+/**
+ * DELETE /api/clients/:id
+ *
+ * Takes the client's orders with them, and the purchases and payments on those
+ * orders. Leaving them behind would strand rows pointing at a client that no
+ * longer exists, and the finance screens would keep counting money against
+ * nobody. Returns what was removed so the confirmation can say so plainly.
+ */
+export interface ClientDeletionImpact {
+  orders: number;
+  purchases: number;
+  payments: number;
+}
+
+export function clientDeletionImpact(id: ID): ClientDeletionImpact {
+  const { orders, purchases, payments } = state();
+  const orderIds = new Set(
+    orders.filter((o) => o.clientId === id).map((o) => o.id),
+  );
+  return {
+    orders: orderIds.size,
+    purchases: purchases.filter((p) => orderIds.has(p.orderId)).length,
+    payments: payments.filter((p) => p.clientId === id).length,
+  };
+}
+
+export async function deleteClient(id: ID): Promise<void> {
+  const client = state().clients.find((c) => c.id === id);
+  state().removeClient(id);
+  if (client) {
+    notify("deletion", `Client ${client.name} deleted`, "Removed with their orders, purchases and payments.");
+  }
   return delay(undefined);
 }
 
@@ -216,6 +289,12 @@ export async function createOrder(input: CreateOrderInput): Promise<Order> {
   };
 
   addOrder(order);
+  notify(
+    "order_created",
+    `New order ${order.orderNo}`,
+    `${client?.name ?? "A client"} · ${items.length} item${items.length > 1 ? "s" : ""} · tracking ${order.trackingNumber}`,
+    `/orders/${order.id}`,
+  );
   return delay(order);
 }
 
@@ -246,6 +325,12 @@ export async function updateOrderStatus(
     deliveredAt:
       status === "delivered" ? now().toISOString() : order.deliveredAt,
   });
+  notify(
+    "order_status",
+    `${order.orderNo} is now ${ORDER_STATUS[status].label}`,
+    note ?? `Tracking ${order.trackingNumber}`,
+    `/orders/${id}`,
+  );
   return delay(undefined);
 }
 
@@ -288,6 +373,44 @@ export async function setOrderTrackingNumber(
   }
 
   updateOrder(id, { trackingNumber: value });
+  return delay(undefined);
+}
+
+/**
+ * DELETE /api/orders/:id
+ *
+ * Removes the purchases and payments logged against the order too. A purchase
+ * records money paid out *for this order*; keeping it would leave a cost with
+ * nothing to attribute it to and quietly distort the P&L.
+ */
+export interface OrderDeletionImpact {
+  purchases: number;
+  payments: number;
+  paidAfn: number;
+}
+
+export function orderDeletionImpact(id: ID): OrderDeletionImpact {
+  const { purchases, payments } = state();
+  const linked = payments.filter((p) => p.orderId === id);
+  return {
+    purchases: purchases.filter((p) => p.orderId === id).length,
+    payments: linked.length,
+    paidAfn: linked.reduce((sum, p) => sum + p.amountAfn, 0),
+  };
+}
+
+export async function deleteOrder(id: ID): Promise<void> {
+  const order = state().orders.find((o) => o.id === id);
+  state().removeOrder(id);
+  if (order) {
+    notify("deletion", `Order ${order.orderNo} deleted`, "Removed with its purchases and payments.");
+  }
+  return delay(undefined);
+}
+
+/** DELETE /api/purchases/:id */
+export async function deletePurchase(id: ID): Promise<void> {
+  state().removePurchase(id);
   return delay(undefined);
 }
 
@@ -345,6 +468,12 @@ export async function createPurchase(
 
   // Placing a purchase moves the order forward, the way it does in the shop.
   const order = orders.find((o) => o.id === input.orderId);
+  notify(
+    "purchase",
+    `Purchase ${purchase.purchaseNo} logged`,
+    `${Math.round(purchase.totalCostAfn).toLocaleString()} AFN paid out for ${order?.orderNo ?? "an order"}`,
+    "/purchases",
+  );
   if (order && ["requested", "quoted", "confirmed", "purchasing"].includes(order.status)) {
     updateOrder(order.id, {
       status: "purchased",
@@ -397,6 +526,12 @@ export async function createPayment(
   };
 
   addPayment(payment);
+  notify(
+    "payment",
+    `Payment received${payment.orderId ? "" : " (unallocated)"}`,
+    `${Math.round(payment.amountAfn).toLocaleString()} AFN · receipt ${payment.receiptNo}`,
+    payment.orderId ? `/orders/${payment.orderId}` : "/payments",
+  );
 
   // Log it on the order timeline so the activity tab tells the whole story.
   const order = orders.find((o) => o.id === input.orderId);

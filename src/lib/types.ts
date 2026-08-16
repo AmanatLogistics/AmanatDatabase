@@ -202,6 +202,35 @@ export interface Payment {
 }
 
 /* -------------------------------------------------------------------------- */
+/* Notifications                                                               */
+/* -------------------------------------------------------------------------- */
+
+export type NotificationKind =
+  | "order_created"
+  | "order_status"
+  | "payment"
+  | "purchase"
+  | "deletion";
+
+/**
+ * Something that happened, recorded when it happened.
+ *
+ * Distinct from the dashboard's "needs attention" list, which is derived from
+ * current state and so cannot tell you that an order moved — only that it is
+ * late. These are events, they are appended, and they stay until dismissed.
+ */
+export interface AppNotification {
+  id: ID;
+  at: ISODate;
+  kind: NotificationKind;
+  title: string;
+  description: string;
+  /** Where to go when it is clicked. Omitted when the record is gone. */
+  href?: string;
+  read: boolean;
+}
+
+/* -------------------------------------------------------------------------- */
 /* Settings / reference data                                                   */
 /* -------------------------------------------------------------------------- */
 

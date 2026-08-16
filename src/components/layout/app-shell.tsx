@@ -9,6 +9,7 @@ import {
   useCommandPalette,
 } from "@/components/layout/command-palette";
 import { Sidebar } from "@/components/layout/sidebar";
+import { StoreGate } from "@/components/shared/store-gate";
 import { Topbar } from "@/components/layout/topbar";
 
 export function AppShell({ children }: { children: React.ReactNode }) {
@@ -55,7 +56,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         />
         <main className="scrollbar-thin flex-1 overflow-y-auto">
           <div className="mx-auto w-full max-w-[1600px] space-y-4 p-4 sm:px-6 sm:py-5">
-            {children}
+            <StoreGate>{children}</StoreGate>
           </div>
         </main>
       </div>

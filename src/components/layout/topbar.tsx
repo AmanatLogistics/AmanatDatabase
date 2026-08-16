@@ -21,8 +21,17 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { usePageMeta } from "@/components/layout/use-page-meta";
-import { useNavCounts, useTeam, useToday } from "@/lib/api";
-import { formatAfn, initials } from "@/lib/format";
+import {
+  clearNotifications,
+  markNotificationsRead,
+  useNavCounts,
+  useNotifications,
+  useTeam,
+  useToday,
+  useUnreadNotificationCount,
+} from "@/lib/api";
+import { formatAfn, formatRelative, initials } from "@/lib/format";
+import type { AppNotification } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 function greeting(hour: number): string {
@@ -56,7 +65,15 @@ export function Topbar({
    */
   const isDashboard = pathname === "/";
 
-  const notifications = nav.attention.length;
+  const events = useNotifications();
+  const unread = useUnreadNotificationCount();
+  /*
+   * Two different things share this bell: events that happened (appended when
+   * they happen) and the derived "needs attention" list (computed from current
+   * state). The badge counts unread events, because that is the part that is
+   * new since the operator last looked.
+   */
+  const badgeCount = unread || nav.attention.length;
 
   return (
     <header className="bg-background/85 supports-[backdrop-filter]:bg-background/70 sticky top-0 z-30 flex h-16 shrink-0 items-center gap-3 border-b px-4 backdrop-blur-md sm:px-6">
@@ -139,23 +156,62 @@ export function Topbar({
         <SearchIcon />
       </Button>
 
-      <DropdownMenu>
+      <DropdownMenu
+        onOpenChange={(open) => {
+          // Seen is seen: opening the panel clears the unread badge.
+          if (open && unread > 0) void markNotificationsRead();
+        }}
+      >
         <DropdownMenuTrigger asChild>
           <Button
             variant="ghost"
             size="icon-sm"
             className="relative"
-            aria-label={`Notifications (${notifications})`}
+            aria-label={`Notifications (${badgeCount} new)`}
           >
             <BellIcon />
-            {notifications > 0 && (
+            {badgeCount > 0 && (
               <span className="bg-destructive text-destructive-foreground absolute -top-0.5 -right-0.5 flex size-4 items-center justify-center rounded-full text-[9px] font-semibold">
-                {notifications}
+                {badgeCount > 9 ? "9+" : badgeCount}
               </span>
             )}
           </Button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-80">
+        <DropdownMenuContent align="end" className="w-88 max-h-[70vh] overflow-y-auto">
+          {events.length > 0 && (
+            <>
+              <div className="flex items-center justify-between px-2 py-1.5">
+                <DropdownMenuLabel className="p-0">Activity</DropdownMenuLabel>
+                <button
+                  type="button"
+                  onClick={() => void clearNotifications()}
+                  className="text-muted-foreground hover:text-foreground text-xs"
+                >
+                  Clear
+                </button>
+              </div>
+              <DropdownMenuSeparator />
+              {events.slice(0, 12).map((event) => (
+                <DropdownMenuItem
+                  key={event.id}
+                  asChild={Boolean(event.href)}
+                  data-testid="notification-item"
+                  className={cn(!event.read && "bg-brand-700/5")}
+                >
+                  {event.href ? (
+                    <Link href={event.href} className="flex-col items-start gap-0.5">
+                      <NotificationBody event={event} />
+                    </Link>
+                  ) : (
+                    <div className="flex flex-col items-start gap-0.5">
+                      <NotificationBody event={event} />
+                    </div>
+                  )}
+                </DropdownMenuItem>
+              ))}
+              <DropdownMenuSeparator />
+            </>
+          )}
           <DropdownMenuLabel>Needs attention</DropdownMenuLabel>
           <DropdownMenuSeparator />
           {nav.attention.length === 0 ? (
@@ -226,5 +282,31 @@ export function Topbar({
         </DropdownMenuContent>
       </DropdownMenu>
     </header>
+  );
+}
+
+/**
+ * One event line. Kept apart so the linked and unlinked cases cannot drift —
+ * a notification about a deleted record has nowhere to go.
+ */
+function NotificationBody({ event }: { event: AppNotification }) {
+  return (
+    <>
+      <span className="flex w-full items-center gap-2">
+        <span
+          className={cn(
+            "size-1.5 shrink-0 rounded-full",
+            event.read ? "bg-muted-foreground/40" : "bg-brand-600",
+          )}
+        />
+        <span className="text-[13px] font-medium">{event.title}</span>
+      </span>
+      <span className="text-muted-foreground pl-3.5 text-xs">
+        {event.description}
+      </span>
+      <span className="text-muted-foreground/70 pl-3.5 text-[11px]">
+        {formatRelative(event.at)}
+      </span>
+    </>
   );
 }

@@ -13,6 +13,7 @@ import {
   PlusIcon,
   PrinterIcon,
   ShoppingCartIcon,
+  Trash2Icon,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -33,9 +34,16 @@ import {
 import { Money } from "@/components/shared/money";
 import { PageHeader } from "@/components/shared/page-header";
 import { ProductThumb } from "@/components/shared/product-thumb";
+import { ConfirmDeleteDialog } from "@/components/shared/confirm-delete-dialog";
 import { StatusBadge } from "@/components/shared/status-badge";
 import { RecordPaymentDialog } from "@/features/payments/record-payment-dialog";
-import { useOrderRows, useStores, type OrderRow } from "@/lib/api";
+import {
+  deleteOrder,
+  orderDeletionImpact,
+  useOrderRows,
+  useStores,
+  type OrderRow,
+} from "@/lib/api";
 import { ACTIVE_ORDER_STATUSES, ORDER_SOURCE_LABEL } from "@/lib/constants";
 import { formatDateShort, truncate } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -53,6 +61,7 @@ export function OrdersScreen() {
   const [source, setSource] = React.useState("all");
   const [paymentState, setPaymentState] = React.useState<PaymentFilter>("all");
   const [payingOrder, setPayingOrder] = React.useState<OrderRow | null>(null);
+  const [deleting, setDeleting] = React.useState<OrderRow | null>(null);
 
   const chips = React.useMemo(() => {
     const count = (predicate: (row: OrderRow) => boolean) =>
@@ -372,6 +381,14 @@ export function OrdersScreen() {
                     </Link>
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    variant="destructive"
+                    onSelect={() => setDeleting(row.original)}
+                  >
+                    <Trash2Icon />
+                    Delete order
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
                   <DropdownMenuItem asChild>
                     <Link href={`/print/invoice/${order.id}`} target="_blank">
                       <PrinterIcon />
@@ -478,6 +495,19 @@ export function OrdersScreen() {
         }
       />
 
+      {deleting && (
+        <ConfirmDeleteDialog
+          open
+          onOpenChange={(open) => !open && setDeleting(null)}
+          title="Delete this order?"
+          subject={`${deleting.order.orderNo} · ${deleting.order.trackingNumber}`}
+          consequences={describeOrderDeletion(deleting.order.id)}
+          confirmLabel="Delete order"
+          successMessage={`Order ${deleting.order.orderNo} deleted`}
+          onConfirm={() => deleteOrder(deleting.order.id)}
+        />
+      )}
+
       <RecordPaymentDialog
         open={!!payingOrder}
         onOpenChange={(open) => !open && setPayingOrder(null)}
@@ -485,4 +515,25 @@ export function OrdersScreen() {
       />
     </>
   );
+}
+
+/**
+ * Spell out what else goes when an order does, so the confirmation is specific
+ * rather than a generic warning. Money already collected is called out in
+ * words — that is the part an operator would not want to lose silently.
+ */
+function describeOrderDeletion(orderId: string): string[] {
+  const { purchases, payments, paidAfn } = orderDeletionImpact(orderId);
+  const lines: string[] = [];
+  if (purchases > 0) {
+    lines.push(
+      `${purchases} logged purchase${purchases > 1 ? "s" : ""} and their cost`,
+    );
+  }
+  if (payments > 0) {
+    lines.push(
+      `${payments} recorded payment${payments > 1 ? "s" : ""} totalling ${Math.round(paidAfn).toLocaleString()} AFN`,
+    );
+  }
+  return lines;
 }
