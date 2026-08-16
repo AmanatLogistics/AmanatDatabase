@@ -157,6 +157,23 @@ export const PURCHASE_STATUS: Record<
   refunded: meta("refunded", "Refunded", "destructive", "bg-destructive"),
 };
 
+/**
+ * What each purchase stage actually means, in the operator's words.
+ *
+ * "Placed" and "Received" are ambiguous on their own — received by whom, from
+ * whom? These sentences are shown next to the choice so the answer never has to
+ * be guessed.
+ */
+export const PURCHASE_STATUS_DESCRIPTION: Record<PurchaseStatus, string> = {
+  pending: "Decided to buy it, but the store order is not placed yet.",
+  placed: "Ordered from the store. Our money has left.",
+  shipped_to_warehouse:
+    "The store has shipped it to our forwarder, not to us yet.",
+  received: "It has reached us and can go to the client.",
+  cancelled: "The store order was cancelled. No money was spent.",
+  refunded: "The store refunded us. The money came back.",
+};
+
 /* -------------------------------------------------------------------------- */
 /* Payments & clients                                                          */
 /* -------------------------------------------------------------------------- */
