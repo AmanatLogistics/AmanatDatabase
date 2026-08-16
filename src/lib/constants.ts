@@ -190,6 +190,25 @@ export const SHIPMENT_STATUS: Record<
 };
 
 /**
+ * The public /track page, off by default.
+ *
+ * A kill switch, not a feature toggle. While the app is frontend-only the
+ * whole seeded dataset — client names, phone numbers, addresses, cost prices —
+ * ships inside the client JS bundle, so a publicly reachable /track exposes all
+ * of it regardless of which fields the page renders. `PublicTrackingResult`
+ * controls the DOM; it cannot control what is in the bundle.
+ *
+ * Default-off means no deployment can serve the page by accident, and the
+ * guarantee lives in the repository rather than in a hosting-provider setting
+ * that is invisible from the code and can be changed by anyone with access.
+ *
+ * Turn this on only once /track is served by a real
+ * `GET /api/track/:trackingNumber` (SPEC.md §2.4, risk R1).
+ */
+export const PUBLIC_TRACKING_ENABLED =
+  process.env.NEXT_PUBLIC_PUBLIC_TRACKING_ENABLED === "true";
+
+/**
  * Third-party carrier tracking, off by default.
  *
  * We have no carriers — every parcel moves on our own internal tracking number
