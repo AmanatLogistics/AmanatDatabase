@@ -163,6 +163,24 @@ export function CompanySettingsScreen() {
               className="tabular"
             />
           </div>
+
+          <div className="grid gap-2">
+            <Label htmlFor="setting-order-prefix">Tracking number prefix</Label>
+            <Input
+              id="setting-order-prefix"
+              value={draft.orderPrefix}
+              onChange={(e) =>
+                set("orderPrefix", e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ""))
+              }
+              className="tabular"
+              maxLength={6}
+            />
+            <p className="text-muted-foreground text-xs">
+              Used when we generate a tracking number, e.g.{" "}
+              {draft.orderPrefix || "AS"}-2026-4F7K2Q. You can still type your
+              own reference on any order.
+            </p>
+          </div>
         </CardContent>
       </Card>
 
