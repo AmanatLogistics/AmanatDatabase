@@ -10,6 +10,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { usePublicTracking } from "@/lib/api";
+import { startHydration, useStoreHydrated } from "@/lib/hydration";
 import { formatDateTime } from "@/lib/format";
 
 /**
@@ -23,7 +24,10 @@ import { formatDateTime } from "@/lib/format";
  * It renders only `PublicTrackingResult` (see `src/lib/api/queries.ts`), which
  * is the field allowlist. Nothing here reaches for the raw order.
  */
+startHydration();
+
 export function PublicTrackingScreen() {
+  const hydrated = useStoreHydrated();
   const [input, setInput] = React.useState("");
   /** Only set on submit, so the page does not look up as the client types. */
   const [submitted, setSubmitted] = React.useState("");
@@ -70,8 +74,8 @@ export function PublicTrackingScreen() {
         </CardContent>
       </Card>
 
-      {submitted && !result && <NotFound />}
-      {result && <Result result={result} />}
+      {hydrated && submitted && !result && <NotFound />}
+      {hydrated && result && <Result result={result} />}
     </main>
   );
 }
