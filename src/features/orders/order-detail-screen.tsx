@@ -5,6 +5,8 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { toast } from "sonner";
 import {
+  CheckIcon,
+  CopyIcon,
   CreditCardIcon,
   ExternalLinkIcon,
   MessageSquarePlusIcon,
@@ -138,7 +140,12 @@ export function OrderDetailScreen({ orderId }: { orderId: string }) {
   return (
     <>
       <PageHeader
-        meta={<StatusBadge kind="order" value={order.status} />}
+        meta={
+          <>
+            <StatusBadge kind="order" value={order.status} />
+            <TrackingNumberChip value={order.trackingNumber} />
+          </>
+        }
         description={
           <>
             Requested {formatDate(order.requestedAt)} via{" "}
@@ -872,6 +879,43 @@ export function OrderDetailScreen({ orderId }: { orderId: string }) {
         order={row}
       />
     </>
+  );
+}
+
+/**
+ * The number the client quotes on the phone, so it sits beside the status badge
+ * rather than inside a tab. Copying it is the common case — staff paste it into
+ * WhatsApp — so the whole chip is the copy button.
+ */
+function TrackingNumberChip({ value }: { value: string }) {
+  const [copied, setCopied] = React.useState(false);
+
+  async function copy() {
+    try {
+      await navigator.clipboard.writeText(value);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      toast.error("Could not copy the tracking number.");
+    }
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={copy}
+      data-testid="tracking-number"
+      aria-label={`Copy tracking number ${value}`}
+      className="bg-muted/60 text-foreground hover:bg-muted inline-flex items-center gap-1.5 rounded-md border px-2 py-1 text-xs font-medium transition-colors"
+    >
+      <span className="text-muted-foreground">Tracking</span>
+      <span className="tabular">{value}</span>
+      {copied ? (
+        <CheckIcon className="text-success size-3.5" />
+      ) : (
+        <CopyIcon className="text-muted-foreground size-3.5" />
+      )}
+    </button>
   );
 }
 
