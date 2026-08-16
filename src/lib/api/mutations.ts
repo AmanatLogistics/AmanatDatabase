@@ -5,6 +5,7 @@ import { useDataStore } from "@/lib/store";
 import {
   generateUniqueTrackingNumber,
   isValidTrackingNumber,
+  normaliseTrackingNumber,
 } from "@/lib/tracking";
 import type {
   Client,
@@ -168,11 +169,13 @@ export async function createOrder(input: CreateOrderInput): Promise<Order> {
 
   // A number the operator typed is checked the same way the override is; an
   // unusable one must fail here rather than reach the client on a slip of paper.
-  const wanted = input.trackingNumber?.trim().toUpperCase();
+  const wanted = input.trackingNumber
+    ? normaliseTrackingNumber(input.trackingNumber)
+    : undefined;
   if (wanted) {
     if (!isValidTrackingNumber(wanted)) {
       throw new Error(
-        "A tracking number looks like AS-2026-4F7K2Q — the letters I, L, O and U are not used.",
+        "Use letters, numbers and hyphens only — 3 to 32 characters, e.g. AM-2026-0001.",
       );
     }
     if (orders.some((o) => o.trackingNumber === wanted)) {
@@ -185,10 +188,11 @@ export async function createOrder(input: CreateOrderInput): Promise<Order> {
     orderNo: `AS-${at.getUTCFullYear()}-${pad(seq)}`,
     trackingNumber:
       wanted ??
-      generateUniqueTrackingNumber(
-        at.getUTCFullYear(),
-        orders.map((o) => o.trackingNumber),
-      ),
+      generateUniqueTrackingNumber({
+        year: at.getUTCFullYear(),
+        prefix: state().settings.company.orderPrefix,
+        taken: orders.map((o) => o.trackingNumber),
+      }),
     clientId: input.clientId,
     status: "requested",
     source: input.source,
@@ -270,11 +274,11 @@ export async function setOrderTrackingNumber(
   trackingNumber: string,
 ): Promise<void> {
   const { orders, updateOrder } = state();
-  const value = trackingNumber.trim().toUpperCase();
+  const value = normaliseTrackingNumber(trackingNumber);
 
   if (!isValidTrackingNumber(value)) {
     throw new Error(
-      "A tracking number looks like AS-2026-4F7K2Q — the letters I, L, O and U are not used.",
+      "Use letters, numbers and hyphens only — 3 to 32 characters, e.g. AM-2026-0001.",
     );
   }
 

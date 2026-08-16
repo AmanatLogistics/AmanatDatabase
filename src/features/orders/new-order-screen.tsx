@@ -25,6 +25,7 @@ import { ProductThumb } from "@/components/shared/product-thumb";
 import {
   createOrder,
   useClients,
+  useCompany,
   useStores,
   type CreateOrderItemInput,
 } from "@/lib/api";
@@ -64,6 +65,7 @@ export function NewOrderScreen() {
   const router = useRouter();
   const clients = useClients();
   const stores = useStores().filter((s) => s.active);
+  const company = useCompany();
 
   const [clientId, setClientId] = React.useState("");
   const [source, setSource] = React.useState<OrderSource>("whatsapp");
@@ -261,7 +263,7 @@ export function NewOrderScreen() {
                     setTracking(e.target.value.toUpperCase());
                     setTrackingError(null);
                   }}
-                  placeholder="AS-2026-4F7K2Q"
+                  placeholder={`${company.orderPrefix}-2026-0001`}
                   className="tabular"
                   aria-invalid={trackingError !== null}
                 />
@@ -271,7 +273,12 @@ export function NewOrderScreen() {
                   size="icon"
                   aria-label="Generate a tracking number"
                   onClick={() => {
-                    setTracking(generateTrackingNumber(new Date().getFullYear()));
+                    setTracking(
+                      generateTrackingNumber({
+                        year: new Date().getFullYear(),
+                        prefix: company.orderPrefix,
+                      }),
+                    );
                     setTrackingError(null);
                   }}
                 >
@@ -284,8 +291,9 @@ export function NewOrderScreen() {
                 </p>
               ) : (
                 <p className="text-muted-foreground text-xs">
-                  Format AS-YYYY-XXXXXX. The letters I, L, O and U are not used,
-                  so it cannot be misread over the phone.
+                  Your own reference is fine — letters, numbers and hyphens,
+                  e.g. {company.orderPrefix}-2026-0001. Generated numbers avoid
+                  I, L, O and U so they cannot be misheard on the phone.
                 </p>
               )}
             </CardContent>

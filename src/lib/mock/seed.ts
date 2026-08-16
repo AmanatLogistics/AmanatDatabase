@@ -442,11 +442,12 @@ draft.forEach(({ requestedAt, clientId }) => {
   const discountAfn =
     chance(0.14) ? Math.round((itemsAfn * (rand() * 0.04 + 0.01)) / 50) * 50 : 0;
 
-  const trackingNumber = generateUniqueTrackingNumber(
-    requestedAt.getUTCFullYear(),
-    trackingNumbersUsed,
-    trackingRand,
-  );
+  const trackingNumber = generateUniqueTrackingNumber({
+    year: requestedAt.getUTCFullYear(),
+    prefix: settings.company.orderPrefix,
+    taken: trackingNumbersUsed,
+    random: trackingRand,
+  });
   trackingNumbersUsed.add(trackingNumber);
 
   const base: Omit<Order, "timeline"> = {
