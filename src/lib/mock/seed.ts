@@ -12,6 +12,7 @@ import type {
   Payment,
   Purchase,
   PurchaseStatus,
+  StoreProduct,
 } from "@/lib/types";
 
 /**
@@ -405,6 +406,34 @@ function buildFreight(
 }
 
 /* -------------------------------------------------------------------------- */
+/* Storefront catalogue                                                        */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * A starting catalogue, so the storefront is not empty on first run.
+ *
+ * Drawn from the same product list the order seeds use, priced with the markup
+ * the team quotes at. Staff can edit, unpublish or delete any of it — this is
+ * only a starting point, not a fixture.
+ */
+const storeProducts: StoreProduct[] = catalog.slice(0, 24).map((product, index) => {
+  const costAfn = Math.round(product.costAfn / 50) * 50;
+  return {
+    id: `sp-${String(index + 1).padStart(3, "0")}`,
+    slug: product.slug,
+    name: product.name,
+    description: `${product.name}. Sourced to order from our partner stores and delivered to our office in Kabul.`,
+    category: product.category,
+    priceAfn: Math.round((costAfn * QUOTE_MARKUP * 1.12) / 50) * 50,
+    costAfn,
+    storeId: product.storeId,
+    // A couple left unpublished so the admin has something to publish.
+    active: index % 11 !== 0,
+    createdAt: iso(shift(TODAY, -120 + index)),
+  };
+});
+
+/* -------------------------------------------------------------------------- */
 /* Main generation pass                                                        */
 /* -------------------------------------------------------------------------- */
 
@@ -568,6 +597,7 @@ purchases.sort((a, b) => b.purchasedAt.localeCompare(a.purchasedAt));
 payments.sort((a, b) => b.at.localeCompare(a.at));
 
 export const seedData = {
+  storeProducts,
   clients,
   orders,
   purchases,

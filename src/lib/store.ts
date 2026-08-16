@@ -6,11 +6,14 @@ import { createJSONStorage, persist } from "zustand/middleware";
 import { seedData, TODAY } from "@/lib/mock/seed";
 import type {
   AppNotification,
+  CartLine,
   Client,
   Order,
   Payment,
   Purchase,
   Settings,
+  StoreProduct,
+  WebOrder,
 } from "@/lib/types";
 
 /**
@@ -35,6 +38,12 @@ const STORAGE_KEY = "amanat-shopping-data";
 export interface DataState {
   clients: Client[];
   notifications: AppNotification[];
+  /** The storefront catalogue. Staff-managed, customer-visible when active. */
+  storeProducts: StoreProduct[];
+  /** The visitor's basket. Theirs alone — never seen by staff. */
+  cart: CartLine[];
+  /** Orders placed on the storefront, awaiting a human decision. */
+  webOrders: WebOrder[];
   orders: Order[];
   purchases: Purchase[];
   payments: Payment[];
@@ -58,6 +67,18 @@ export interface DataState {
 
   addPayment: (payment: Payment) => void;
 
+  addStoreProduct: (product: StoreProduct) => void;
+  updateStoreProduct: (id: string, patch: Partial<StoreProduct>) => void;
+  removeStoreProduct: (id: string) => void;
+
+  addToCart: (productId: string, qty: number) => void;
+  setCartQty: (productId: string, qty: number) => void;
+  clearCart: () => void;
+
+  addWebOrder: (order: WebOrder) => void;
+  updateWebOrder: (id: string, patch: Partial<WebOrder>) => void;
+  removeWebOrder: (id: string) => void;
+
   /** Append an event. Newest first, capped so the log cannot grow forever. */
   pushNotification: (notification: AppNotification) => void;
   markNotificationsRead: () => void;
@@ -72,6 +93,9 @@ export interface DataState {
 const initial = () => ({
   clients: seedData.clients,
   notifications: [] as AppNotification[],
+  storeProducts: seedData.storeProducts,
+  cart: [] as CartLine[],
+  webOrders: [] as WebOrder[],
   orders: seedData.orders,
   purchases: seedData.purchases,
   payments: seedData.payments,
@@ -153,6 +177,63 @@ export const useDataStore = create<DataState>()(
       addPayment: (payment) =>
         set((state) => ({ payments: [payment, ...state.payments] })),
 
+      addStoreProduct: (product) =>
+        set((state) => ({ storeProducts: [product, ...state.storeProducts] })),
+
+      updateStoreProduct: (id, patch) =>
+        set((state) => ({
+          storeProducts: state.storeProducts.map((p) =>
+            p.id === id ? { ...p, ...patch } : p,
+          ),
+        })),
+
+      /** Also drops it from the basket — you cannot buy what no longer exists. */
+      removeStoreProduct: (id) =>
+        set((state) => ({
+          storeProducts: state.storeProducts.filter((p) => p.id !== id),
+          cart: state.cart.filter((line) => line.productId !== id),
+        })),
+
+      addToCart: (productId, qty) =>
+        set((state) => {
+          const existing = state.cart.find((l) => l.productId === productId);
+          return {
+            cart: existing
+              ? state.cart.map((l) =>
+                  l.productId === productId ? { ...l, qty: l.qty + qty } : l,
+                )
+              : [...state.cart, { productId, qty }],
+          };
+        }),
+
+      /** Setting a quantity of zero or less removes the line entirely. */
+      setCartQty: (productId, qty) =>
+        set((state) => ({
+          cart:
+            qty > 0
+              ? state.cart.map((l) =>
+                  l.productId === productId ? { ...l, qty } : l,
+                )
+              : state.cart.filter((l) => l.productId !== productId),
+        })),
+
+      clearCart: () => set({ cart: [] }),
+
+      addWebOrder: (order) =>
+        set((state) => ({ webOrders: [order, ...state.webOrders] })),
+
+      updateWebOrder: (id, patch) =>
+        set((state) => ({
+          webOrders: state.webOrders.map((o) =>
+            o.id === id ? { ...o, ...patch } : o,
+          ),
+        })),
+
+      removeWebOrder: (id) =>
+        set((state) => ({
+          webOrders: state.webOrders.filter((o) => o.id !== id),
+        })),
+
       pushNotification: (notification) =>
         set((state) => ({
           notifications: [notification, ...state.notifications].slice(0, 50),
@@ -191,6 +272,9 @@ export const useDataStore = create<DataState>()(
       partialize: (state) => ({
         clients: state.clients,
         notifications: state.notifications,
+        storeProducts: state.storeProducts,
+        cart: state.cart,
+        webOrders: state.webOrders,
         orders: state.orders,
         purchases: state.purchases,
         payments: state.payments,

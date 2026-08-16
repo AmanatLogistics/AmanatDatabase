@@ -202,10 +202,85 @@ export interface Payment {
 }
 
 /* -------------------------------------------------------------------------- */
+/* Shop — the storefront catalogue and the orders placed on it                 */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Something we list for sale ourselves.
+ *
+ * Distinct from `CatalogProduct` in `src/lib/mock/*`, which is seed scaffolding
+ * describing what a client might ask us to buy. This is a product *we* publish,
+ * with a price a customer pays and a cost only staff see.
+ */
+export interface StoreProduct {
+  id: ID;
+  /** URL segment, e.g. "airpods-pro-2". Unique. */
+  slug: string;
+  name: string;
+  description: string;
+  imageUrl?: string;
+  category: ProductCategory;
+  /** What the customer pays, AFN. */
+  priceAfn: number;
+  /** What we expect to pay to source it, AFN. Never shown to a customer. */
+  costAfn: number;
+  /** Where we buy it from. */
+  storeId: ID;
+  /** Listed on the storefront. Unpublished products stay staff-only. */
+  active: boolean;
+  createdAt: ISODate;
+}
+
+/** A line in the customer's basket. Lives in their browser until checkout. */
+export interface CartLine {
+  productId: ID;
+  qty: number;
+}
+
+/**
+ * An order placed on the storefront, before staff have touched it.
+ *
+ * Deliberately not an `Order`. It is a request from someone who may not be a
+ * client yet, for products we have not bought — turning it into a real order is
+ * a decision a person makes, and that decision is what creates the client
+ * record and the tracking number.
+ */
+export type WebOrderStatus = "new" | "converted" | "dismissed";
+
+export interface WebOrderLine {
+  productId: ID;
+  /** Copied at checkout, so later edits to the product do not rewrite history. */
+  name: string;
+  qty: number;
+  priceAfn: number;
+}
+
+export interface WebOrder {
+  id: ID;
+  /** Human-facing reference, e.g. "WEB-2026-0007". */
+  reference: string;
+  placedAt: ISODate;
+  customerName: string;
+  customerPhone: string;
+  customerCity: string;
+  customerAddress?: string;
+  note?: string;
+  lines: WebOrderLine[];
+  /** Sum of the lines at the moment of checkout, AFN. */
+  totalAfn: number;
+  status: WebOrderStatus;
+  /** Set once staff turn it into a real order. */
+  convertedOrderId?: ID;
+  /** The tracking number the customer was given, once converted. */
+  trackingNumber?: string;
+}
+
+/* -------------------------------------------------------------------------- */
 /* Notifications                                                               */
 /* -------------------------------------------------------------------------- */
 
 export type NotificationKind =
+  | "web_order"
   | "order_created"
   | "order_status"
   | "payment"

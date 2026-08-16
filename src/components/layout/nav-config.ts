@@ -9,6 +9,7 @@ import {
   PackageIcon,
   SettingsIcon,
   ShoppingCartIcon,
+  StoreIcon,
   UsersIcon,
   UsersRoundIcon,
   WalletIcon,
@@ -45,6 +46,16 @@ export const navigation: NavSection[] = [
       },
       { label: "Clients", href: "/clients", icon: UsersIcon },
       { label: "Purchases", href: "/purchases", icon: PackageIcon },
+    ],
+  },
+  {
+    caption: "Online shop",
+    items: [
+      /*
+       * The one door between the two systems. The shop keeps its own shell and
+       * navigation — this is a link across, not a merge.
+       */
+      { label: "Shop admin", href: "/shop", icon: StoreIcon },
     ],
   },
   {
