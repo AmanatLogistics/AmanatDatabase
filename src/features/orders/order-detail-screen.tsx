@@ -22,6 +22,14 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -29,6 +37,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
@@ -84,6 +93,12 @@ export function OrderDetailScreen({ orderId }: { orderId: string }) {
   const [trackingOpen, setTrackingOpen] = React.useState(false);
   const [note, setNote] = React.useState("");
   const [savingNote, setSavingNote] = React.useState(false);
+  /** The status the operator picked, held until they confirm with a note. */
+  const [pendingStatus, setPendingStatus] = React.useState<OrderStatus | null>(
+    null,
+  );
+  const [statusNote, setStatusNote] = React.useState("");
+  const [savingStatus, setSavingStatus] = React.useState(false);
 
   if (!row) notFound();
 
@@ -92,9 +107,20 @@ export function OrderDetailScreen({ orderId }: { orderId: string }) {
     (p) => p.payment.orderId === order.id,
   );
 
-  async function handleStatusChange(next: OrderStatus) {
-    await updateOrderStatus(order.id, next);
-    toast.success(`Status set to ${ORDER_STATUS[next].label}`);
+  async function handleStatusChange() {
+    if (!pendingStatus) return;
+    const next = pendingStatus;
+    setSavingStatus(true);
+    try {
+      await updateOrderStatus(order.id, next, statusNote.trim() || undefined);
+      toast.success(`Status set to ${ORDER_STATUS[next].label}`);
+      setPendingStatus(null);
+      setStatusNote("");
+    } catch {
+      toast.error("Could not change the status. Nothing was saved.");
+    } finally {
+      setSavingStatus(false);
+    }
   }
 
   async function handleAddNote() {
@@ -140,7 +166,7 @@ export function OrderDetailScreen({ orderId }: { orderId: string }) {
                   <DropdownMenuItem
                     key={status}
                     disabled={status === order.status}
-                    onSelect={() => handleStatusChange(status)}
+                    onSelect={() => setPendingStatus(status)}
                   >
                     <span
                       className={cn(
@@ -156,7 +182,7 @@ export function OrderDetailScreen({ orderId }: { orderId: string }) {
                   <DropdownMenuItem
                     key={status}
                     disabled={status === order.status}
-                    onSelect={() => handleStatusChange(status)}
+                    onSelect={() => setPendingStatus(status)}
                   >
                     <span
                       className={cn(
@@ -173,7 +199,7 @@ export function OrderDetailScreen({ orderId }: { orderId: string }) {
                     key={status}
                     variant="destructive"
                     disabled={status === order.status}
-                    onSelect={() => handleStatusChange(status)}
+                    onSelect={() => setPendingStatus(status)}
                   >
                     {ORDER_STATUS[status].label}
                   </DropdownMenuItem>
@@ -780,6 +806,55 @@ export function OrderDetailScreen({ orderId }: { orderId: string }) {
           </p>
         </div>
       </div>
+
+      <Dialog
+        open={pendingStatus !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setPendingStatus(null);
+            setStatusNote("");
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-[440px]">
+          <DialogHeader>
+            <DialogTitle>
+              Move to {pendingStatus ? ORDER_STATUS[pendingStatus].label : ""}
+            </DialogTitle>
+            <DialogDescription>
+              The change is stamped on the order timeline. Add a note if the
+              client or the team will need the reason later.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="grid gap-1.5">
+            <Label htmlFor="status-note">Note (optional)</Label>
+            <Textarea
+              id="status-note"
+              rows={3}
+              value={statusNote}
+              onChange={(e) => setStatusNote(e.target.value)}
+              placeholder="Held until the client confirms the colour."
+            />
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setPendingStatus(null);
+                setStatusNote("");
+              }}
+            >
+              Cancel
+            </Button>
+            <Button size="sm" onClick={handleStatusChange} disabled={savingStatus}>
+              {savingStatus ? "Saving…" : "Change status"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <RecordPaymentDialog
         open={paymentOpen}
