@@ -143,6 +143,12 @@ export interface CreateOrderInput {
   shippingChargedAfn: number;
   discountAfn: number;
   notes?: string;
+  /**
+   * The number the operator wants to give the client. Optional — when it is
+   * left out we mint one. Supplying it is the normal case: the form shows a
+   * generated number up front and lets the operator overwrite it.
+   */
+  trackingNumber?: string;
 }
 
 export async function createOrder(input: CreateOrderInput): Promise<Order> {
@@ -160,13 +166,29 @@ export async function createOrder(input: CreateOrderInput): Promise<Order> {
     id: `${id}-item-${index + 1}`,
   }));
 
+  // A number the operator typed is checked the same way the override is; an
+  // unusable one must fail here rather than reach the client on a slip of paper.
+  const wanted = input.trackingNumber?.trim().toUpperCase();
+  if (wanted) {
+    if (!isValidTrackingNumber(wanted)) {
+      throw new Error(
+        "A tracking number looks like AS-2026-4F7K2Q — the letters I, L, O and U are not used.",
+      );
+    }
+    if (orders.some((o) => o.trackingNumber === wanted)) {
+      throw new Error(`${wanted} is already used by another order.`);
+    }
+  }
+
   const order: Order = {
     id,
     orderNo: `AS-${at.getUTCFullYear()}-${pad(seq)}`,
-    trackingNumber: generateUniqueTrackingNumber(
-      at.getUTCFullYear(),
-      orders.map((o) => o.trackingNumber),
-    ),
+    trackingNumber:
+      wanted ??
+      generateUniqueTrackingNumber(
+        at.getUTCFullYear(),
+        orders.map((o) => o.trackingNumber),
+      ),
     clientId: input.clientId,
     status: "requested",
     source: input.source,

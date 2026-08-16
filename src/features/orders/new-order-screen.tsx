@@ -4,7 +4,7 @@ import * as React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { PlusIcon, Trash2Icon } from "lucide-react";
+import { PlusIcon, RefreshCwIcon, Trash2Icon } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -29,6 +29,7 @@ import {
   type CreateOrderItemInput,
 } from "@/lib/api";
 import { ORDER_SOURCE_LABEL, PRODUCT_CATEGORY_LABEL } from "@/lib/constants";
+import { generateTrackingNumber } from "@/lib/tracking";
 import type { OrderSource, ProductCategory } from "@/lib/types";
 
 interface DraftItem extends CreateOrderItemInput {
@@ -74,6 +75,8 @@ export function NewOrderScreen() {
   const [discount, setDiscount] = React.useState("0");
   const [notes, setNotes] = React.useState("");
   const [saving, setSaving] = React.useState(false);
+  const [tracking, setTracking] = React.useState("");
+  const [trackingError, setTrackingError] = React.useState<string | null>(null);
 
 
   function patchItem(key: string, patch: Partial<DraftItem>) {
@@ -105,6 +108,7 @@ export function NewOrderScreen() {
   async function handleSubmit() {
     if (invalid) return;
     setSaving(true);
+    setTrackingError(null);
     try {
       const order = await createOrder({
         clientId,
@@ -124,11 +128,19 @@ export function NewOrderScreen() {
         shippingChargedAfn: shippingAfn,
         discountAfn,
         notes: notes.trim() || undefined,
+        trackingNumber: tracking.trim() || undefined,
       });
       toast.success(`Order ${order.orderNo} created`, {
         description: "It is now in the Requested stage — send a quotation next.",
       });
       router.push(`/orders/${order.id}`);
+    } catch (error) {
+      // Surfaced beside the field rather than as a toast: a rejected tracking
+      // number is something the operator has to correct here and now.
+      const message =
+        error instanceof Error ? error.message : "Could not create the order.";
+      setTrackingError(message);
+      toast.error(message);
     } finally {
       setSaving(false);
     }
@@ -225,6 +237,57 @@ export function NewOrderScreen() {
                 <PlusIcon />
                 Add another product
               </Button>
+            </CardContent>
+          </Card>
+
+          {/* Tracking ---------------------------------------------------- */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-sm">Tracking number</CardTitle>
+              <p className="text-muted-foreground text-xs">
+                The number you give the client. Type your own, or press the
+                button to generate one. Left empty, we assign one on save.
+              </p>
+            </CardHeader>
+            <CardContent className="grid gap-2 sm:max-w-xs">
+              <Label htmlFor="order-tracking" className="sr-only">
+                Tracking number
+              </Label>
+              <div className="flex gap-2">
+                <Input
+                  id="order-tracking"
+                  value={tracking}
+                  onChange={(e) => {
+                    setTracking(e.target.value.toUpperCase());
+                    setTrackingError(null);
+                  }}
+                  placeholder="AS-2026-4F7K2Q"
+                  className="tabular"
+                  aria-invalid={trackingError !== null}
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  aria-label="Generate a tracking number"
+                  onClick={() => {
+                    setTracking(generateTrackingNumber(new Date().getFullYear()));
+                    setTrackingError(null);
+                  }}
+                >
+                  <RefreshCwIcon />
+                </Button>
+              </div>
+              {trackingError ? (
+                <p className="text-destructive text-xs" role="alert">
+                  {trackingError}
+                </p>
+              ) : (
+                <p className="text-muted-foreground text-xs">
+                  Format AS-YYYY-XXXXXX. The letters I, L, O and U are not used,
+                  so it cannot be misread over the phone.
+                </p>
+              )}
             </CardContent>
           </Card>
 
