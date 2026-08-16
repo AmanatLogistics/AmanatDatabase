@@ -2,6 +2,7 @@ import { catalog, productUrl, type CatalogProduct } from "@/lib/mock/catalog";
 import { clients } from "@/lib/mock/clients";
 import { settings } from "@/lib/mock/settings";
 import { ORDER_PIPELINE } from "@/lib/constants";
+import { generateUniqueTrackingNumber } from "@/lib/tracking";
 import type {
   Order,
   OrderEvent,
@@ -170,6 +171,9 @@ const payments: Payment[] = [];
 let orderSeq = 0;
 let purchaseSeq = 0;
 let receiptSeq = 0;
+
+/** Grows as orders are built, so no two seeded orders share a tracking number. */
+const trackingNumbersUsed = new Set<string>();
 
 function buildItems(orderId: string, count: number): OrderItem[] {
   const chosen: CatalogProduct[] = [];
@@ -590,9 +594,17 @@ draft.forEach(({ requestedAt, clientId }) => {
   const discountAfn =
     chance(0.14) ? Math.round((itemsAfn * (rand() * 0.04 + 0.01)) / 50) * 50 : 0;
 
+  const trackingNumber = generateUniqueTrackingNumber(
+    requestedAt.getUTCFullYear(),
+    trackingNumbersUsed,
+    rand,
+  );
+  trackingNumbersUsed.add(trackingNumber);
+
   const base: Omit<Order, "timeline"> = {
     id,
     orderNo,
+    trackingNumber,
     clientId,
     status,
     source: pick(SOURCES),

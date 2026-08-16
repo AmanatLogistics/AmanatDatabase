@@ -2,6 +2,7 @@
 
 import { orderRevenue } from "@/lib/finance";
 import { useDataStore } from "@/lib/store";
+import { generateUniqueTrackingNumber } from "@/lib/tracking";
 import type {
   Client,
   ID,
@@ -162,6 +163,10 @@ export async function createOrder(input: CreateOrderInput): Promise<Order> {
   const order: Order = {
     id,
     orderNo: `AS-${at.getUTCFullYear()}-${pad(seq)}`,
+    trackingNumber: generateUniqueTrackingNumber(
+      at.getUTCFullYear(),
+      orders.map((o) => o.trackingNumber),
+    ),
     clientId: input.clientId,
     status: "requested",
     source: input.source,

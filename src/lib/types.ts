@@ -112,8 +112,14 @@ export interface OrderEvent {
 
 export interface Order {
   id: ID;
-  /** Human-facing reference, e.g. "AS-2026-0148" */
+  /** Internal sequential reference, e.g. "AS-2026-0148". Staff-facing. */
   orderNo: string;
+  /**
+   * The number the client uses on the public tracking page, e.g.
+   * "AS-2026-4F7K2Q". Random, not sequential, so holding one does not let you
+   * read another. Unique across orders.
+   */
+  trackingNumber: string;
   clientId: ID;
   status: OrderStatus;
   source: OrderSource;
