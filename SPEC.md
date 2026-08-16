@@ -255,6 +255,17 @@ meaningful server-side, and **D1 defers the backend**. In a frontend-only build:
 
 The page must therefore be treated as a **UI prototype, not a shippable public
 surface**, and must not be deployed to a public URL until the backend lands.
+
+> **Enforced in code since the Phase 1 follow-up.** `/track` is gated behind
+> `NEXT_PUBLIC_PUBLIC_TRACKING_ENABLED`, default **off**, and returns a 404
+> unless explicitly enabled. This was added after PR #3 merged and a Vercel
+> preview turned out to be publicly reachable: a `grep` of the production
+> bundle found seeded client names, phone numbers and `unitCostAfn` in the
+> shipped JS chunks, confirming the exposure is real and not theoretical. (The
+> data in question is the fabricated seed set from `src/lib/mock/clients.ts`,
+> so no real client information was ever public.) The guarantee now lives in
+> the repository instead of in a hosting-provider setting that is invisible
+> from the code. Turn the flag on only once the endpoint below exists.
 Carried to §7 as the top risk. When the backend arrives, this page needs:
 a `GET /api/track/:trackingNumber` handler returning exactly
 `PublicTrackingResult`, an IP-based rate limit, and a constant-time-ish
