@@ -271,53 +271,44 @@ a `GET /api/track/:trackingNumber` handler returning exactly
 `PublicTrackingResult`, an IP-based rate limit, and a constant-time-ish
 identical 404 body for both "no such number" and "malformed number".
 
-### 2.5 Carrier tracking — isolate, do not delete
+### 2.5 Carrier tracking — REMOVED
 
-The brief allowed isolation "if removal is risky". **It is risky**, so this spec
-chooses isolation and explains why, as required.
+> **Superseded.** This section originally specified isolating carrier tracking
+> behind a flag, on the grounds that deleting `Shipment` would silently change
+> every order's cost and margin. The owner confirmed twice that the business has
+> no carriers, so it has now been **deleted outright**. The flag approach shipped
+> first (PR #3) and was replaced in the follow-up.
 
-`Shipment` (`src/lib/types.ts:187-205`) is not a leaf. Deleting it breaks:
+The dependency that made deletion unsafe was real, and was resolved rather than
+ignored: `finance.ts` read `freightCostAfn` and `customsDutyAfn` off `Shipment`.
+Those two fields now live on `Order` itself:
 
-- **`src/lib/finance.ts`** — structurally. `Shipment` is imported at `:14`;
-  `LedgerIndex.shipmentByOrder` at `:40`; `buildLedgerIndex(...)` takes
-  `shipments` at `:51-56` and populates at `:70`. The cost model reads freight
-  and duty off the shipment at `:137,145-148`. Both reads are optional-chained
-  with fallbacks (`FREIGHT_COST_RATIO = 0.75`, `constants.ts:260`), so it would
-  not crash — **it would silently change every order's cost, profit and margin,
-  and zero out customs duty across the whole P&L.** That is worse than a crash.
-- **Dashboard** — `buildAttention()` (`queries.ts:402-445`) derives two of its
-  four attention categories purely from shipments; `customsHolds`
-  (`queries.ts:485`) feeds the sidebar badge.
-- **Print documents** — `label-document.tsx` and `packing-list-document.tsx`
-  are shipment-only and would be deleted, along with two routes; the document
-  register (`queries.ts:726-752`) mints two rows per shipment.
-- **Order detail** — `shipment` is destructured at `order-detail-screen.tsx:89`
-  and drives the Tracking tab, two P&L rows, and three sidebar actions.
+```ts
+/** What the freight actually cost us, AFN. Unset until the parcel moves. */
+freightCostAfn?: number;
+/** Import duty we paid, AFN. Unset until the parcel clears. */
+customsDutyAfn?: number;
+```
 
-**Phase 1 therefore does this instead:**
+`orderCost()` reads them directly, falling back to the same 3/4 estimate from
+`shippingChargedAfn` when the real figure is not yet known. That change alone was
+verified to leave all 20 rows of `/orders` byte-identical, proving the rewiring
+faithful before anything was deleted.
 
-1. Add `NEXT_PUBLIC_CARRIER_TRACKING_ENABLED` (default `false`) read once into a
-   single exported constant, `CARRIER_TRACKING_ENABLED`, in
-   `src/lib/constants.ts` — next to the existing `CARRIERS` list at `:183-190`.
-2. When disabled: hide the `Tracking` item from `nav-config.ts`, hide the
-   `Tracking` tab and the tracking-related Quick actions on
-   `order-detail-screen.tsx`, hide the `Tracking` row action in
-   `orders-screen.tsx:364-366`, and hide the shipment entries from the command
-   palette.
-   **Also — added after implementation review, this list was incomplete —** the
-   dashboard: the `Track shipments` quick link (`dashboard-screen.tsx:438-442`)
-   and the `customs` / `exception` items from `buildAttention()`
-   (`queries.ts:511-535`), which name the carrier and link into `/tracking`.
-   The dashboard is the landing page, so leaving these made the isolation
-   cosmetic in practice.
-3. **Leave `Shipment`, `finance.ts`, the seed generator and the `/tracking`
-   routes completely untouched**, so freight, customs duty, margin and the P&L
-   keep producing identical numbers.
+**Deleted:** `Shipment`, `ShipmentStatus`, `ShipmentEvent`, `CARRIERS`,
+`SHIPMENT_PIPELINE`, `SHIPMENT_STATUS`, `CARRIER_ROUTES`, the `shipments` store
+slice and its actions, `createShipment` / `updateShipmentStatus`, the
+`/tracking` and `/tracking/[id]` routes, the shipping-label and packing-list
+print routes and documents, `AddTrackingDialog`, the `shipment` field on
+`OrderRow`, the `customs` and `exception` dashboard attention kinds, the
+`customsHolds` badge, and the `packing_list` / `shipping_label` document kinds.
 
-Actual deletion is a separate, later piece of work that must first decide where
-freight and customs cost will live instead. Out of scope here (§6).
-
----
+**Known consequence, accepted:** the seeded dataset regenerates. `buildShipment`
+consumed a large number of draws from the seed's shared PRNG, so removing it
+shifts every downstream value — statuses, sources, payments. All 20 rows of
+`/orders` differ from before. This is fabricated demo data, not real figures, and
+the economics *model* is unchanged; freight and customs were confirmed still
+populated after the deletion rather than silently zeroed.
 
 ## 3. PHASE 2 — Manual fee, Afghani currency
 

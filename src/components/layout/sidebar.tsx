@@ -46,7 +46,6 @@ export function Sidebar({
 
   const badgeCounts: Record<string, number> = {
     activeOrders: nav.activeOrders,
-    customsHolds: nav.customsHolds,
     overdueClients: nav.attention.filter((a) => a.kind === "overdue").length,
   };
 

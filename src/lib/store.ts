@@ -9,7 +9,6 @@ import type {
   Payment,
   Purchase,
   Settings,
-  Shipment,
 } from "@/lib/types";
 
 /**
@@ -29,7 +28,6 @@ export interface DataState {
   clients: Client[];
   orders: Order[];
   purchases: Purchase[];
-  shipments: Shipment[];
   payments: Payment[];
   settings: Settings;
   /** Frozen "now" so derived figures stay stable between server and client. */
@@ -42,9 +40,6 @@ export interface DataState {
   updateOrder: (id: string, patch: Partial<Order>) => void;
 
   addPurchase: (purchase: Purchase) => void;
-  addShipment: (shipment: Shipment) => void;
-  updateShipment: (id: string, patch: Partial<Shipment>) => void;
-
   addPayment: (payment: Payment) => void;
 
   updateSettings: (patch: Partial<Settings>) => void;
@@ -57,7 +52,6 @@ const initial = () => ({
   clients: seedData.clients,
   orders: seedData.orders,
   purchases: seedData.purchases,
-  shipments: seedData.shipments,
   payments: seedData.payments,
   settings: seedData.settings,
   today: TODAY,
@@ -83,16 +77,6 @@ export const useDataStore = create<DataState>((set) => ({
 
   addPurchase: (purchase) =>
     set((state) => ({ purchases: [purchase, ...state.purchases] })),
-
-  addShipment: (shipment) =>
-    set((state) => ({ shipments: [shipment, ...state.shipments] })),
-
-  updateShipment: (id, patch) =>
-    set((state) => ({
-      shipments: state.shipments.map((s) =>
-        s.id === id ? { ...s, ...patch } : s,
-      ),
-    })),
 
   addPayment: (payment) =>
     set((state) => ({ payments: [payment, ...state.payments] })),

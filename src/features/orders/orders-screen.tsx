@@ -13,7 +13,6 @@ import {
   PlusIcon,
   PrinterIcon,
   ShoppingCartIcon,
-  TruckIcon,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -37,11 +36,7 @@ import { ProductThumb } from "@/components/shared/product-thumb";
 import { StatusBadge } from "@/components/shared/status-badge";
 import { RecordPaymentDialog } from "@/features/payments/record-payment-dialog";
 import { useOrderRows, useStores, type OrderRow } from "@/lib/api";
-import {
-  ACTIVE_ORDER_STATUSES,
-  CARRIER_TRACKING_ENABLED,
-  ORDER_SOURCE_LABEL,
-} from "@/lib/constants";
+import { ACTIVE_ORDER_STATUSES, ORDER_SOURCE_LABEL } from "@/lib/constants";
 import { formatDateShort, truncate } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
@@ -345,7 +340,7 @@ export function OrdersScreen() {
         enableSorting: false,
         enableHiding: false,
         cell: ({ row }) => {
-          const { order, shipment } = row.original;
+          const { order } = row.original;
           return (
             <div
               className="flex justify-end"
@@ -376,14 +371,6 @@ export function OrdersScreen() {
                       Purchases
                     </Link>
                   </DropdownMenuItem>
-                  {CARRIER_TRACKING_ENABLED && shipment && (
-                    <DropdownMenuItem asChild>
-                      <Link href={`/tracking/${shipment.id}`}>
-                        <TruckIcon />
-                        Tracking
-                      </Link>
-                    </DropdownMenuItem>
-                  )}
                   <DropdownMenuSeparator />
                   <DropdownMenuItem asChild>
                     <Link href={`/print/invoice/${order.id}`} target="_blank">

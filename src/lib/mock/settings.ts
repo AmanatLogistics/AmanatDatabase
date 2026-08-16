@@ -21,7 +21,6 @@ export const company: CompanyProfile = {
   taxId: "9014-2287",
   invoicePrefix: "INV",
   orderPrefix: "AS",
-  defaultServiceFeePercent: 14,
   currency: "AFN",
   invoiceFooter:
     "Thank you for shopping with Amanat. Goods remain the property of Amanat Shopping until paid in full.",

@@ -23,11 +23,7 @@ import {
   type PeriodPnL,
 } from "@/lib/finance";
 import { useDataStore } from "@/lib/store";
-import {
-  CARRIER_TRACKING_ENABLED,
-  DOCUMENT_KIND_LABEL,
-  ORDER_STATUS,
-} from "@/lib/constants";
+import { DOCUMENT_KIND_LABEL, ORDER_STATUS } from "@/lib/constants";
 import type {
   BusinessDocument,
   Client,
@@ -39,7 +35,6 @@ import type {
   PaymentMethod,
   Purchase,
   Settings,
-  Shipment,
   Store,
 } from "@/lib/types";
 
@@ -90,18 +85,16 @@ export function useToday(): Date {
  * One set of order-keyed lookups shared by every derivation on the screen.
  *
  * Without it, each of the ~150 orders re-scans all payments, purchases and
- * shipments to find its own — quadratic work repeated on every render. Building
+ * payments to find its own — quadratic work repeated on every render. Building
  * the index once per data change makes those lookups constant time.
  */
 export function useLedgerIndex(): LedgerIndex {
   const orders = useDataStore((s) => s.orders);
   const purchases = useDataStore((s) => s.purchases);
   const payments = useDataStore((s) => s.payments);
-  const shipments = useDataStore((s) => s.shipments);
-
   return useMemo(
-    () => buildLedgerIndex(orders, purchases, payments, shipments),
-    [orders, purchases, payments, shipments],
+    () => buildLedgerIndex(orders, purchases, payments),
+    [orders, purchases, payments],
   );
 }
 
@@ -182,7 +175,6 @@ export interface OrderRow {
   order: Order;
   client?: Client;
   economics: OrderEconomics;
-  shipment?: Shipment;
   purchases: Purchase[];
   itemCount: number;
   unitCount: number;
@@ -203,7 +195,6 @@ export function useOrderRows(): OrderRow[] {
         order,
         client: clientOf(order.clientId),
         economics: orderEconomics(order, index),
-        shipment: index.shipmentByOrder.get(order.id),
         purchases: index.purchasesByOrder.get(order.id) ?? [],
         itemCount: order.items.length,
         unitCount: order.items.reduce((sum, i) => sum + i.qty, 0),
@@ -225,7 +216,6 @@ export function useOrder(id: ID): OrderRow | undefined {
       order,
       client: clientOf(order.clientId),
       economics: orderEconomics(order, index),
-      shipment: index.shipmentByOrder.get(order.id),
       purchases: index.purchasesByOrder.get(order.id) ?? [],
       itemCount: order.items.length,
       unitCount: order.items.reduce((sum, i) => sum + i.qty, 0),
@@ -257,7 +247,7 @@ export function useClientOrders(clientId: ID): OrderRow[] {
  * Deliberately absent: the client in any form (no name, no phone even partial,
  * no address, no city, no code), `orderNo`, `notes`, every `*Afn` figure,
  * `unitCostAfn`, `unitPriceAfn`, `productUrl`, `storeId`, purchases and
- * shipments. See SPEC.md §2.4 for the full list and the reasoning.
+ * purchases. See SPEC.md §2.4 for the full list and the reasoning.
  *
  * `OrderEvent.title`, `.description` and `.actor` are excluded on purpose: they
  * are free text typed by staff, so the timeline below carries the status label
@@ -369,53 +359,6 @@ export function usePurchase(id: ID): PurchaseRow | undefined {
 }
 
 /* -------------------------------------------------------------------------- */
-/* Shipments — GET /api/shipments                                              */
-/* -------------------------------------------------------------------------- */
-
-export interface ShipmentRow {
-  shipment: Shipment;
-  order?: Order;
-  client?: Client;
-  /** Days until ETA; negative when the ETA has passed. */
-  daysToEta: number | null;
-}
-
-export function useShipments(): Shipment[] {
-  return useDataStore((s) => s.shipments);
-}
-
-export function useShipmentRows(): ShipmentRow[] {
-  const shipments = useDataStore((s) => s.shipments);
-  const orders = useDataStore((s) => s.orders);
-  const clientOf = useClientLookup();
-  const today = useToday();
-
-  return useMemo(() => {
-    const orderMap = new Map(orders.map((o) => [o.id, o]));
-    return shipments.map((shipment) => {
-      const order = orderMap.get(shipment.orderId);
-      const daysToEta = shipment.etaAt
-        ? Math.round(
-            (new Date(shipment.etaAt).getTime() - today.getTime()) / 86_400_000,
-          )
-        : null;
-      return {
-        shipment,
-        order,
-        client: order ? clientOf(order.clientId) : undefined,
-        daysToEta,
-      };
-    });
-  }, [shipments, orders, clientOf, today]);
-}
-
-/** GET /api/shipments/:id */
-export function useShipment(id: ID): ShipmentRow | undefined {
-  const rows = useShipmentRows();
-  return useMemo(() => rows.find((r) => r.shipment.id === id), [rows, id]);
-}
-
-/* -------------------------------------------------------------------------- */
 /* Payments — GET /api/payments                                                */
 /* -------------------------------------------------------------------------- */
 
@@ -458,7 +401,6 @@ export function useClientPayments(clientId: ID): PaymentRow[] {
 
 export interface NavCounts {
   activeOrders: number;
-  customsHolds: number;
   outstandingAfn: number;
   attention: AttentionItem[];
 }
@@ -470,20 +412,19 @@ export interface NavCounts {
  */
 export function useNavCounts(): NavCounts {
   const orders = useDataStore((s) => s.orders);
-  const shipments = useDataStore((s) => s.shipments);
   const index = useLedgerIndex();
   const clientOf = useClientLookup();
   const today = useToday();
 
   return useMemo(
-    () => buildAttention(orders, shipments, index, clientOf, today),
-    [orders, shipments, index, clientOf, today],
+    () => buildAttention(orders, index, clientOf, today),
+    [orders, index, clientOf, today],
   );
 }
 
 export interface AttentionItem {
   id: string;
-  kind: "customs" | "overdue" | "unpurchased" | "exception";
+  kind: "overdue" | "unpurchased";
   title: string;
   description: string;
   href: string;
@@ -492,13 +433,11 @@ export interface AttentionItem {
 
 function buildAttention(
   orders: Order[],
-  shipments: Shipment[],
   index: LedgerIndex,
   clientOf: (id: ID) => Client | undefined,
   today: Date,
 ): NavCounts {
   const attention: AttentionItem[] = [];
-  const orderMap = new Map(orders.map((o) => [o.id, o]));
   let outstandingAfn = 0;
   let activeOrders = 0;
 
@@ -507,36 +446,6 @@ function buildAttention(
     const econ = orderEconomics(order, index);
     if (econ.balanceAfn > 0) outstandingAfn += econ.balanceAfn;
   });
-
-  // Both of these name a carrier and link into /tracking, so they stay out of
-  // the dashboard while carrier tracking is off (SPEC.md §2.5).
-  const customs = CARRIER_TRACKING_ENABLED
-    ? shipments.filter((s) => s.status === "customs")
-    : [];
-  customs.slice(0, 3).forEach((shipment) => {
-    const order = orderMap.get(shipment.orderId);
-    attention.push({
-      id: `customs-${shipment.id}`,
-      kind: "customs",
-      title: `${order?.orderNo ?? "Order"} held in customs`,
-      description: `${shipment.carrier} · ${shipment.trackingNumber} — clearance documents requested.`,
-      href: `/tracking/${shipment.id}`,
-    });
-  });
-
-  (CARRIER_TRACKING_ENABLED ? shipments : [])
-    .filter((s) => s.status === "exception")
-    .slice(0, 2)
-    .forEach((shipment) => {
-      const order = orderMap.get(shipment.orderId);
-      attention.push({
-        id: `exception-${shipment.id}`,
-        kind: "exception",
-        title: `Delivery exception on ${order?.orderNo ?? "an order"}`,
-        description: `${shipment.carrier} could not complete delivery — contact the client.`,
-        href: `/tracking/${shipment.id}`,
-      });
-    });
 
   orders
     .filter(
@@ -577,7 +486,6 @@ function buildAttention(
 
   return {
     activeOrders,
-    customsHolds: customs.length,
     outstandingAfn,
     attention: attention.slice(0, 6),
   };
@@ -763,18 +671,16 @@ export function useReceivablesAging(): {
 
 /**
  * The document register is derived, not stored: an order that has been confirmed
- * has an invoice, a quoted order has a quotation, every payment has a receipt,
- * and every shipment has a packing list and a label.
+ * has an invoice, a quoted order has a quotation, and every payment has a
+ * receipt.
  */
 export function useDocuments(): BusinessDocument[] {
   const orders = useDataStore((s) => s.orders);
   const payments = useDataStore((s) => s.payments);
-  const shipments = useDataStore((s) => s.shipments);
 
   return useMemo(() => {
     const docs: BusinessDocument[] = [];
-    const orderMap = new Map(orders.map((o) => [o.id, o]));
-
+  
     orders.forEach((order) => {
       const revenue = orderRevenue(order);
       if (isBillable(order)) {
@@ -818,35 +724,8 @@ export function useDocuments(): BusinessDocument[] {
         });
       });
 
-    shipments.forEach((shipment) => {
-      const order = orderMap.get(shipment.orderId);
-      if (!order) return;
-      docs.push({
-        id: `doc-pkl-${shipment.id}`,
-        kind: "packing_list",
-        number: order.orderNo.replace(/^AS-/, "PKL-"),
-        shipmentId: shipment.id,
-        orderId: order.id,
-        clientId: order.clientId,
-        issuedAt: shipment.shippedAt ?? order.requestedAt,
-        totalAfn: orderRevenue(order).itemsAfn,
-        href: `/print/packing-list/${shipment.id}`,
-      });
-      docs.push({
-        id: `doc-lbl-${shipment.id}`,
-        kind: "shipping_label",
-        number: shipment.trackingNumber,
-        shipmentId: shipment.id,
-        orderId: order.id,
-        clientId: order.clientId,
-        issuedAt: shipment.shippedAt ?? order.requestedAt,
-        totalAfn: 0,
-        href: `/print/label/${shipment.id}`,
-      });
-    });
-
     return docs.sort((a, b) => b.issuedAt.localeCompare(a.issuedAt));
-  }, [orders, payments, shipments]);
+  }, [orders, payments]);
 }
 
 /* -------------------------------------------------------------------------- */
@@ -855,7 +734,7 @@ export function useDocuments(): BusinessDocument[] {
 
 export interface SearchResult {
   id: string;
-  group: "Orders" | "Clients" | "Shipments" | "Purchases";
+  group: "Orders" | "Clients" | "Purchases";
   title: string;
   subtitle: string;
   href: string;
@@ -864,7 +743,6 @@ export interface SearchResult {
 export function useSearch(query: string): SearchResult[] {
   const orders = useDataStore((s) => s.orders);
   const clients = useDataStore((s) => s.clients);
-  const shipmentRows = useShipmentRows();
   const purchaseRows = usePurchaseRows();
   const clientOf = useClientLookup();
 
@@ -903,21 +781,6 @@ export function useSearch(query: string): SearchResult[] {
       }
     });
 
-    shipmentRows.forEach(({ shipment, client }) => {
-      if (!CARRIER_TRACKING_ENABLED) return;
-      if (
-        `${shipment.trackingNumber} ${shipment.carrier}`.toLowerCase().includes(q)
-      ) {
-        results.push({
-          id: shipment.id,
-          group: "Shipments",
-          title: shipment.trackingNumber,
-          subtitle: `${shipment.carrier} · ${client?.name ?? "—"}`,
-          href: `/tracking/${shipment.id}`,
-        });
-      }
-    });
-
     purchaseRows.forEach(({ purchase, store }) => {
       if (
         `${purchase.purchaseNo} ${purchase.externalOrderNumber}`
@@ -935,7 +798,7 @@ export function useSearch(query: string): SearchResult[] {
     });
 
     return results.slice(0, 24);
-  }, [query, orders, clients, shipmentRows, purchaseRows, clientOf]);
+  }, [query, orders, clients, purchaseRows, clientOf]);
 }
 
 export { deltaPercent, DOCUMENT_KIND_LABEL };

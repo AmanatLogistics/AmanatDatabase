@@ -11,7 +11,7 @@ export interface TimelineEntry {
   meta?: React.ReactNode;
 }
 
-/** Vertical event rail used by the order activity tab and shipment tracking. */
+/** Vertical event rail used by the order activity tab. */
 export function Timeline({
   entries,
   className,

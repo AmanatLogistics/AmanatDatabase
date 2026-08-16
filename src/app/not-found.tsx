@@ -13,7 +13,7 @@ export default function NotFound() {
           We could not find that record
         </h1>
         <p className="text-muted-foreground max-w-md text-sm">
-          The order, client or shipment you are looking for does not exist — it
+          The order, client or purchase you are looking for does not exist — it
           may have been removed, or the link may be wrong.
         </p>
       </div>

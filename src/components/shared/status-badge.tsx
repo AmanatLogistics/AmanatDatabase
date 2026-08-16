@@ -4,7 +4,6 @@ import {
   ORDER_STATUS,
   PAYMENT_TYPE,
   PURCHASE_STATUS,
-  SHIPMENT_STATUS,
 } from "@/lib/constants";
 import { cn } from "@/lib/utils";
 import type {
@@ -12,13 +11,11 @@ import type {
   OrderStatus,
   PaymentType,
   PurchaseStatus,
-  ShipmentStatus,
 } from "@/lib/types";
 
 type Registry =
   | { kind: "order"; value: OrderStatus }
   | { kind: "purchase"; value: PurchaseStatus }
-  | { kind: "shipment"; value: ShipmentStatus }
   | { kind: "payment"; value: PaymentType }
   | { kind: "client"; value: ClientStatus };
 
@@ -28,8 +25,6 @@ function resolve(input: Registry) {
       return ORDER_STATUS[input.value];
     case "purchase":
       return PURCHASE_STATUS[input.value];
-    case "shipment":
-      return SHIPMENT_STATUS[input.value];
     case "payment":
       return PAYMENT_TYPE[input.value];
     case "client":

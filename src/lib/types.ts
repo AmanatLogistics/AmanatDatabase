@@ -38,8 +38,6 @@ export interface Client {
   city: string;
   address?: string;
   preferredContact: ContactChannel;
-  /** Optional agreed markup for this client; falls back to company default. */
-  serviceFeePercent?: number;
   notes?: string;
   createdAt: ISODate;
 }
@@ -104,7 +102,7 @@ export interface OrderItem {
 export interface OrderEvent {
   id: ID;
   at: ISODate;
-  status: OrderStatus | "note" | "payment" | "purchase" | "shipment";
+  status: OrderStatus | "note" | "payment" | "purchase";
   title: string;
   description?: string;
   actor: string;
@@ -127,11 +125,21 @@ export interface Order {
   /** Set when status first reaches `delivered`. */
   deliveredAt?: ISODate;
   items: OrderItem[];
-  serviceFeeType: "percent" | "fixed";
-  /** Percent (0-100) or a flat AFN amount, per `serviceFeeType`. */
-  serviceFeeValue: number;
+  /**
+   * Our fee for the job, AFN. Typed in by hand per order — there is no
+   * percentage and no automatic calculation.
+   */
+  serviceFeeAfn: number;
   /** Shipping we re-bill to the client, AFN. */
   shippingChargedAfn: number;
+  /**
+   * What the freight actually cost us, AFN. Typed in by an operator once the
+   * parcel has moved. Left unset until then, when the margin falls back to an
+   * estimate from `shippingChargedAfn`.
+   */
+  freightCostAfn?: number;
+  /** Import duty we paid, AFN. Unset until the parcel clears. */
+  customsDutyAfn?: number;
   /** Goodwill discount, AFN. */
   discountAfn: number;
   notes?: string;
@@ -168,47 +176,6 @@ export interface Purchase {
   totalCostAfn: number;
   invoiceRef?: string;
   notes?: string;
-}
-
-/* -------------------------------------------------------------------------- */
-/* Shipments                                                                   */
-/* -------------------------------------------------------------------------- */
-
-export type ShipmentStatus =
-  | "label_created"
-  | "picked_up"
-  | "in_transit"
-  | "customs"
-  | "out_for_delivery"
-  | "delivered"
-  | "exception";
-
-export interface ShipmentEvent {
-  id: ID;
-  at: ISODate;
-  status: ShipmentStatus;
-  location: string;
-  description: string;
-}
-
-export interface Shipment {
-  id: ID;
-  orderId: ID;
-  carrier: string;
-  trackingNumber: string;
-  trackingUrl?: string;
-  status: ShipmentStatus;
-  origin: string;
-  destination: string;
-  shippedAt?: ISODate;
-  etaAt?: ISODate;
-  deliveredAt?: ISODate;
-  weightKg: number;
-  /** Freight we pay the carrier, AFN. */
-  freightCostAfn: number;
-  /** Import duty we pay, AFN. */
-  customsDutyAfn: number;
-  events: ShipmentEvent[];
 }
 
 /* -------------------------------------------------------------------------- */
@@ -292,8 +259,6 @@ export interface CompanyProfile {
   /** Prefix used when generating the next invoice number. */
   invoicePrefix: string;
   orderPrefix: string;
-  /** Default markup applied to new orders, percent. */
-  defaultServiceFeePercent: number;
   /** Reporting currency. The money layer reads this. */
   currency: "AFN";
   invoiceFooter: string;
@@ -311,12 +276,7 @@ export interface Settings {
 /* Documents                                                                   */
 /* -------------------------------------------------------------------------- */
 
-export type DocumentKind =
-  | "invoice"
-  | "quotation"
-  | "receipt"
-  | "packing_list"
-  | "shipping_label";
+export type DocumentKind = "invoice" | "quotation" | "receipt";
 
 export interface BusinessDocument {
   id: ID;
@@ -326,7 +286,6 @@ export interface BusinessDocument {
   /** Whichever entity the document renders from. */
   orderId?: ID;
   paymentId?: ID;
-  shipmentId?: ID;
   clientId: ID;
   issuedAt: ISODate;
   /** AFN total the document shows, for the register view. */

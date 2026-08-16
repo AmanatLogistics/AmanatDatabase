@@ -9,7 +9,6 @@ import type {
   PaymentType,
   ProductCategory,
   PurchaseStatus,
-  ShipmentStatus,
   TeamRole,
 } from "@/lib/types";
 
@@ -159,80 +158,6 @@ export const PURCHASE_STATUS: Record<
 };
 
 /* -------------------------------------------------------------------------- */
-/* Shipments                                                                   */
-/* -------------------------------------------------------------------------- */
-
-export const SHIPMENT_PIPELINE: ShipmentStatus[] = [
-  "label_created",
-  "picked_up",
-  "in_transit",
-  "customs",
-  "out_for_delivery",
-  "delivered",
-];
-
-export const SHIPMENT_STATUS: Record<
-  ShipmentStatus,
-  StatusMeta<ShipmentStatus>
-> = {
-  label_created: meta("label_created", "Label created", "muted", "bg-muted-foreground"),
-  picked_up: meta("picked_up", "Picked up", "teal", "bg-teal"),
-  in_transit: meta("in_transit", "In transit", "info", "bg-info"),
-  customs: meta("customs", "In customs", "warning", "bg-warning"),
-  out_for_delivery: meta(
-    "out_for_delivery",
-    "Out for delivery",
-    "gold",
-    "bg-gold-500",
-  ),
-  delivered: meta("delivered", "Delivered", "success", "bg-success"),
-  exception: meta("exception", "Exception", "destructive", "bg-destructive"),
-};
-
-/**
- * The public /track page, off by default.
- *
- * A kill switch, not a feature toggle. While the app is frontend-only the
- * whole seeded dataset — client names, phone numbers, addresses, cost prices —
- * ships inside the client JS bundle, so a publicly reachable /track exposes all
- * of it regardless of which fields the page renders. `PublicTrackingResult`
- * controls the DOM; it cannot control what is in the bundle.
- *
- * Default-off means no deployment can serve the page by accident, and the
- * guarantee lives in the repository rather than in a hosting-provider setting
- * that is invisible from the code and can be changed by anyone with access.
- *
- * Turn this on only once /track is served by a real
- * `GET /api/track/:trackingNumber` (SPEC.md §2.4, risk R1).
- */
-export const PUBLIC_TRACKING_ENABLED =
-  process.env.NEXT_PUBLIC_PUBLIC_TRACKING_ENABLED === "true";
-
-/**
- * Third-party carrier tracking, off by default.
- *
- * We have no carriers — every parcel moves on our own internal tracking number
- * now. The screens are hidden rather than deleted because `Shipment` is not a
- * leaf: `finance.ts` reads `freightCostAfn` and `customsDutyAfn` off it, and
- * both reads fall back silently, so removing the concept would quietly change
- * every order's cost, profit and margin and zero out customs duty across the
- * P&L. SPEC.md §2.5 has the full dependency list.
- *
- * Set NEXT_PUBLIC_CARRIER_TRACKING_ENABLED=true to bring the screens back.
- */
-export const CARRIER_TRACKING_ENABLED =
-  process.env.NEXT_PUBLIC_CARRIER_TRACKING_ENABLED === "true";
-
-export const CARRIERS = [
-  "DHL Express",
-  "FedEx",
-  "Aramex",
-  "Afghan Post",
-  "Kabul City Courier",
-  "Silk Road Air Cargo",
-] as const;
-
-/* -------------------------------------------------------------------------- */
 /* Payments & clients                                                          */
 /* -------------------------------------------------------------------------- */
 
@@ -276,6 +201,20 @@ export const TEAM_ROLE_LABEL: Record<TeamRole, string> = {
   accountant: "Accountant",
 };
 
+/**
+ * The public /track page, off by default.
+ *
+ * A kill switch, not a feature toggle. While the app is frontend-only the whole
+ * seeded dataset ships inside the client JS bundle, so a publicly reachable
+ * /track exposes it regardless of which fields the page renders.
+ * `PublicTrackingResult` controls the DOM; it cannot control the bundle.
+ *
+ * Turn this on only once /track is served by a real
+ * `GET /api/track/:trackingNumber` (SPEC.md §2.4, risk R1).
+ */
+export const PUBLIC_TRACKING_ENABLED =
+  process.env.NEXT_PUBLIC_PUBLIC_TRACKING_ENABLED === "true";
+
 /* -------------------------------------------------------------------------- */
 /* Documents                                                                   */
 /* -------------------------------------------------------------------------- */
@@ -284,23 +223,25 @@ export const DOCUMENT_KIND_LABEL: Record<DocumentKind, string> = {
   invoice: "Invoice",
   quotation: "Quotation",
   receipt: "Receipt",
-  packing_list: "Packing list",
-  shipping_label: "Shipping label",
 };
 
 export const DOCUMENT_KIND_TONE: Record<DocumentKind, BadgeTone> = {
   invoice: "brand",
   quotation: "info",
   receipt: "success",
-  packing_list: "muted",
-  shipping_label: "gold",
 };
 
 /**
  * Share of the shipping we charge a client that we expect to pay out in freight
- * once the parcel actually moves. Used to estimate margin before booking.
+ * once the parcel actually moves — three quarters. Used to estimate margin
+ * before the real figure is known.
+ *
+ * Expressed as a fraction rather than 0.75 so no float enters the money path:
+ * every `*Afn` value is a whole number of Afghani, and the only operations
+ * allowed on one are integer arithmetic and a `Math.round` at the boundary.
  */
-export const FREIGHT_COST_RATIO = 0.75;
+export const FREIGHT_COST_NUMERATOR = 3;
+export const FREIGHT_COST_DENOMINATOR = 4;
 
 /** Categorical colours used across charts; mirrors --chart-N in globals.css. */
 export const CHART_COLORS = [

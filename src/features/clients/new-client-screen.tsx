@@ -19,7 +19,7 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { PageHeader } from "@/components/shared/page-header";
-import { createClient, useClients, useCompany } from "@/lib/api";
+import { createClient, useClients } from "@/lib/api";
 import { CONTACT_CHANNEL_LABEL } from "@/lib/constants";
 import type { ClientType, ContactChannel } from "@/lib/types";
 
@@ -37,7 +37,6 @@ const CITIES = [
 export function NewClientScreen() {
   const router = useRouter();
   const clients = useClients();
-  const company = useCompany();
 
   const [name, setName] = React.useState("");
   const [type, setType] = React.useState<ClientType>("individual");
@@ -48,7 +47,6 @@ export function NewClientScreen() {
   const [address, setAddress] = React.useState("");
   const [preferredContact, setPreferredContact] =
     React.useState<ContactChannel>("whatsapp");
-  const [serviceFee, setServiceFee] = React.useState("");
   const [notes, setNotes] = React.useState("");
   const [saving, setSaving] = React.useState(false);
 
@@ -71,7 +69,6 @@ export function NewClientScreen() {
         city,
         address: address.trim() || undefined,
         preferredContact,
-        serviceFeePercent: serviceFee ? Number(serviceFee) : undefined,
         notes: notes.trim() || undefined,
       });
       toast.success(`${client.name} added`, {
@@ -216,23 +213,6 @@ export function NewClientScreen() {
             <CardTitle className="text-sm">Commercial terms</CardTitle>
           </CardHeader>
           <CardContent className="grid gap-4">
-            <div className="grid gap-2 sm:max-w-xs">
-              <Label htmlFor="client-fee">Agreed service fee %</Label>
-              <Input
-                id="client-fee"
-                inputMode="decimal"
-                value={serviceFee}
-                onChange={(e) =>
-                  setServiceFee(e.target.value.replace(/[^\d.]/g, ""))
-                }
-                placeholder={String(company.defaultServiceFeePercent)}
-                className="tabular"
-              />
-              <p className="text-muted-foreground text-xs">
-                Leave empty to use the company default of{" "}
-                {company.defaultServiceFeePercent}%.
-              </p>
-            </div>
             <div className="grid gap-2">
               <Label htmlFor="client-notes">Notes</Label>
               <Textarea

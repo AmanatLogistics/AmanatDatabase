@@ -18,8 +18,6 @@ import type {
   PaymentType,
   Purchase,
   PurchaseStatus,
-  Shipment,
-  ShipmentStatus,
 } from "@/lib/types";
 
 /**
@@ -91,7 +89,6 @@ export interface CreateClientInput {
   city: string;
   address?: string;
   preferredContact: Client["preferredContact"];
-  serviceFeePercent?: number;
   notes?: string;
 }
 
@@ -141,8 +138,8 @@ export interface CreateOrderInput {
   clientId: ID;
   source: OrderSource;
   items: CreateOrderItemInput[];
-  serviceFeeType: Order["serviceFeeType"];
-  serviceFeeValue: number;
+  /** Our fee for the job, AFN. Typed in by hand. */
+  serviceFeeAfn: number;
   shippingChargedAfn: number;
   discountAfn: number;
   notes?: string;
@@ -175,8 +172,7 @@ export async function createOrder(input: CreateOrderInput): Promise<Order> {
     source: input.source,
     requestedAt: at.toISOString(),
     items,
-    serviceFeeType: input.serviceFeeType,
-    serviceFeeValue: input.serviceFeeValue,
+    serviceFeeAfn: input.serviceFeeAfn,
     shippingChargedAfn: input.shippingChargedAfn,
     discountAfn: input.discountAfn,
     notes: input.notes,
@@ -340,96 +336,6 @@ export async function createPurchase(
   }
 
   return delay(purchase);
-}
-
-/* -------------------------------------------------------------------------- */
-/* Shipments — POST /api/shipments                                             */
-/* -------------------------------------------------------------------------- */
-
-export interface CreateShipmentInput {
-  orderId: ID;
-  carrier: string;
-  trackingNumber: string;
-  trackingUrl?: string;
-  origin: string;
-  destination: string;
-  etaAt?: string;
-  weightKg: number;
-  freightCostAfn: number;
-  customsDutyAfn: number;
-}
-
-export async function createShipment(
-  input: CreateShipmentInput,
-): Promise<Shipment> {
-  const { addShipment, orders, updateOrder } = state();
-  const at = now();
-
-  const shipment: Shipment = {
-    id: `shipment-new-${Date.now()}`,
-    status: "label_created",
-    shippedAt: at.toISOString(),
-    events: [
-      {
-        id: `shipment-evt-${Date.now()}`,
-        at: at.toISOString(),
-        status: "label_created",
-        location: input.origin,
-        description: "Shipping label created by the forwarder.",
-      },
-    ],
-    ...input,
-  };
-
-  addShipment(shipment);
-
-  const order = orders.find((o) => o.id === input.orderId);
-  if (order && ["purchased", "purchasing", "confirmed"].includes(order.status)) {
-    updateOrder(order.id, {
-      status: "in_transit",
-      timeline: [
-        ...order.timeline,
-        event(
-          order.id,
-          order.timeline.length + 1,
-          "shipment",
-          "Shipment booked",
-          `${input.carrier} · ${input.trackingNumber}`,
-        ),
-      ],
-    });
-  }
-
-  return delay(shipment);
-}
-
-/** PATCH /api/shipments/:id/status */
-export async function updateShipmentStatus(
-  id: ID,
-  status: ShipmentStatus,
-  location: string,
-  description: string,
-): Promise<void> {
-  const { shipments, updateShipment } = state();
-  const shipment = shipments.find((s) => s.id === id);
-  if (!shipment) return delay(undefined);
-
-  const at = now().toISOString();
-  updateShipment(id, {
-    status,
-    deliveredAt: status === "delivered" ? at : shipment.deliveredAt,
-    events: [
-      ...shipment.events,
-      {
-        id: `${id}-evt-${shipment.events.length + 1}`,
-        at,
-        status,
-        location,
-        description,
-      },
-    ],
-  });
-  return delay(undefined);
 }
 
 /* -------------------------------------------------------------------------- */

@@ -12,9 +12,6 @@ import type {
   Payment,
   Purchase,
   PurchaseStatus,
-  Shipment,
-  ShipmentEvent,
-  ShipmentStatus,
 } from "@/lib/types";
 
 /**
@@ -176,7 +173,6 @@ function effectiveStage(status: OrderStatus): number {
 
 const orders: Order[] = [];
 const purchases: Purchase[] = [];
-const shipments: Shipment[] = [];
 const payments: Payment[] = [];
 
 let orderSeq = 0;
@@ -280,7 +276,6 @@ function buildTimeline(
   }
   if (stage >= stageIndex("in_transit")) {
     cursor = shift(cursor, int(2, 6), int(1, 12));
-    push("shipment", "Shipment booked", "Consolidated at the forwarder and handed to the carrier.", cursor);
   }
   if (stage >= stageIndex("arrived")) {
     cursor = shift(cursor, int(4, 11), int(1, 10));
@@ -384,187 +379,29 @@ function externalOrderNumber(storeId: string): string {
   }
 }
 
-const CARRIER_ROUTES: Array<{
-  carrier: string;
-  origin: string;
-  destination: string;
-  stores: string[];
-  tracking: () => string;
-  url: (t: string) => string;
-}> = [
-  {
-    carrier: "DHL Express",
-    origin: "Dubai, UAE",
-    destination: "Kabul, Afghanistan",
-    stores: ["store-amazon-ae", "store-noon", "store-amazon-us"],
-    tracking: () => `${int(1000000000, 9999999999)}`,
-    url: (t) => `https://www.dhl.com/af-en/home/tracking.html?tracking-id=${t}`,
-  },
-  {
-    carrier: "Aramex",
-    origin: "Dubai, UAE",
-    destination: "Kabul, Afghanistan",
-    stores: ["store-amazon-ae", "store-noon"],
-    tracking: () => `${int(10000000000, 99999999999)}`,
-    url: (t) => `https://www.aramex.com/track/results?ShipmentNumber=${t}`,
-  },
-  {
-    carrier: "FedEx",
-    origin: "Memphis, USA",
-    destination: "Kabul, Afghanistan",
-    stores: ["store-amazon-us"],
-    tracking: () => `${int(100000000000, 999999999999)}`,
-    url: (t) => `https://www.fedex.com/fedextrack/?trknbr=${t}`,
-  },
-  {
-    carrier: "Silk Road Air Cargo",
-    origin: "Guangzhou, China",
-    destination: "Kabul, Afghanistan",
-    stores: ["store-aliexpress"],
-    tracking: () => `SRA${int(100000, 999999)}AF`,
-    url: (t) => `https://track.silkroadcargo.af/${t}`,
-  },
-  {
-    carrier: "Kabul City Courier",
-    origin: "Peshawar, Pakistan",
-    destination: "Kabul, Afghanistan",
-    stores: ["store-daraz-pk"],
-    tracking: () => `KCC-${int(100000, 999999)}`,
-    url: (t) => `https://kabulcitycourier.af/track/${t}`,
-  },
-];
-
-function buildShipment(order: Order, itemsAfn: number): Shipment {
-  const primaryStore = order.items[0]?.storeId ?? "store-amazon-us";
-  const route =
-    CARRIER_ROUTES.find((r) => r.stores.includes(primaryStore)) ?? CARRIER_ROUTES[0];
-  const trackingNumber = route.tracking();
-
-  const stage = effectiveStage(order.status);
-  const shipEvent = order.timeline.find((e) => e.status === "shipment");
-  const shippedAt = shipEvent
-    ? new Date(shipEvent.at)
-    : shift(new Date(order.requestedAt), 7);
-
-  const store = storeById.get(primaryStore);
-  const leadTime = store?.leadTimeDays ?? 18;
-  const etaAt = shift(shippedAt, Math.round(leadTime * 0.6) + int(-2, 4));
-
+/**
+ * What the parcel cost us to move.
+ *
+ * Freight is roughly weight-based; duty is a share of the declared value. These
+ * two numbers are all that survived the carrier model — they now live on the
+ * order itself rather than on a shipment record.
+ */
+function buildFreight(
+  order: Order,
+  itemsAfn: number,
+): { freightCostAfn: number; customsDutyAfn: number } {
   const weightKg =
-    Math.round(order.items.reduce((s, i) => s + (i.weightKg ?? 0.5), 0) * 100) / 100;
+    Math.round(order.items.reduce((s, i) => s + (i.weightKg ?? 0.5), 0) * 100) /
+    100;
 
-  let status: ShipmentStatus;
-  if (order.status === "refunded") status = "delivered";
-  else if (stage >= stageIndex("arrived")) status = "delivered";
-  else if (chance(0.14)) status = "customs";
-  else if (chance(0.1)) status = "exception";
-  else status = pick<ShipmentStatus>(["in_transit", "in_transit", "picked_up"]);
-
-  const arrivedEvent = order.timeline.find((e) => e.status === "arrived");
-  const deliveredAt =
-    status === "delivered"
-      ? arrivedEvent
-        ? new Date(arrivedEvent.at)
-        : shift(shippedAt, leadTime)
-      : undefined;
-
-  const events: ShipmentEvent[] = [];
-  let seq = 0;
-  const addEvent = (
-    at: Date,
-    evtStatus: ShipmentStatus,
-    location: string,
-    description: string,
-  ) => {
-    seq += 1;
-    events.push({
-      id: `${order.id}-shp-evt-${seq}`,
-      at: iso(at),
-      status: evtStatus,
-      location,
-      description,
-    });
-  };
-
-  addEvent(shippedAt, "label_created", route.origin, "Shipping label created by the forwarder.");
-  addEvent(shift(shippedAt, 0, int(6, 20)), "picked_up", route.origin, `Picked up by ${route.carrier}.`);
-
-  if (status !== "picked_up") {
-    addEvent(
-      shift(shippedAt, int(1, 3)),
-      "in_transit",
-      route.origin.split(",")[0],
-      "Departed origin facility.",
-    );
-    addEvent(
-      shift(shippedAt, int(4, 7)),
-      "in_transit",
-      "Kabul International Airport",
-      "Arrived at destination airport.",
-    );
-  }
-
-  if (status === "customs") {
-    addEvent(
-      shift(shippedAt, int(6, 9)),
-      "customs",
-      "Kabul Customs House",
-      "Held for import clearance — commercial invoice requested.",
-    );
-  }
-
-  if (status === "exception") {
-    addEvent(
-      shift(shippedAt, int(6, 10)),
-      "exception",
-      "Kabul, Afghanistan",
-      "Delivery attempt failed — client phone unreachable.",
-    );
-  }
-
-  if (status === "delivered" && deliveredAt) {
-    addEvent(
-      shift(deliveredAt, -1),
-      "customs",
-      "Kabul Customs House",
-      "Cleared import formalities, duty paid.",
-    );
-    addEvent(
-      shift(deliveredAt, 0, -3),
-      "out_for_delivery",
-      "Kabul, Afghanistan",
-      "Out for delivery to the Amanat shop.",
-    );
-    addEvent(
-      deliveredAt,
-      "delivered",
-      "Shahr-e-Naw, Kabul",
-      "Delivered and checked into shop inventory.",
-    );
-  }
-
-  // Freight is roughly weight-based; duty is a share of the declared value.
-  const freightCostAfn = Math.round(Math.max(280, weightKg * int(78, 105)) / 10) * 10;
+  const freightCostAfn =
+    Math.round(Math.max(280, weightKg * int(78, 105)) / 10) * 10;
   const customsDutyAfn =
-    itemsAfn > 12000 ? Math.round((itemsAfn * (chance(0.5) ? 0.03 : 0.045)) / 10) * 10 : 0;
+    itemsAfn > 12000
+      ? Math.round((itemsAfn * (chance(0.5) ? 0.03 : 0.045)) / 10) * 10
+      : 0;
 
-  return {
-    id: `shipment-${order.id.replace("order-", "")}`,
-    orderId: order.id,
-    carrier: route.carrier,
-    trackingNumber,
-    trackingUrl: route.url(trackingNumber),
-    status,
-    origin: route.origin,
-    destination: route.destination,
-    shippedAt: iso(shippedAt),
-    etaAt: iso(etaAt),
-    deliveredAt: deliveredAt ? iso(deliveredAt) : undefined,
-    weightKg,
-    freightCostAfn,
-    customsDutyAfn,
-    events: events.sort((a, b) => a.at.localeCompare(b.at)),
-  };
+  return { freightCostAfn, customsDutyAfn };
 }
 
 /* -------------------------------------------------------------------------- */
@@ -621,9 +458,9 @@ draft.forEach(({ requestedAt, clientId }) => {
     source: pick(SOURCES),
     requestedAt: iso(requestedAt),
     items,
-    serviceFeeType: "percent",
-    serviceFeeValue:
-      client?.serviceFeePercent ?? settings.company.defaultServiceFeePercent,
+    // Historic orders were quoted at 14%; the amount is frozen here so past
+    // totals stay exactly what they were when the percentage existed.
+    serviceFeeAfn: Math.round((itemsAfn * 14) / 100),
     shippingChargedAfn,
     discountAfn,
     notes: chance(0.18)
@@ -648,13 +485,15 @@ draft.forEach(({ requestedAt, clientId }) => {
     purchases.push(...buildPurchases(order));
   }
 
-  /* --- shipment ---------------------------------------------------------- */
+  /* --- freight & duty ----------------------------------------------------- */
   if (stage >= stageIndex("in_transit") && status !== "cancelled") {
-    shipments.push(buildShipment(order, itemsAfn));
+    const freight = buildFreight(order, itemsAfn);
+    order.freightCostAfn = freight.freightCostAfn;
+    order.customsDutyAfn = freight.customsDutyAfn;
   }
 
   /* --- payments ---------------------------------------------------------- */
-  const serviceFeeAfn = Math.round((itemsAfn * base.serviceFeeValue) / 100);
+  const serviceFeeAfn = base.serviceFeeAfn;
   const revenue = itemsAfn + serviceFeeAfn + shippingChargedAfn - discountAfn;
 
   const confirmEvent = timeline.find((e) => e.status === "confirmed");
@@ -726,13 +565,11 @@ draft.forEach(({ requestedAt, clientId }) => {
 orders.sort((a, b) => b.requestedAt.localeCompare(a.requestedAt));
 purchases.sort((a, b) => b.purchasedAt.localeCompare(a.purchasedAt));
 payments.sort((a, b) => b.at.localeCompare(a.at));
-shipments.sort((a, b) => (b.shippedAt ?? "").localeCompare(a.shippedAt ?? ""));
 
 export const seedData = {
   clients,
   orders,
   purchases,
-  shipments,
   payments,
   settings,
 };
