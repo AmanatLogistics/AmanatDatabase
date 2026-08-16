@@ -203,13 +203,11 @@ test, which is the harness the per-task verification below relies on.
 
 ---
 
-## PHASE 2 — Manual fee, Afghani currency
-
-> Do not start until Phase 1 is merged.
+## PHASE 2 — Manual fee, Afghani currency ✅ DONE
 
 ### 2.1 — Convert the service fee to a manual AFN amount
 
-- [ ] Drop `Order.serviceFeeType` and rename `serviceFeeValue` →
+- [x] Drop `Order.serviceFeeType` and rename `serviceFeeValue` →
       `serviceFeeAfn` (`SPEC.md` §3.1). Simplify `orderRevenue()`
       (`src/lib/finance.ts:90-108`) to read the amount directly.
 
@@ -220,7 +218,7 @@ test, which is the harness the per-task verification below relies on.
 
 ### 2.2 — Remove the two duplicated percentage formulas
 
-- [ ] `src/features/orders/new-order-screen.tsx:105` and
+- [x] `src/features/orders/new-order-screen.tsx:105` and
       `src/lib/mock/seed.ts:634` each re-implement
       `Math.round((itemsAfn * pct) / 100)`. Replace both with the stored amount.
       For seed data, compute the amount once so historic totals do not move.
@@ -230,7 +228,7 @@ test, which is the harness the per-task verification below relies on.
 
 ### 2.3 — Replace the `Fee %` input with a `Fee (AFN)` amount input
 
-- [ ] `src/features/orders/new-order-screen.tsx:272-284`. Relabel, and remove
+- [x] `src/features/orders/new-order-screen.tsx:272-284`. Relabel, and remove
       the client-rate prefill effect at `:83-92`.
 
   **Verify:** create an order, type `2500` as the fee → the Quotation rail's
@@ -238,7 +236,7 @@ test, which is the harness the per-task verification below relies on.
 
 ### 2.4 — Remove the per-client and company-default fee percentages
 
-- [ ] Remove `Client.serviceFeePercent` (`src/lib/types.ts:41-42`) and
+- [x] Remove `Client.serviceFeePercent` (`src/lib/types.ts:41-42`) and
       `CompanyProfile.defaultServiceFeePercent` (`:288-289`), plus their inputs
       and displays in `src/features/clients/new-client-screen.tsx:219-234`,
       `src/features/clients/client-detail-screen.tsx:239-250`,
@@ -250,7 +248,7 @@ test, which is the harness the per-task verification below relies on.
 
 ### 2.5 — Fix the percentage-suffixed fee labels
 
-- [ ] `src/features/orders/order-detail-screen.tsx:294` and
+- [x] `src/features/orders/order-detail-screen.tsx:294` and
       `src/features/print/invoice-document.tsx:138-139` render
       `Service fee ({order.serviceFeeValue}%)`. Drop the `%` suffix.
 
@@ -259,7 +257,7 @@ test, which is the harness the per-task verification below relies on.
 
 ### 2.6 — Remove the last float from the money path
 
-- [ ] `FREIGHT_COST_RATIO = 0.75` (`src/lib/constants.ts:260`), used at
+- [x] `FREIGHT_COST_RATIO = 0.75` (`src/lib/constants.ts:260`), used at
       `src/lib/finance.ts:145-148`. Express as integer arithmetic
       (`Math.round(x * 3 / 4)`) per `SPEC.md` §3.2.
 

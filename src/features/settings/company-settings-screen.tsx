@@ -153,21 +153,7 @@ export function CompanySettingsScreen() {
               Afghani.
             </p>
           </div>
-          <div className="grid gap-2">
-            <Label htmlFor="setting-fee">Default service fee %</Label>
-            <Input
-              id="setting-fee"
-              inputMode="decimal"
-              value={draft.defaultServiceFeePercent}
-              onChange={(e) =>
-                set(
-                  "defaultServiceFeePercent",
-                  Number(e.target.value.replace(/[^\d.]/g, "")),
-                )
-              }
-              className="tabular"
-            />
-          </div>
+          
           <div className="grid gap-2">
             <Label htmlFor="setting-prefix">Invoice prefix</Label>
             <Input

@@ -25,7 +25,6 @@ import { ProductThumb } from "@/components/shared/product-thumb";
 import {
   createOrder,
   useClients,
-  useCompany,
   useStores,
   type CreateOrderItemInput,
 } from "@/lib/api";
@@ -64,33 +63,18 @@ export function NewOrderScreen() {
   const router = useRouter();
   const clients = useClients();
   const stores = useStores().filter((s) => s.active);
-  const company = useCompany();
 
   const [clientId, setClientId] = React.useState("");
   const [source, setSource] = React.useState<OrderSource>("whatsapp");
   const [items, setItems] = React.useState<DraftItem[]>(() => [
     emptyItem(stores[0]?.id ?? "store-amazon-us"),
   ]);
-  const [serviceFee, setServiceFee] = React.useState(
-    String(company.defaultServiceFeePercent),
-  );
+  const [serviceFee, setServiceFee] = React.useState("");
   const [shipping, setShipping] = React.useState("400");
   const [discount, setDiscount] = React.useState("0");
   const [notes, setNotes] = React.useState("");
   const [saving, setSaving] = React.useState(false);
 
-  const selectedClient = clients.find((c) => c.id === clientId);
-
-  // A client with an agreed rate overrides the company default.
-  const [lastClientId, setLastClientId] = React.useState(clientId);
-  if (lastClientId !== clientId) {
-    setLastClientId(clientId);
-    setServiceFee(
-      String(
-        selectedClient?.serviceFeePercent ?? company.defaultServiceFeePercent,
-      ),
-    );
-  }
 
   function patchItem(key: string, patch: Partial<DraftItem>) {
     setItems((prev) =>
@@ -102,7 +86,7 @@ export function NewOrderScreen() {
     (sum, item) => sum + item.unitPriceAfn * item.qty,
     0,
   );
-  const serviceFeeAfn = Math.round((itemsAfn * (Number(serviceFee) || 0)) / 100);
+  const serviceFeeAfn = Number(serviceFee) || 0;
   const shippingAfn = Number(shipping) || 0;
   const discountAfn = Number(discount) || 0;
   const totalAfn = itemsAfn + serviceFeeAfn + shippingAfn - discountAfn;
@@ -136,8 +120,7 @@ export function NewOrderScreen() {
           variant: item.variant?.trim() || undefined,
           weightKg: item.weightKg || undefined,
         })),
-        serviceFeeType: "percent",
-        serviceFeeValue: Number(serviceFee) || 0,
+        serviceFeeAfn,
         shippingChargedAfn: shippingAfn,
         discountAfn,
         notes: notes.trim() || undefined,
@@ -271,16 +254,17 @@ export function NewOrderScreen() {
               <div className="grid grid-cols-3 gap-2">
                 <div className="grid gap-1.5">
                   <Label htmlFor="order-fee" className="text-xs">
-                    Fee %
+                    Fee (AFN)
                   </Label>
                   <Input
                     id="order-fee"
-                    inputMode="decimal"
+                    inputMode="numeric"
                     value={serviceFee}
                     onChange={(e) =>
-                      setServiceFee(e.target.value.replace(/[^\d.]/g, ""))
+                      setServiceFee(e.target.value.replace(/[^\d]/g, ""))
                     }
                     className="tabular h-8"
+                    placeholder="2500"
                   />
                 </div>
                 <div className="grid gap-1.5">

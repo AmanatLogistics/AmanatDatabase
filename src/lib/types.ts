@@ -38,8 +38,6 @@ export interface Client {
   city: string;
   address?: string;
   preferredContact: ContactChannel;
-  /** Optional agreed markup for this client; falls back to company default. */
-  serviceFeePercent?: number;
   notes?: string;
   createdAt: ISODate;
 }
@@ -127,9 +125,11 @@ export interface Order {
   /** Set when status first reaches `delivered`. */
   deliveredAt?: ISODate;
   items: OrderItem[];
-  serviceFeeType: "percent" | "fixed";
-  /** Percent (0-100) or a flat AFN amount, per `serviceFeeType`. */
-  serviceFeeValue: number;
+  /**
+   * Our fee for the job, AFN. Typed in by hand per order — there is no
+   * percentage and no automatic calculation.
+   */
+  serviceFeeAfn: number;
   /** Shipping we re-bill to the client, AFN. */
   shippingChargedAfn: number;
   /**
@@ -259,8 +259,6 @@ export interface CompanyProfile {
   /** Prefix used when generating the next invoice number. */
   invoicePrefix: string;
   orderPrefix: string;
-  /** Default markup applied to new orders, percent. */
-  defaultServiceFeePercent: number;
   /** Reporting currency. The money layer reads this. */
   currency: "AFN";
   invoiceFooter: string;

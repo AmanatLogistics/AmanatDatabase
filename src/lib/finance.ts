@@ -88,10 +88,7 @@ export function orderRevenue(order: Order): OrderRevenue {
     (sum, item) => sum + item.unitPriceAfn * item.qty,
     0,
   );
-  const serviceFeeAfn =
-    order.serviceFeeType === "percent"
-      ? Math.round((itemsAfn * order.serviceFeeValue) / 100)
-      : order.serviceFeeValue;
+  const serviceFeeAfn = order.serviceFeeAfn;
 
   return {
     itemsAfn,

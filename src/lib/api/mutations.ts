@@ -89,7 +89,6 @@ export interface CreateClientInput {
   city: string;
   address?: string;
   preferredContact: Client["preferredContact"];
-  serviceFeePercent?: number;
   notes?: string;
 }
 
@@ -139,8 +138,8 @@ export interface CreateOrderInput {
   clientId: ID;
   source: OrderSource;
   items: CreateOrderItemInput[];
-  serviceFeeType: Order["serviceFeeType"];
-  serviceFeeValue: number;
+  /** Our fee for the job, AFN. Typed in by hand. */
+  serviceFeeAfn: number;
   shippingChargedAfn: number;
   discountAfn: number;
   notes?: string;
@@ -173,8 +172,7 @@ export async function createOrder(input: CreateOrderInput): Promise<Order> {
     source: input.source,
     requestedAt: at.toISOString(),
     items,
-    serviceFeeType: input.serviceFeeType,
-    serviceFeeValue: input.serviceFeeValue,
+    serviceFeeAfn: input.serviceFeeAfn,
     shippingChargedAfn: input.shippingChargedAfn,
     discountAfn: input.discountAfn,
     notes: input.notes,

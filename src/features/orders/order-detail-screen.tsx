@@ -375,7 +375,7 @@ export function OrderDetailScreen({ orderId }: { orderId: string }) {
                 <div className="bg-muted/25 space-y-1.5 border-t px-4 py-3.5 text-sm">
                   <SummaryLine label="Items subtotal" value={economics.revenue.itemsAfn} />
                   <SummaryLine
-                    label={`Service fee (${order.serviceFeeValue}%)`}
+                    label="Service fee"
                     value={economics.revenue.serviceFeeAfn}
                   />
                   <SummaryLine label="Shipping charged" value={economics.revenue.shippingAfn} />

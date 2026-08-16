@@ -135,7 +135,7 @@ export function InvoiceDocument({
             value={economics.revenue.itemsAfn}
           />
           <TotalRow
-            label={`Service fee (${order.serviceFeeValue}%)`}
+            label="Service fee"
             value={economics.revenue.serviceFeeAfn}
           />
           <TotalRow label="Shipping & handling" value={economics.revenue.shippingAfn} />

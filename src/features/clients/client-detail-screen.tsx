@@ -236,19 +236,6 @@ export function ClientDetailScreen({ clientId }: { clientId: string }) {
                 </div>
               </div>
 
-              {client.serviceFeePercent !== undefined && (
-                <>
-                  <Separator />
-                  <div className="bg-muted/40 rounded-lg border px-3 py-2 text-sm">
-                    <p className="text-muted-foreground text-xs">
-                      Agreed service fee
-                    </p>
-                    <p className="tabular font-medium">
-                      {client.serviceFeePercent}%
-                    </p>
-                  </div>
-                </>
-              )}
 
               {client.notes && (
                 <>

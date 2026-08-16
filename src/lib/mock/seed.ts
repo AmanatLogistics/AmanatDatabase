@@ -458,9 +458,9 @@ draft.forEach(({ requestedAt, clientId }) => {
     source: pick(SOURCES),
     requestedAt: iso(requestedAt),
     items,
-    serviceFeeType: "percent",
-    serviceFeeValue:
-      client?.serviceFeePercent ?? settings.company.defaultServiceFeePercent,
+    // Historic orders were quoted at 14%; the amount is frozen here so past
+    // totals stay exactly what they were when the percentage existed.
+    serviceFeeAfn: Math.round((itemsAfn * 14) / 100),
     shippingChargedAfn,
     discountAfn,
     notes: chance(0.18)
@@ -493,7 +493,7 @@ draft.forEach(({ requestedAt, clientId }) => {
   }
 
   /* --- payments ---------------------------------------------------------- */
-  const serviceFeeAfn = Math.round((itemsAfn * base.serviceFeeValue) / 100);
+  const serviceFeeAfn = base.serviceFeeAfn;
   const revenue = itemsAfn + serviceFeeAfn + shippingChargedAfn - discountAfn;
 
   const confirmEvent = timeline.find((e) => e.status === "confirmed");
