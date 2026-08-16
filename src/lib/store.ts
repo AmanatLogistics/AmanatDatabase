@@ -5,6 +5,7 @@ import { createJSONStorage, persist } from "zustand/middleware";
 
 import { seedData, TODAY } from "@/lib/mock/seed";
 import type {
+  AppNotification,
   Client,
   Order,
   Payment,
@@ -33,6 +34,7 @@ const STORAGE_KEY = "amanat-shopping-data";
 
 export interface DataState {
   clients: Client[];
+  notifications: AppNotification[];
   orders: Order[];
   purchases: Purchase[];
   payments: Payment[];
@@ -56,6 +58,11 @@ export interface DataState {
 
   addPayment: (payment: Payment) => void;
 
+  /** Append an event. Newest first, capped so the log cannot grow forever. */
+  pushNotification: (notification: AppNotification) => void;
+  markNotificationsRead: () => void;
+  clearNotifications: () => void;
+
   updateSettings: (patch: Partial<Settings>) => void;
 
   /** Restore the seed dataset — used by the "Reset demo data" action. */
@@ -64,6 +71,7 @@ export interface DataState {
 
 const initial = () => ({
   clients: seedData.clients,
+  notifications: [] as AppNotification[],
   orders: seedData.orders,
   purchases: seedData.purchases,
   payments: seedData.payments,
@@ -145,6 +153,20 @@ export const useDataStore = create<DataState>()(
       addPayment: (payment) =>
         set((state) => ({ payments: [payment, ...state.payments] })),
 
+      pushNotification: (notification) =>
+        set((state) => ({
+          notifications: [notification, ...state.notifications].slice(0, 50),
+        })),
+
+      markNotificationsRead: () =>
+        set((state) => ({
+          notifications: state.notifications.map((n) =>
+            n.read ? n : { ...n, read: true },
+          ),
+        })),
+
+      clearNotifications: () => set({ notifications: [] }),
+
       updateSettings: (patch) =>
         set((state) => ({ settings: { ...state.settings, ...patch } })),
 
@@ -168,6 +190,7 @@ export const useDataStore = create<DataState>()(
        */
       partialize: (state) => ({
         clients: state.clients,
+        notifications: state.notifications,
         orders: state.orders,
         purchases: state.purchases,
         payments: state.payments,

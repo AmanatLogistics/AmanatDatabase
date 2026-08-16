@@ -37,4 +37,25 @@ export function startHydration(): void {
   if (typeof window === "undefined") return;
   if (useDataStore.persist.hasHydrated()) return;
   void useDataStore.persist.rehydrate();
+  listenForOtherTabs();
+}
+
+let listening = false;
+
+/**
+ * Keep other tabs current.
+ *
+ * The browser fires `storage` in every *other* tab when one of them writes, so
+ * an order placed in one tab reaches the rest without anyone refreshing. This
+ * is as close to live as a browser-only app gets: it does not reach another
+ * device or another member of staff, which needs a server.
+ */
+function listenForOtherTabs(): void {
+  if (listening) return;
+  listening = true;
+
+  window.addEventListener("storage", (event) => {
+    if (event.key !== "amanat-shopping-data") return;
+    void useDataStore.persist.rehydrate();
+  });
 }
