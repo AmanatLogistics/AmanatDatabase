@@ -41,6 +41,7 @@ import { StatusBadge } from "@/components/shared/status-badge";
 import { RevenueChart } from "@/features/dashboard/revenue-chart";
 import { StatusDonut } from "@/features/dashboard/status-donut";
 import { useDashboard, useToday } from "@/lib/api";
+import { CARRIER_TRACKING_ENABLED } from "@/lib/constants";
 import { deltaPercent } from "@/lib/finance";
 import {
   formatAfn,
@@ -435,12 +436,14 @@ export function DashboardScreen() {
           title="Log a purchase"
           description="Record what you paid the store"
         />
-        <QuickLink
-          href="/tracking"
-          icon={TruckIcon}
-          title="Track shipments"
-          description="See what is stuck in customs"
-        />
+        {CARRIER_TRACKING_ENABLED && (
+          <QuickLink
+            href="/tracking"
+            icon={TruckIcon}
+            title="Track shipments"
+            description="See what is stuck in customs"
+          />
+        )}
         <QuickLink
           href="/finance/balances"
           icon={BanknoteIcon}

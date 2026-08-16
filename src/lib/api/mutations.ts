@@ -2,6 +2,10 @@
 
 import { orderRevenue } from "@/lib/finance";
 import { useDataStore } from "@/lib/store";
+import {
+  generateUniqueTrackingNumber,
+  isValidTrackingNumber,
+} from "@/lib/tracking";
 import type {
   Client,
   ID,
@@ -162,6 +166,10 @@ export async function createOrder(input: CreateOrderInput): Promise<Order> {
   const order: Order = {
     id,
     orderNo: `AS-${at.getUTCFullYear()}-${pad(seq)}`,
+    trackingNumber: generateUniqueTrackingNumber(
+      at.getUTCFullYear(),
+      orders.map((o) => o.trackingNumber),
+    ),
     clientId: input.clientId,
     status: "requested",
     source: input.source,
@@ -225,6 +233,39 @@ export async function updateOrder(
   patch: Partial<Order>,
 ): Promise<void> {
   state().updateOrder(id, patch);
+  return delay(undefined);
+}
+
+/**
+ * PATCH /api/orders/:id/tracking-number
+ *
+ * Overriding the generated number is allowed, but it stays the client's only
+ * handle on the order, so a malformed or already-used value is refused rather
+ * than written. The guard lives here and not in `updateOrder` because that one
+ * patches arbitrary fields.
+ *
+ * Uniqueness is checked against the orders in memory — there is no database to
+ * enforce it (SPEC.md §2.2, risk R3).
+ */
+export async function setOrderTrackingNumber(
+  id: ID,
+  trackingNumber: string,
+): Promise<void> {
+  const { orders, updateOrder } = state();
+  const value = trackingNumber.trim().toUpperCase();
+
+  if (!isValidTrackingNumber(value)) {
+    throw new Error(
+      "A tracking number looks like AS-2026-4F7K2Q — the letters I, L, O and U are not used.",
+    );
+  }
+
+  const clash = orders.find((o) => o.trackingNumber === value && o.id !== id);
+  if (clash) {
+    throw new Error(`${value} is already used by order ${clash.orderNo}.`);
+  }
+
+  updateOrder(id, { trackingNumber: value });
   return delay(undefined);
 }
 

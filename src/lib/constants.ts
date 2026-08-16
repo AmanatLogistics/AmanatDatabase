@@ -61,6 +61,13 @@ export const ORDER_PIPELINE: OrderStatus[] = [
   "delivered",
 ];
 
+/**
+ * Paused, but not finished. An order can leave `on_hold` again, so it belongs
+ * to neither the pipeline nor the terminal set — it gets its own group in the
+ * status menu.
+ */
+export const ORDER_HOLD: OrderStatus[] = ["on_hold"];
+
 export const ORDER_TERMINAL: OrderStatus[] = ["cancelled", "refunded"];
 
 export const ORDER_STATUS: Record<OrderStatus, StatusMeta<OrderStatus>> = {
@@ -79,6 +86,7 @@ export const ORDER_STATUS: Record<OrderStatus, StatusMeta<OrderStatus>> = {
     "bg-gold-500",
   ),
   delivered: meta("delivered", "Delivered", "success", "bg-success"),
+  on_hold: meta("on_hold", "On hold", "warning", "bg-warning"),
   cancelled: meta("cancelled", "Cancelled", "secondary", "bg-muted-foreground"),
   refunded: meta("refunded", "Refunded", "destructive", "bg-destructive"),
 };
@@ -99,6 +107,7 @@ export const BILLABLE_ORDER_STATUSES: OrderStatus[] = [
 export const ACTIVE_ORDER_STATUSES: OrderStatus[] = [
   "requested",
   "quoted",
+  "on_hold",
   "confirmed",
   "purchasing",
   "purchased",
@@ -179,6 +188,21 @@ export const SHIPMENT_STATUS: Record<
   delivered: meta("delivered", "Delivered", "success", "bg-success"),
   exception: meta("exception", "Exception", "destructive", "bg-destructive"),
 };
+
+/**
+ * Third-party carrier tracking, off by default.
+ *
+ * We have no carriers — every parcel moves on our own internal tracking number
+ * now. The screens are hidden rather than deleted because `Shipment` is not a
+ * leaf: `finance.ts` reads `freightCostAfn` and `customsDutyAfn` off it, and
+ * both reads fall back silently, so removing the concept would quietly change
+ * every order's cost, profit and margin and zero out customs duty across the
+ * P&L. SPEC.md §2.5 has the full dependency list.
+ *
+ * Set NEXT_PUBLIC_CARRIER_TRACKING_ENABLED=true to bring the screens back.
+ */
+export const CARRIER_TRACKING_ENABLED =
+  process.env.NEXT_PUBLIC_CARRIER_TRACKING_ENABLED === "true";
 
 export const CARRIERS = [
   "DHL Express",

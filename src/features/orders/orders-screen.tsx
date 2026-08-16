@@ -37,7 +37,11 @@ import { ProductThumb } from "@/components/shared/product-thumb";
 import { StatusBadge } from "@/components/shared/status-badge";
 import { RecordPaymentDialog } from "@/features/payments/record-payment-dialog";
 import { useOrderRows, useStores, type OrderRow } from "@/lib/api";
-import { ACTIVE_ORDER_STATUSES, ORDER_SOURCE_LABEL } from "@/lib/constants";
+import {
+  ACTIVE_ORDER_STATUSES,
+  CARRIER_TRACKING_ENABLED,
+  ORDER_SOURCE_LABEL,
+} from "@/lib/constants";
 import { formatDateShort, truncate } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
@@ -148,7 +152,7 @@ export function OrdersScreen() {
       }
 
       if (query) {
-        const haystack = `${order.orderNo} ${client?.name ?? ""} ${client?.phone ?? ""} ${order.items
+        const haystack = `${order.orderNo} ${order.trackingNumber} ${client?.name ?? ""} ${client?.phone ?? ""} ${order.items
           .map((i) => i.name)
           .join(" ")}`.toLowerCase();
         if (!haystack.includes(query)) return false;
@@ -181,6 +185,17 @@ export function OrdersScreen() {
             </div>
           );
         },
+      },
+      {
+        id: "tracking",
+        meta: "Tracking",
+        accessorFn: (row) => row.order.trackingNumber,
+        header: "Tracking",
+        cell: ({ row }) => (
+          <span className="tabular text-muted-foreground text-xs whitespace-nowrap">
+            {row.original.order.trackingNumber}
+          </span>
+        ),
       },
       {
         id: "client",
@@ -361,7 +376,7 @@ export function OrdersScreen() {
                       Purchases
                     </Link>
                   </DropdownMenuItem>
-                  {shipment && (
+                  {CARRIER_TRACKING_ENABLED && shipment && (
                     <DropdownMenuItem asChild>
                       <Link href={`/tracking/${shipment.id}`}>
                         <TruckIcon />
@@ -433,7 +448,7 @@ export function OrdersScreen() {
             <SearchInput
               value={search}
               onChange={setSearch}
-              placeholder="Search order no, client or product…"
+              placeholder="Search tracking no, order no, client or product…"
               className="w-full sm:w-72"
             />
             <FilterSelect

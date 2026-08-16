@@ -2,6 +2,7 @@ import { catalog, productUrl, type CatalogProduct } from "@/lib/mock/catalog";
 import { clients } from "@/lib/mock/clients";
 import { settings } from "@/lib/mock/settings";
 import { ORDER_PIPELINE } from "@/lib/constants";
+import { generateUniqueTrackingNumber } from "@/lib/tracking";
 import type {
   Order,
   OrderEvent,
@@ -52,6 +53,17 @@ function mulberry32(seed: number) {
 }
 
 const rand = mulberry32(20260811);
+
+/**
+ * A second, independent stream for tracking numbers.
+ *
+ * Minting them from `rand` would consume draws inside the order loop and shift
+ * every later value — freight, customs duty, payments, sources, statuses — so
+ * the seeded P&L would silently differ from what it was before tracking
+ * numbers existed. Kept separate so adding a tracking number changes nothing
+ * but the tracking number.
+ */
+const trackingRand = mulberry32(20260812);
 
 const int = (min: number, max: number) =>
   Math.floor(rand() * (max - min + 1)) + min;
@@ -170,6 +182,9 @@ const payments: Payment[] = [];
 let orderSeq = 0;
 let purchaseSeq = 0;
 let receiptSeq = 0;
+
+/** Grows as orders are built, so no two seeded orders share a tracking number. */
+const trackingNumbersUsed = new Set<string>();
 
 function buildItems(orderId: string, count: number): OrderItem[] {
   const chosen: CatalogProduct[] = [];
@@ -590,9 +605,17 @@ draft.forEach(({ requestedAt, clientId }) => {
   const discountAfn =
     chance(0.14) ? Math.round((itemsAfn * (rand() * 0.04 + 0.01)) / 50) * 50 : 0;
 
+  const trackingNumber = generateUniqueTrackingNumber(
+    requestedAt.getUTCFullYear(),
+    trackingNumbersUsed,
+    trackingRand,
+  );
+  trackingNumbersUsed.add(trackingNumber);
+
   const base: Omit<Order, "timeline"> = {
     id,
     orderNo,
+    trackingNumber,
     clientId,
     status,
     source: pick(SOURCES),

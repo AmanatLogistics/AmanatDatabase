@@ -5,8 +5,9 @@ import type { OrderStatus } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 /**
- * Horizontal pipeline for an order. Terminal states (cancelled / refunded)
- * short-circuit the rail and render as a single warning line instead.
+ * Horizontal pipeline for an order. Statuses that are not pipeline stages —
+ * the terminal ones (cancelled / refunded) and `on_hold` — short-circuit the
+ * rail and render as a single line instead.
  */
 export function OrderStatusStepper({
   status,
@@ -26,6 +27,26 @@ export function OrderStatusStepper({
       >
         <span className={cn("size-2 rounded-full", meta.dot)} />
         This order was {meta.label.toLowerCase()} and is no longer in the pipeline.
+      </div>
+    );
+  }
+
+  /*
+   * `on_hold` is not a pipeline stage, so `indexOf` would return -1 and every
+   * step below would render as pending — the rail would claim the order had
+   * never started. Say it is paused instead.
+   */
+  if (status === "on_hold") {
+    const meta = ORDER_STATUS[status];
+    return (
+      <div
+        className={cn(
+          "border-warning/30 bg-warning/10 text-warning-foreground flex items-center gap-2 rounded-lg border px-3 py-2 text-sm",
+          className,
+        )}
+      >
+        <span className={cn("size-2 rounded-full", meta.dot)} />
+        This order is on hold. Move it back to a pipeline stage to resume.
       </div>
     );
   }

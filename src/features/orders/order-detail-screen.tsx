@@ -5,10 +5,13 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { toast } from "sonner";
 import {
+  CheckIcon,
+  CopyIcon,
   CreditCardIcon,
   ExternalLinkIcon,
   MessageSquarePlusIcon,
   PackagePlusIcon,
+  PencilIcon,
   PhoneIcon,
   PrinterIcon,
   TruckIcon,
@@ -22,6 +25,14 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -29,6 +40,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
@@ -52,12 +65,15 @@ import { RecordPaymentDialog } from "@/features/payments/record-payment-dialog";
 import { AddTrackingDialog } from "@/features/tracking/add-tracking-dialog";
 import {
   addOrderNote,
+  setOrderTrackingNumber,
   updateOrderStatus,
   useClientPayments,
   useOrder,
   useStoreLookup,
 } from "@/lib/api";
 import {
+  CARRIER_TRACKING_ENABLED,
+  ORDER_HOLD,
   ORDER_PIPELINE,
   ORDER_SOURCE_LABEL,
   ORDER_STATUS,
@@ -83,6 +99,16 @@ export function OrderDetailScreen({ orderId }: { orderId: string }) {
   const [trackingOpen, setTrackingOpen] = React.useState(false);
   const [note, setNote] = React.useState("");
   const [savingNote, setSavingNote] = React.useState(false);
+  /** The status the operator picked, held until they confirm with a note. */
+  const [pendingStatus, setPendingStatus] = React.useState<OrderStatus | null>(
+    null,
+  );
+  const [statusNote, setStatusNote] = React.useState("");
+  const [savingStatus, setSavingStatus] = React.useState(false);
+  const [trackingEditOpen, setTrackingEditOpen] = React.useState(false);
+  const [trackingDraft, setTrackingDraft] = React.useState("");
+  const [trackingError, setTrackingError] = React.useState<string | null>(null);
+  const [savingTracking, setSavingTracking] = React.useState(false);
 
   if (!row) notFound();
 
@@ -91,9 +117,38 @@ export function OrderDetailScreen({ orderId }: { orderId: string }) {
     (p) => p.payment.orderId === order.id,
   );
 
-  async function handleStatusChange(next: OrderStatus) {
-    await updateOrderStatus(order.id, next);
-    toast.success(`Status set to ${ORDER_STATUS[next].label}`);
+  async function handleStatusChange() {
+    if (!pendingStatus) return;
+    const next = pendingStatus;
+    setSavingStatus(true);
+    try {
+      await updateOrderStatus(order.id, next, statusNote.trim() || undefined);
+      toast.success(`Status set to ${ORDER_STATUS[next].label}`);
+      setPendingStatus(null);
+      setStatusNote("");
+    } catch {
+      toast.error("Could not change the status. Nothing was saved.");
+    } finally {
+      setSavingStatus(false);
+    }
+  }
+
+  async function handleTrackingSave() {
+    setSavingTracking(true);
+    setTrackingError(null);
+    try {
+      await setOrderTrackingNumber(order.id, trackingDraft);
+      toast.success("Tracking number updated");
+      setTrackingEditOpen(false);
+    } catch (error) {
+      // Shown inline rather than as a toast: the operator needs it next to the
+      // field they must correct.
+      setTrackingError(
+        error instanceof Error ? error.message : "Could not save that number.",
+      );
+    } finally {
+      setSavingTracking(false);
+    }
   }
 
   async function handleAddNote() {
@@ -111,7 +166,25 @@ export function OrderDetailScreen({ orderId }: { orderId: string }) {
   return (
     <>
       <PageHeader
-        meta={<StatusBadge kind="order" value={order.status} />}
+        meta={
+          <>
+            <StatusBadge kind="order" value={order.status} />
+            <TrackingNumberChip value={order.trackingNumber} />
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 px-2 text-xs"
+              onClick={() => {
+                setTrackingDraft(order.trackingNumber);
+                setTrackingError(null);
+                setTrackingEditOpen(true);
+              }}
+            >
+              <PencilIcon className="size-3.5" />
+              Edit
+            </Button>
+          </>
+        }
         description={
           <>
             Requested {formatDate(order.requestedAt)} via{" "}
@@ -139,7 +212,23 @@ export function OrderDetailScreen({ orderId }: { orderId: string }) {
                   <DropdownMenuItem
                     key={status}
                     disabled={status === order.status}
-                    onSelect={() => handleStatusChange(status)}
+                    onSelect={() => setPendingStatus(status)}
+                  >
+                    <span
+                      className={cn(
+                        "size-2 rounded-full",
+                        ORDER_STATUS[status].dot,
+                      )}
+                    />
+                    {ORDER_STATUS[status].label}
+                  </DropdownMenuItem>
+                ))}
+                <DropdownMenuSeparator />
+                {ORDER_HOLD.map((status) => (
+                  <DropdownMenuItem
+                    key={status}
+                    disabled={status === order.status}
+                    onSelect={() => setPendingStatus(status)}
                   >
                     <span
                       className={cn(
@@ -156,7 +245,7 @@ export function OrderDetailScreen({ orderId }: { orderId: string }) {
                     key={status}
                     variant="destructive"
                     disabled={status === order.status}
-                    onSelect={() => handleStatusChange(status)}
+                    onSelect={() => setPendingStatus(status)}
                   >
                     {ORDER_STATUS[status].label}
                   </DropdownMenuItem>
@@ -201,7 +290,9 @@ export function OrderDetailScreen({ orderId }: { orderId: string }) {
                   {purchases.length}
                 </span>
               </TabsTrigger>
-              <TabsTrigger value="tracking">Tracking</TabsTrigger>
+              {CARRIER_TRACKING_ENABLED && (
+                <TabsTrigger value="tracking">Tracking</TabsTrigger>
+              )}
               <TabsTrigger value="payments">
                 Payments
                 <span className="text-muted-foreground text-xs">
@@ -392,6 +483,7 @@ export function OrderDetailScreen({ orderId }: { orderId: string }) {
             </TabsContent>
 
             {/* ---- Tracking ----------------------------------------- */}
+            {CARRIER_TRACKING_ENABLED && (
             <TabsContent value="tracking">
               {!shipment ? (
                 <Card>
@@ -452,6 +544,7 @@ export function OrderDetailScreen({ orderId }: { orderId: string }) {
                 </Card>
               )}
             </TabsContent>
+            )}
 
             {/* ---- Payments ----------------------------------------- */}
             <TabsContent value="payments">
@@ -717,36 +810,37 @@ export function OrderDetailScreen({ orderId }: { orderId: string }) {
                 <PackagePlusIcon />
                 Log purchase
               </Button>
-              {shipment ? (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="justify-start"
-                  asChild
-                >
-                  <Link href={`/tracking/${shipment.id}`}>
+              {CARRIER_TRACKING_ENABLED &&
+                (shipment ? (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="justify-start"
+                    asChild
+                  >
+                    <Link href={`/tracking/${shipment.id}`}>
+                      <TruckIcon />
+                      View tracking
+                    </Link>
+                  </Button>
+                ) : (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="justify-start"
+                    onClick={() => setTrackingOpen(true)}
+                  >
                     <TruckIcon />
-                    View tracking
-                  </Link>
-                </Button>
-              ) : (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="justify-start"
-                  onClick={() => setTrackingOpen(true)}
-                >
-                  <TruckIcon />
-                  Add tracking
-                </Button>
-              )}
+                    Add tracking
+                  </Button>
+                ))}
               <Button variant="outline" size="sm" className="justify-start" asChild>
                 <Link href={`/print/quotation/${order.id}`} target="_blank">
                   <PrinterIcon />
                   Print quotation
                 </Link>
               </Button>
-              {shipment && (
+              {CARRIER_TRACKING_ENABLED && shipment && (
                 <Button variant="outline" size="sm" className="justify-start" asChild>
                   <Link href={`/print/packing-list/${shipment.id}`} target="_blank">
                     <PrinterIcon />
@@ -764,6 +858,111 @@ export function OrderDetailScreen({ orderId }: { orderId: string }) {
         </div>
       </div>
 
+      <Dialog
+        open={pendingStatus !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setPendingStatus(null);
+            setStatusNote("");
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-[440px]">
+          <DialogHeader>
+            <DialogTitle>
+              Move to {pendingStatus ? ORDER_STATUS[pendingStatus].label : ""}
+            </DialogTitle>
+            <DialogDescription>
+              The change is stamped on the order timeline. Add a note if the
+              client or the team will need the reason later.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="grid gap-1.5">
+            <Label htmlFor="status-note">Note (optional)</Label>
+            <Textarea
+              id="status-note"
+              rows={3}
+              value={statusNote}
+              onChange={(e) => setStatusNote(e.target.value)}
+              placeholder="Held until the client confirms the colour."
+            />
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setPendingStatus(null);
+                setStatusNote("");
+              }}
+            >
+              Cancel
+            </Button>
+            <Button size="sm" onClick={handleStatusChange} disabled={savingStatus}>
+              {savingStatus ? "Saving…" : "Change status"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={trackingEditOpen} onOpenChange={setTrackingEditOpen}>
+        <DialogContent className="sm:max-w-[440px]">
+          <DialogHeader>
+            <DialogTitle>Edit tracking number</DialogTitle>
+            <DialogDescription>
+              This is the only number the client can look the order up with.
+              Changing it makes any copy they already have stop working.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="grid gap-1.5">
+            <Label htmlFor="tracking-number-input">Tracking number</Label>
+            <Input
+              id="tracking-number-input"
+              value={trackingDraft}
+              onChange={(e) => {
+                setTrackingDraft(e.target.value.toUpperCase());
+                setTrackingError(null);
+              }}
+              className="tabular"
+              aria-invalid={trackingError !== null}
+            />
+            {trackingError ? (
+              <p className="text-destructive text-xs" role="alert">
+                {trackingError}
+              </p>
+            ) : (
+              <p className="text-muted-foreground text-xs">
+                Format AS-YYYY-XXXXXX. The letters I, L, O and U are not used.
+              </p>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setTrackingEditOpen(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              size="sm"
+              onClick={handleTrackingSave}
+              disabled={
+                savingTracking ||
+                !trackingDraft.trim() ||
+                trackingDraft.trim().toUpperCase() === order.trackingNumber
+              }
+            >
+              {savingTracking ? "Saving…" : "Save"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <RecordPaymentDialog
         open={paymentOpen}
         onOpenChange={setPaymentOpen}
@@ -780,6 +979,43 @@ export function OrderDetailScreen({ orderId }: { orderId: string }) {
         order={row}
       />
     </>
+  );
+}
+
+/**
+ * The number the client quotes on the phone, so it sits beside the status badge
+ * rather than inside a tab. Copying it is the common case — staff paste it into
+ * WhatsApp — so the whole chip is the copy button.
+ */
+function TrackingNumberChip({ value }: { value: string }) {
+  const [copied, setCopied] = React.useState(false);
+
+  async function copy() {
+    try {
+      await navigator.clipboard.writeText(value);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      toast.error("Could not copy the tracking number.");
+    }
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={copy}
+      data-testid="tracking-number"
+      aria-label={`Copy tracking number ${value}`}
+      className="bg-muted/60 text-foreground hover:bg-muted inline-flex items-center gap-1.5 rounded-md border px-2 py-1 text-xs font-medium transition-colors"
+    >
+      <span className="text-muted-foreground">Tracking</span>
+      <span className="tabular">{value}</span>
+      {copied ? (
+        <CheckIcon className="text-success size-3.5" />
+      ) : (
+        <CopyIcon className="text-muted-foreground size-3.5" />
+      )}
+    </button>
   );
 }
 
