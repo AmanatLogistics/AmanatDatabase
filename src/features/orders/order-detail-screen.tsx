@@ -58,6 +58,7 @@ import {
   useStoreLookup,
 } from "@/lib/api";
 import {
+  ORDER_HOLD,
   ORDER_PIPELINE,
   ORDER_SOURCE_LABEL,
   ORDER_STATUS,
@@ -136,6 +137,22 @@ export function OrderDetailScreen({ orderId }: { orderId: string }) {
                 <DropdownMenuLabel>Move order to</DropdownMenuLabel>
                 <DropdownMenuSeparator />
                 {ORDER_PIPELINE.map((status) => (
+                  <DropdownMenuItem
+                    key={status}
+                    disabled={status === order.status}
+                    onSelect={() => handleStatusChange(status)}
+                  >
+                    <span
+                      className={cn(
+                        "size-2 rounded-full",
+                        ORDER_STATUS[status].dot,
+                      )}
+                    />
+                    {ORDER_STATUS[status].label}
+                  </DropdownMenuItem>
+                ))}
+                <DropdownMenuSeparator />
+                {ORDER_HOLD.map((status) => (
                   <DropdownMenuItem
                     key={status}
                     disabled={status === order.status}
