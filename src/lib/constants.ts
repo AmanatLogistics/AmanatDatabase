@@ -136,6 +136,63 @@ export const PRODUCT_CATEGORY_LABEL: Record<ProductCategory, string> = {
   other: "Other",
 };
 
+/**
+ * The order's journey as a customer experiences it.
+ *
+ * The admin pipeline has nine stages, which is the right grain for staff and far
+ * too much for a client — they do not care about the difference between
+ * "quoted" and "confirmed". These five are the ones a customer would actually
+ * ask about, and every admin status maps onto one of them.
+ */
+export const CLIENT_PROGRESS_STAGES = [
+  { key: "received", label: "Order received" },
+  { key: "purchased", label: "Bought from the store" },
+  { key: "in_transit", label: "On the way" },
+  { key: "at_office", label: "Arrived at our office" },
+  { key: "delivered", label: "Delivered" },
+] as const;
+
+export type ClientProgressStage = (typeof CLIENT_PROGRESS_STAGES)[number]["key"];
+
+const STAGE_BY_STATUS: Record<OrderStatus, ClientProgressStage | null> = {
+  requested: "received",
+  quoted: "received",
+  confirmed: "received",
+  purchasing: "purchased",
+  purchased: "purchased",
+  in_transit: "in_transit",
+  arrived: "at_office",
+  ready_for_pickup: "at_office",
+  delivered: "delivered",
+  // These are not points on the journey — the page says so in words instead.
+  on_hold: null,
+  cancelled: null,
+  refunded: null,
+};
+
+/** How far along the customer-facing rail an order is, or null if it is off it. */
+export function clientProgressIndex(status: OrderStatus): number | null {
+  const stage = STAGE_BY_STATUS[status];
+  if (!stage) return null;
+  return CLIENT_PROGRESS_STAGES.findIndex((s) => s.key === stage);
+}
+
+/** What we tell the customer an order is doing, in their words rather than ours. */
+export const CLIENT_STATUS_MESSAGE: Record<OrderStatus, string> = {
+  requested: "We have your request and are preparing a price for you.",
+  quoted: "We have sent you a price. Confirm and we will buy it.",
+  confirmed: "Confirmed. We are buying it from the store now.",
+  purchasing: "We are placing the order with the store.",
+  purchased: "Bought. We are waiting for the store to ship it.",
+  in_transit: "On its way to Kabul.",
+  arrived: "It has reached our office. We will call you shortly.",
+  ready_for_pickup: "Ready for you to collect from our office.",
+  delivered: "Delivered. Thank you for shopping with us.",
+  on_hold: "On hold for the moment. We will contact you about it.",
+  cancelled: "This order was cancelled.",
+  refunded: "This order was refunded.",
+};
+
 /* -------------------------------------------------------------------------- */
 /* Purchases                                                                   */
 /* -------------------------------------------------------------------------- */
@@ -219,18 +276,23 @@ export const TEAM_ROLE_LABEL: Record<TeamRole, string> = {
 };
 
 /**
- * The public /track page, off by default.
+ * The customer tracking page at /track. On by default.
  *
- * A kill switch, not a feature toggle. While the app is frontend-only the whole
- * seeded dataset ships inside the client JS bundle, so a publicly reachable
- * /track exposes it regardless of which fields the page renders.
- * `PublicTrackingResult` controls the DOM; it cannot control the bundle.
+ * It was gated off when real orders lived in the JS bundle alongside the seed
+ * data, where a public page would have exposed them. That is no longer how the
+ * app stores anything: orders are written to the visitor's own localStorage and
+ * are never bundled, so the only records a stranger's browser can hold are the
+ * fabricated seeds. There is nothing real left to leak.
  *
- * Turn this on only once /track is served by a real
- * `GET /api/track/:trackingNumber` (SPEC.md §2.4, risk R1).
+ * Set NEXT_PUBLIC_PUBLIC_TRACKING_ENABLED=false to take the page down again.
+ *
+ * Note this is about exposure, not usefulness: until a backend serves
+ * `GET /api/track/:trackingNumber`, a lookup only finds orders saved in the
+ * visitor's own browser, so a customer cannot yet be sent to this page and
+ * find their order.
  */
 export const PUBLIC_TRACKING_ENABLED =
-  process.env.NEXT_PUBLIC_PUBLIC_TRACKING_ENABLED === "true";
+  process.env.NEXT_PUBLIC_PUBLIC_TRACKING_ENABLED !== "false";
 
 /* -------------------------------------------------------------------------- */
 /* Documents                                                                   */

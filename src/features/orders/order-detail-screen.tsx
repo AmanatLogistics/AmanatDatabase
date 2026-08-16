@@ -185,6 +185,12 @@ export function OrderDetailScreen({ orderId }: { orderId: string }) {
               <PencilIcon className="size-3.5" />
               Edit
             </Button>
+            <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" asChild>
+              <Link href={`/track?n=${order.trackingNumber}`} target="_blank">
+                <ExternalLinkIcon className="size-3.5" />
+                Client view
+              </Link>
+            </Button>
           </>
         }
         description={

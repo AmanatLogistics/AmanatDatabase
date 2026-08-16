@@ -23,7 +23,12 @@ import {
   type PeriodPnL,
 } from "@/lib/finance";
 import { useDataStore } from "@/lib/store";
-import { DOCUMENT_KIND_LABEL, ORDER_STATUS } from "@/lib/constants";
+import {
+  CLIENT_STATUS_MESSAGE,
+  clientProgressIndex,
+  DOCUMENT_KIND_LABEL,
+  ORDER_STATUS,
+} from "@/lib/constants";
 import type {
   AppNotification,
   BusinessDocument,
@@ -274,10 +279,50 @@ export interface PublicTrackingEvent {
 export interface PublicTrackingResult {
   trackingNumber: string;
   statusLabel: string;
+  /** The status explained to the customer, not the internal label. */
+  statusMessage: string;
+  /** Position on the five-stage customer rail, or null when off it. */
+  progressIndex: number | null;
   /** Has it reached the office the client collects from? */
   arrivedAtOffice: boolean;
+  /** True once handed over. */
+  delivered: boolean;
+  /** When the client placed it. Their own date — safe to show them. */
+  placedAt: ISODate;
+  /** When it was handed over, if it has been. */
+  deliveredAt?: ISODate;
   items: PublicTrackingItem[];
   timeline: PublicTrackingEvent[];
+}
+
+/**
+ * Where to collect from, and who to call.
+ *
+ * Company details, not client data — the same information printed on an
+ * invoice or a shop sign, so there is nothing here to leak.
+ */
+export interface PublicPickupDetails {
+  companyName: string;
+  addressLine1: string;
+  addressLine2: string;
+  city: string;
+  phone: string;
+  whatsapp: string;
+}
+
+export function usePublicPickupDetails(): PublicPickupDetails {
+  const company = useDataStore((s) => s.settings.company);
+  return useMemo(
+    () => ({
+      companyName: company.name,
+      addressLine1: company.addressLine1,
+      addressLine2: company.addressLine2,
+      city: company.city,
+      phone: company.phone,
+      whatsapp: company.whatsapp,
+    }),
+    [company],
+  );
 }
 
 /** The stages at which the parcel is physically with us in Kabul. */
@@ -302,7 +347,12 @@ export function usePublicTracking(
     return {
       trackingNumber: order.trackingNumber,
       statusLabel: ORDER_STATUS[order.status].label,
+      statusMessage: CLIENT_STATUS_MESSAGE[order.status],
+      progressIndex: clientProgressIndex(order.status),
       arrivedAtOffice: ARRIVED_STATUSES.includes(order.status),
+      delivered: order.status === "delivered",
+      placedAt: order.requestedAt,
+      deliveredAt: order.deliveredAt,
       items: order.items.map((item) => ({
         name: item.name,
         qty: item.qty,

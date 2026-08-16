@@ -17,15 +17,20 @@ export function generateMetadata(): Metadata {
   };
 }
 
-export default function TrackPage() {
-  /*
-   * Refused unless explicitly enabled. Until a real backend serves this, the
-   * seeded dataset travels in the client bundle, so a reachable /track exposes
-   * every client record whatever the page chooses to render. Gating in the
-   * route means the page cannot be served by accident — and the 404 is
-   * indistinguishable from a route that was never built.
-   */
+export default async function TrackPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ n?: string }>;
+}) {
   if (!PUBLIC_TRACKING_ENABLED) notFound();
 
-  return <PublicTrackingScreen />;
+  /*
+   * `?n=` lets a link go straight to one order — the admin's "Client view"
+   * button, and the shape a shareable link would take later. Read here rather
+   * than from `window` in the screen, so the server and the browser start from
+   * the same value and hydration stays quiet.
+   */
+  const { n } = await searchParams;
+
+  return <PublicTrackingScreen initialNumber={n ?? ""} />;
 }
