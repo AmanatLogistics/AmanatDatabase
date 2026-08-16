@@ -72,6 +72,7 @@ import {
   useStoreLookup,
 } from "@/lib/api";
 import {
+  CARRIER_TRACKING_ENABLED,
   ORDER_HOLD,
   ORDER_PIPELINE,
   ORDER_SOURCE_LABEL,
@@ -289,7 +290,9 @@ export function OrderDetailScreen({ orderId }: { orderId: string }) {
                   {purchases.length}
                 </span>
               </TabsTrigger>
-              <TabsTrigger value="tracking">Tracking</TabsTrigger>
+              {CARRIER_TRACKING_ENABLED && (
+                <TabsTrigger value="tracking">Tracking</TabsTrigger>
+              )}
               <TabsTrigger value="payments">
                 Payments
                 <span className="text-muted-foreground text-xs">
@@ -480,6 +483,7 @@ export function OrderDetailScreen({ orderId }: { orderId: string }) {
             </TabsContent>
 
             {/* ---- Tracking ----------------------------------------- */}
+            {CARRIER_TRACKING_ENABLED && (
             <TabsContent value="tracking">
               {!shipment ? (
                 <Card>
@@ -540,6 +544,7 @@ export function OrderDetailScreen({ orderId }: { orderId: string }) {
                 </Card>
               )}
             </TabsContent>
+            )}
 
             {/* ---- Payments ----------------------------------------- */}
             <TabsContent value="payments">
@@ -805,36 +810,37 @@ export function OrderDetailScreen({ orderId }: { orderId: string }) {
                 <PackagePlusIcon />
                 Log purchase
               </Button>
-              {shipment ? (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="justify-start"
-                  asChild
-                >
-                  <Link href={`/tracking/${shipment.id}`}>
+              {CARRIER_TRACKING_ENABLED &&
+                (shipment ? (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="justify-start"
+                    asChild
+                  >
+                    <Link href={`/tracking/${shipment.id}`}>
+                      <TruckIcon />
+                      View tracking
+                    </Link>
+                  </Button>
+                ) : (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="justify-start"
+                    onClick={() => setTrackingOpen(true)}
+                  >
                     <TruckIcon />
-                    View tracking
-                  </Link>
-                </Button>
-              ) : (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="justify-start"
-                  onClick={() => setTrackingOpen(true)}
-                >
-                  <TruckIcon />
-                  Add tracking
-                </Button>
-              )}
+                    Add tracking
+                  </Button>
+                ))}
               <Button variant="outline" size="sm" className="justify-start" asChild>
                 <Link href={`/print/quotation/${order.id}`} target="_blank">
                   <PrinterIcon />
                   Print quotation
                 </Link>
               </Button>
-              {shipment && (
+              {CARRIER_TRACKING_ENABLED && shipment && (
                 <Button variant="outline" size="sm" className="justify-start" asChild>
                   <Link href={`/print/packing-list/${shipment.id}`} target="_blank">
                     <PrinterIcon />

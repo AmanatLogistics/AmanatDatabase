@@ -23,7 +23,11 @@ import {
   type PeriodPnL,
 } from "@/lib/finance";
 import { useDataStore } from "@/lib/store";
-import { DOCUMENT_KIND_LABEL, ORDER_STATUS } from "@/lib/constants";
+import {
+  CARRIER_TRACKING_ENABLED,
+  DOCUMENT_KIND_LABEL,
+  ORDER_STATUS,
+} from "@/lib/constants";
 import type {
   BusinessDocument,
   Client,
@@ -896,6 +900,7 @@ export function useSearch(query: string): SearchResult[] {
     });
 
     shipmentRows.forEach(({ shipment, client }) => {
+      if (!CARRIER_TRACKING_ENABLED) return;
       if (
         `${shipment.trackingNumber} ${shipment.carrier}`.toLowerCase().includes(q)
       ) {

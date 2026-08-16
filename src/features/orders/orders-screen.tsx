@@ -37,7 +37,11 @@ import { ProductThumb } from "@/components/shared/product-thumb";
 import { StatusBadge } from "@/components/shared/status-badge";
 import { RecordPaymentDialog } from "@/features/payments/record-payment-dialog";
 import { useOrderRows, useStores, type OrderRow } from "@/lib/api";
-import { ACTIVE_ORDER_STATUSES, ORDER_SOURCE_LABEL } from "@/lib/constants";
+import {
+  ACTIVE_ORDER_STATUSES,
+  CARRIER_TRACKING_ENABLED,
+  ORDER_SOURCE_LABEL,
+} from "@/lib/constants";
 import { formatDateShort, truncate } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
@@ -372,7 +376,7 @@ export function OrdersScreen() {
                       Purchases
                     </Link>
                   </DropdownMenuItem>
-                  {shipment && (
+                  {CARRIER_TRACKING_ENABLED && shipment && (
                     <DropdownMenuItem asChild>
                       <Link href={`/tracking/${shipment.id}`}>
                         <TruckIcon />

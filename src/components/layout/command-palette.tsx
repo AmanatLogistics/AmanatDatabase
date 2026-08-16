@@ -72,7 +72,7 @@ export function CommandPalette({
         <CommandEmpty>
           {query
             ? `No results for “${query}”.`
-            : "Type to search across orders, clients and shipments."}
+            : "Type to search across orders, clients and purchases."}
         </CommandEmpty>
 
         {grouped.map(([group, items]) => {

@@ -15,6 +15,8 @@ import {
   WalletIcon,
 } from "lucide-react";
 
+import { CARRIER_TRACKING_ENABLED } from "@/lib/constants";
+
 export interface NavItem {
   label: string;
   href: string;
@@ -30,7 +32,7 @@ export interface NavSection {
 }
 
 /** Single source of truth for the sidebar and the command palette. */
-export const navigation: NavSection[] = [
+const allNavigation: NavSection[] = [
   {
     caption: "Overview",
     items: [{ label: "Dashboard", href: "/", icon: LayoutDashboardIcon }],
@@ -101,6 +103,20 @@ export const settingsPages = [
   },
   { label: "Team", href: "/settings/team", icon: UsersRoundIcon },
 ];
+
+/**
+ * The navigation the app actually renders.
+ *
+ * With carrier tracking off (the default) the Tracking section disappears from
+ * the sidebar and the palette. The route itself still exists — this hides the
+ * way in, it does not delete the feature. See SPEC.md §2.5.
+ */
+export const navigation: NavSection[] = CARRIER_TRACKING_ENABLED
+  ? allNavigation
+  : allNavigation.map((section) => ({
+      ...section,
+      items: section.items.filter((item) => item.href !== "/tracking"),
+    }));
 
 /** Flat list of every navigable page, used by the ⌘K palette. */
 const sidebarLinks = navigation.flatMap((section) =>

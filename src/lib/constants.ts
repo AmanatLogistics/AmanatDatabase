@@ -189,6 +189,21 @@ export const SHIPMENT_STATUS: Record<
   exception: meta("exception", "Exception", "destructive", "bg-destructive"),
 };
 
+/**
+ * Third-party carrier tracking, off by default.
+ *
+ * We have no carriers — every parcel moves on our own internal tracking number
+ * now. The screens are hidden rather than deleted because `Shipment` is not a
+ * leaf: `finance.ts` reads `freightCostAfn` and `customsDutyAfn` off it, and
+ * both reads fall back silently, so removing the concept would quietly change
+ * every order's cost, profit and margin and zero out customs duty across the
+ * P&L. SPEC.md §2.5 has the full dependency list.
+ *
+ * Set NEXT_PUBLIC_CARRIER_TRACKING_ENABLED=true to bring the screens back.
+ */
+export const CARRIER_TRACKING_ENABLED =
+  process.env.NEXT_PUBLIC_CARRIER_TRACKING_ENABLED === "true";
+
 export const CARRIERS = [
   "DHL Express",
   "FedEx",
