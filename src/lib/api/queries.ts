@@ -387,7 +387,7 @@ export function usePublicTracking(
             name: line.name,
             qty: line.qty,
             imageUrl: storeProducts.find((p) => p.id === line.productId)
-              ?.imageUrl,
+              ?.imageUrls[0],
           })),
           timeline: [{ at: web.placedAt, statusLabel: "Order received" }],
         };

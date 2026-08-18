@@ -62,12 +62,31 @@ export function ProductThumb({
   imageUrl?: string;
   name: string;
   className?: string;
-  size?: "sm" | "md" | "lg";
+  /** `fill` takes the size of its container — used for storefront tiles. */
+  size?: "sm" | "md" | "lg" | "fill";
 }) {
   const Icon = CATEGORY_ICON[category];
   const sizing =
-    size === "sm" ? "size-9 rounded-md" : size === "lg" ? "size-16 rounded-xl" : "size-11 rounded-lg";
-  const iconSizing = size === "sm" ? "size-4" : size === "lg" ? "size-7" : "size-5";
+    size === "sm"
+      ? "size-9 rounded-md"
+      : size === "lg"
+        ? "size-16 rounded-xl"
+        : size === "fill"
+          ? "size-full"
+          : "size-11 rounded-lg";
+  /*
+   * A tile the size of a product card needs an icon in proportion to it — the
+   * fixed sizes below would leave a 16px mark adrift in a 220px square, which
+   * is what made a catalogue without photography look broken rather than plain.
+   */
+  const iconSizing =
+    size === "sm"
+      ? "size-4"
+      : size === "lg"
+        ? "size-7"
+        : size === "fill"
+          ? "h-1/4 w-1/4 opacity-80"
+          : "size-5";
 
   if (imageUrl) {
     return (
