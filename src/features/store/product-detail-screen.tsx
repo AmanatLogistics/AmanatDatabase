@@ -48,13 +48,15 @@ export function ProductDetailScreen({ slug }: { slug: string }) {
       </Button>
 
       <div className="grid gap-6 sm:grid-cols-2">
-        <ProductThumb
-          size="lg"
-          category={product.category}
-          name={product.name}
-          imageUrl={product.imageUrl}
-          className="w-full"
-        />
+        <div className="bg-muted/30 aspect-square overflow-hidden rounded-xl border">
+          <ProductThumb
+            size="lg"
+            category={product.category}
+            name={product.name}
+            imageUrl={product.imageUrl}
+            className="size-full rounded-none border-0"
+          />
+        </div>
 
         <div className="flex flex-col gap-3">
           <div>
@@ -69,19 +71,23 @@ export function ProductDetailScreen({ slug }: { slug: string }) {
           <Money
             value={product.priceAfn}
             unit="suffix"
-            className="text-2xl font-semibold"
+            className="text-brand-700 dark:text-brand-300 text-3xl font-bold"
           />
+          <p className="text-muted-foreground -mt-2 text-xs">
+            Pay when you collect. No deposit.
+          </p>
 
           <p className="text-muted-foreground text-sm">{product.description}</p>
 
           <Card className="bg-muted/40">
-            <CardContent className="pt-6 text-xs">
-              <p className="font-medium">How it works</p>
-              <p className="text-muted-foreground mt-1">
-                We buy this for you from our partner store, bring it to Kabul,
-                and call you when it reaches our office. You pay when you
-                collect it.
-              </p>
+            <CardContent className="pt-6">
+              <p className="text-xs font-medium">How it works</p>
+              <ol className="text-muted-foreground mt-2 grid gap-1.5 text-xs">
+                <li>1. We confirm the price with you by phone.</li>
+                <li>2. We buy it from the store and bring it to Kabul.</li>
+                <li>3. We call you when it reaches our office.</li>
+                <li>4. You pay and collect. Usually 2–3 weeks.</li>
+              </ol>
             </CardContent>
           </Card>
 
