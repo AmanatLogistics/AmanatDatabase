@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { PencilIcon, PlusIcon, TagsIcon, Trash2Icon } from "lucide-react";
 
 import { ConfirmDeleteDialog } from "@/components/shared/confirm-delete-dialog";
+import { ImagePicker } from "@/components/shared/image-picker";
 import { EmptyState } from "@/components/shared/empty-state";
 import { Money } from "@/components/shared/money";
 import { ProductThumb } from "@/components/shared/product-thumb";
@@ -219,6 +220,9 @@ function ProductDialog({
   const [storeId, setStoreId] = React.useState(
     product?.storeId ?? stores[0]?.id ?? "",
   );
+  const [imageUrl, setImageUrl] = React.useState<string | undefined>(
+    product?.imageUrl,
+  );
   const [active, setActive] = React.useState(product?.active ?? true);
   const [saving, setSaving] = React.useState(false);
 
@@ -237,6 +241,7 @@ function ProductDialog({
         priceAfn: price,
         costAfn: cost,
         storeId,
+        imageUrl,
         active,
       };
       if (product) {
@@ -268,6 +273,11 @@ function ProductDialog({
         </DialogHeader>
 
         <div className="grid max-h-[60vh] gap-4 overflow-y-auto pr-1">
+          <div className="grid gap-2">
+            <Label>Photo</Label>
+            <ImagePicker value={imageUrl} onChange={setImageUrl} />
+          </div>
+
           <div className="grid gap-2">
             <Label htmlFor="p-name">Product name</Label>
             <Input
