@@ -13,6 +13,8 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { addToCart, useStoreProductBySlug } from "@/lib/api";
 import { PRODUCT_CATEGORY_LABEL } from "@/lib/constants";
+import { cn } from "@/lib/utils";
+import type { StoreProduct } from "@/lib/types";
 import { useStoreHydrated } from "@/lib/hydration";
 
 /** One product, and the decision to buy it. */
@@ -48,15 +50,7 @@ export function ProductDetailScreen({ slug }: { slug: string }) {
       </Button>
 
       <div className="grid gap-6 sm:grid-cols-2">
-        <div className="bg-muted/30 aspect-square overflow-hidden rounded-xl border">
-          <ProductThumb
-            size="lg"
-            category={product.category}
-            name={product.name}
-            imageUrl={product.imageUrl}
-            className="size-full rounded-none border-0"
-          />
-        </div>
+        <Gallery product={product} />
 
         <div className="flex flex-col gap-3">
           <div>
@@ -126,5 +120,63 @@ export function ProductDetailScreen({ slug }: { slug: string }) {
         </div>
       </div>
     </>
+  );
+}
+
+/**
+ * Main image with thumbnails beneath, the way every shop does it.
+ *
+ * The selection is keyed on the product id so navigating from one product to
+ * another does not leave the previous product's third photo selected.
+ */
+function Gallery({ product }: { product: StoreProduct }) {
+  const [active, setActive] = React.useState(0);
+  const [seenId, setSeenId] = React.useState(product.id);
+  if (seenId !== product.id) {
+    setSeenId(product.id);
+    setActive(0);
+  }
+
+  const images = product.imageUrls;
+  const current = images[Math.min(active, Math.max(0, images.length - 1))];
+
+  return (
+    <div className="flex flex-col gap-2.5">
+      <div className="bg-muted/30 aspect-square overflow-hidden rounded-xl border">
+        <ProductThumb
+          size="lg"
+          category={product.category}
+          name={product.name}
+          imageUrl={current}
+          className="size-full rounded-none border-0"
+        />
+      </div>
+
+      {images.length > 1 && (
+        <div
+          className="scrollbar-thin flex gap-2 overflow-x-auto"
+          data-testid="gallery-thumbs"
+        >
+          {images.map((src, index) => (
+            <button
+              key={index}
+              type="button"
+              onClick={() => setActive(index)}
+              aria-label={`Show photo ${index + 1}`}
+              aria-current={index === active}
+              className={cn(
+                "size-16 shrink-0 overflow-hidden rounded-lg border-2 transition-colors",
+                index === active
+                  ? "border-brand-600"
+                  : "border-transparent opacity-70 hover:opacity-100",
+              )}
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={src} alt="" className="size-full object-cover" />
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }

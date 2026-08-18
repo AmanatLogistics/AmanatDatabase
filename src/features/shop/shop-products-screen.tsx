@@ -103,7 +103,7 @@ export function ShopProductsScreen() {
                   size="md"
                   category={product.category}
                   name={product.name}
-                  imageUrl={product.imageUrl}
+                  imageUrl={product.imageUrls[0]}
                 />
                 <div className="min-w-0 flex-1">
                   <div className="flex items-start justify-between gap-2">
@@ -220,8 +220,8 @@ function ProductDialog({
   const [storeId, setStoreId] = React.useState(
     product?.storeId ?? stores[0]?.id ?? "",
   );
-  const [imageUrl, setImageUrl] = React.useState<string | undefined>(
-    product?.imageUrl,
+  const [imageUrls, setImageUrls] = React.useState<string[]>(
+    product?.imageUrls ?? [],
   );
   const [active, setActive] = React.useState(product?.active ?? true);
   const [saving, setSaving] = React.useState(false);
@@ -241,7 +241,7 @@ function ProductDialog({
         priceAfn: price,
         costAfn: cost,
         storeId,
-        imageUrl,
+        imageUrls,
         active,
       };
       if (product) {
@@ -274,8 +274,8 @@ function ProductDialog({
 
         <div className="grid max-h-[60vh] gap-4 overflow-y-auto pr-1">
           <div className="grid gap-2">
-            <Label>Photo</Label>
-            <ImagePicker value={imageUrl} onChange={setImageUrl} />
+            <Label>Photos</Label>
+            <ImagePicker value={imageUrls} onChange={setImageUrls} />
           </div>
 
           <div className="grid gap-2">

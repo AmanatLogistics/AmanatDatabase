@@ -128,7 +128,7 @@ export interface SaveProductInput {
   priceAfn: number;
   costAfn: number;
   storeId: ID;
-  imageUrl?: string;
+  imageUrls: string[];
   active: boolean;
 }
 
@@ -326,7 +326,7 @@ export async function convertWebOrder(id: ID): Promise<Order> {
         category: product?.category ?? "other",
         // Carry the photo through, so the customer sees the same picture on the
         // tracking page that they saw when they bought it.
-        imageUrl: product?.imageUrl,
+        imageUrl: product?.imageUrls[0],
         qty: line.qty,
         // What the customer agreed to on the website is what we bill.
         unitPriceAfn: line.priceAfn,

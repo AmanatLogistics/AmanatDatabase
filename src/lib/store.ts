@@ -31,8 +31,14 @@ import type {
  * imports this module directly — they all go through `src/lib/api`.
  */
 
+/** The v1 shape of a catalogue product: one photo, not a gallery. */
+type LegacyProduct = Omit<StoreProduct, "imageUrls"> & {
+  imageUrl?: string;
+  imageUrls?: string[];
+};
+
 /** Bump to discard persisted data whose shape no longer matches the code. */
-const STORAGE_VERSION = 1;
+const STORAGE_VERSION = 2;
 const STORAGE_KEY = "amanat-shopping-data";
 
 export interface DataState {
@@ -264,6 +270,23 @@ export const useDataStore = create<DataState>()(
        * hydration mismatch. See `useStoreHydrated`.
        */
       skipHydration: true,
+      /*
+       * v1 stored a single `imageUrl` per product. Anyone who already has data
+       * saved keeps their photo — it becomes the first entry of the gallery
+       * rather than being dropped on the floor.
+       */
+      migrate: (persisted, version) => {
+        const state = persisted as Record<string, unknown>;
+        if (version < 2 && Array.isArray(state.storeProducts)) {
+          state.storeProducts = (state.storeProducts as LegacyProduct[]).map(
+            ({ imageUrl, ...rest }) => ({
+              ...rest,
+              imageUrls: rest.imageUrls ?? (imageUrl ? [imageUrl] : []),
+            }),
+          );
+        }
+        return state as unknown as DataState;
+      },
       /*
        * `today` is a frozen reference date, not the operator's data, and a Date
        * does not survive JSON — it would come back as a string and break every

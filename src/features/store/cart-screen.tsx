@@ -52,7 +52,7 @@ export function CartScreen() {
                     size="md"
                     category={product.category}
                     name={product.name}
-                    imageUrl={product.imageUrl}
+                    imageUrl={product.imageUrls[0]}
                   />
                   <div className="min-w-0 flex-1">
                     <Link

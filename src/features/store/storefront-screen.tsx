@@ -149,7 +149,7 @@ function ProductCard({ product }: { product: StoreProduct }) {
             size="lg"
             category={product.category}
             name={product.name}
-            imageUrl={product.imageUrl}
+            imageUrl={product.imageUrls[0]}
             className="size-full rounded-none border-0 transition-transform duration-200 group-hover:scale-[1.03]"
           />
         </div>

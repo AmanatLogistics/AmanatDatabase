@@ -218,7 +218,14 @@ export interface StoreProduct {
   slug: string;
   name: string;
   description: string;
-  imageUrl?: string;
+  /**
+   * Photos, best first.
+   *
+   * The first is the one shown on cards and carried onto an order; the rest
+   * fill the gallery on the product page. An empty array is fine — the branded
+   * category tile stands in.
+   */
+  imageUrls: string[];
   category: ProductCategory;
   /** What the customer pays, AFN. */
   priceAfn: number;

@@ -423,6 +423,7 @@ const storeProducts: StoreProduct[] = catalog.slice(0, 24).map((product, index) 
     slug: product.slug,
     name: product.name,
     description: `${product.name}. Sourced to order from our partner stores and delivered to our office in Kabul.`,
+    imageUrls: [],
     category: product.category,
     priceAfn: Math.round((costAfn * QUOTE_MARKUP * 1.12) / 50) * 50,
     costAfn,
