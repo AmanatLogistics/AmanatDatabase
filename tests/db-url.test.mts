@@ -7,6 +7,7 @@ import {
   describeUrl,
   explainConnectionError,
   findDatabaseUrl,
+  findMigrationUrl,
   isDirectSupabaseHost,
 } from "../src/db/url.ts";
 
@@ -133,5 +134,64 @@ describe("explaining a connection failure", () => {
       explainConnectionError(error, directUrl),
       /relation "staff" does not exist/,
     );
+  });
+});
+
+describe("choosing a connection to migrate over", () => {
+  /** What Supabase's Vercel integration actually sets. */
+  const integration = {
+    POSTGRES_URL:
+      "postgresql://postgres.abc:pw@aws-0-us-east-1.pooler.supabase.com:6543/postgres",
+    POSTGRES_URL_NON_POOLING:
+      "postgresql://postgres:pw@db.abc.supabase.co:5432/postgres",
+  };
+
+  test("off Vercel, the direct connection is preferred", () => {
+    // Anywhere with IPv6 — a laptop, a CI runner — direct is the better tool.
+    const found = findMigrationUrl(integration);
+    assert.equal(found?.name, "POSTGRES_URL_NON_POOLING");
+  });
+
+  test("on Vercel, the unreachable direct host is passed over", () => {
+    /*
+     * The whole point. Preferring POSTGRES_URL_NON_POOLING here picks the one
+     * string guaranteed not to resolve, and fails the deploy against a
+     * database reachable through the pooler beside it.
+     */
+    const found = findMigrationUrl({ ...integration, VERCEL: "1" });
+    assert.equal(found?.name, "POSTGRES_URL");
+  });
+
+  test("on Vercel, a direct host is still used when nothing else exists", () => {
+    // Better to try and fail with a real error than to report nothing set.
+    const found = findMigrationUrl({
+      POSTGRES_URL_NON_POOLING: integration.POSTGRES_URL_NON_POOLING,
+      VERCEL: "1",
+    });
+    assert.equal(found?.name, "POSTGRES_URL_NON_POOLING");
+  });
+
+  test("a hand-set DIRECT_DATABASE_URL on the pooler wins everywhere", () => {
+    const env = {
+      ...integration,
+      DIRECT_DATABASE_URL:
+        "postgresql://postgres.abc:pw@aws-0-us-east-1.pooler.supabase.com:5432/postgres",
+      VERCEL: "1",
+    };
+    assert.equal(findMigrationUrl(env)?.name, "DIRECT_DATABASE_URL");
+  });
+
+  test("nothing configured is still nothing configured", () => {
+    assert.equal(findMigrationUrl({}), null);
+    assert.equal(findMigrationUrl({ VERCEL: "1" }), null);
+  });
+
+  test("non-Supabase hosts are never passed over", () => {
+    // Neon, a self-hosted box, anything else: not our business to second-guess.
+    const found = findMigrationUrl({
+      DIRECT_DATABASE_URL: "postgresql://u:p@ep-x.neon.tech:5432/db",
+      VERCEL: "1",
+    });
+    assert.equal(found?.name, "DIRECT_DATABASE_URL");
   });
 });
