@@ -334,16 +334,63 @@ const ARRIVED_STATUSES: OrderStatus[] = [
   "delivered",
 ];
 
+/**
+ * Look one order up by whatever reference the customer happens to hold.
+ *
+ * They may have either: a tracking number, if we have already taken the order
+ * on; or the WEB-… reference the storefront gave them at checkout, before a
+ * human has looked at it. Both must work, because the customer does not know
+ * which of our systems their order is currently sitting in — and telling them
+ * "not found" for a reference we ourselves issued would be indefensible.
+ *
+ * A website order that has since been converted resolves to the real order, so
+ * the old reference keeps working forever rather than going dead the moment
+ * staff process it.
+ */
 export function usePublicTracking(
-  trackingNumber: string,
+  reference: string,
 ): PublicTrackingResult | null {
   const orders = useDataStore((s) => s.orders);
+  const webOrders = useDataStore((s) => s.webOrders);
 
   return useMemo(() => {
-    const wanted = trackingNumber.trim().toUpperCase();
+    const wanted = reference.trim().toUpperCase();
     if (!wanted) return null;
 
-    const order = orders.find((o) => o.trackingNumber === wanted);
+    let order = orders.find((o) => o.trackingNumber === wanted);
+
+    if (!order) {
+      const web = webOrders.find((w) => w.reference === wanted);
+      if (!web) return null;
+
+      // Converted: follow it through to the order it became.
+      if (web.convertedOrderId) {
+        order = orders.find((o) => o.id === web.convertedOrderId);
+      }
+
+      // Still waiting on us. Show it honestly as received but not yet started,
+      // rather than pretending it is further along than it is.
+      if (!order) {
+        const dismissed = web.status === "dismissed";
+        return {
+          trackingNumber: web.reference,
+          statusLabel: dismissed ? "Not proceeding" : "Order received",
+          statusMessage: dismissed
+            ? "We were not able to take this order on. Please contact us."
+            : "We have your order and are confirming the price. We will call you shortly.",
+          progressIndex: dismissed ? null : 0,
+          arrivedAtOffice: false,
+          delivered: false,
+          placedAt: web.placedAt,
+          items: web.lines.map((line) => ({
+            name: line.name,
+            qty: line.qty,
+          })),
+          timeline: [{ at: web.placedAt, statusLabel: "Order received" }],
+        };
+      }
+    }
+
     if (!order) return null;
 
     return {
@@ -367,7 +414,7 @@ export function usePublicTracking(
           statusLabel: ORDER_STATUS[event.status as OrderStatus].label,
         })),
     };
-  }, [orders, trackingNumber]);
+  }, [orders, webOrders, reference]);
 }
 
 /* -------------------------------------------------------------------------- */

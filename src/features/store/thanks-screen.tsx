@@ -29,7 +29,8 @@ export function ThanksScreen({ reference }: { reference: string }) {
             <li>1. We check your order and call you to confirm the price.</li>
             <li>2. We buy it and bring it to Kabul.</li>
             <li>
-              3. We send you a tracking number so you can follow it any time.
+              3. We send you a tracking number — until then, this reference
+              works on the tracking page.
             </li>
             <li>4. We call you when it reaches our office to collect.</li>
           </ol>
@@ -40,7 +41,9 @@ export function ThanksScreen({ reference }: { reference: string }) {
             <Link href="/store">Keep shopping</Link>
           </Button>
           <Button asChild>
-            <Link href="/track">Track an order</Link>
+            <Link href={reference ? `/track?n=${reference}` : "/track"}>
+              Track this order
+            </Link>
           </Button>
         </div>
       </CardContent>
