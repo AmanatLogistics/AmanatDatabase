@@ -352,6 +352,7 @@ export function usePublicTracking(
 ): PublicTrackingResult | null {
   const orders = useDataStore((s) => s.orders);
   const webOrders = useDataStore((s) => s.webOrders);
+  const storeProducts = useDataStore((s) => s.storeProducts);
 
   return useMemo(() => {
     const wanted = reference.trim().toUpperCase();
@@ -385,6 +386,8 @@ export function usePublicTracking(
           items: web.lines.map((line) => ({
             name: line.name,
             qty: line.qty,
+            imageUrl: storeProducts.find((p) => p.id === line.productId)
+              ?.imageUrl,
           })),
           timeline: [{ at: web.placedAt, statusLabel: "Order received" }],
         };
@@ -414,7 +417,7 @@ export function usePublicTracking(
           statusLabel: ORDER_STATUS[event.status as OrderStatus].label,
         })),
     };
-  }, [orders, webOrders, reference]);
+  }, [orders, webOrders, storeProducts, reference]);
 }
 
 /* -------------------------------------------------------------------------- */

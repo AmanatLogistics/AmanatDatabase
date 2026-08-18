@@ -324,6 +324,9 @@ export async function convertWebOrder(id: ID): Promise<Order> {
         name: line.name,
         storeId: product?.storeId ?? state().settings.stores[0]?.id ?? "",
         category: product?.category ?? "other",
+        // Carry the photo through, so the customer sees the same picture on the
+        // tracking page that they saw when they bought it.
+        imageUrl: product?.imageUrl,
         qty: line.qty,
         // What the customer agreed to on the website is what we bill.
         unitPriceAfn: line.priceAfn,
@@ -430,6 +433,7 @@ export async function deleteClient(id: ID): Promise<void> {
 export interface CreateOrderItemInput {
   name: string;
   productUrl?: string;
+  imageUrl?: string;
   storeId: ID;
   category: OrderItem["category"];
   variant?: string;
