@@ -72,8 +72,8 @@ export function PublicTrackingScreen({
       <header className="brand-gradient text-primary-foreground">
         <div className="mx-auto w-full max-w-3xl px-4 pt-8 pb-16 sm:pt-12 sm:pb-24">
           <div className="mb-6 flex items-center justify-between">
-            <Link href="/store" className="brightness-0 invert">
-              <Logo />
+            <Link href="/store">
+              <Logo tone="onDark" />
             </Link>
             <Button
               variant="ghost"

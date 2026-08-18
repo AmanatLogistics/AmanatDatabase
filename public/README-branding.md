@@ -1,9 +1,12 @@
 # Branding assets
 
-The logo currently rendered by the app is a **vector reconstruction** of the Amanat
-Shopping logo (swallow mark + "Amanat" wordmark + gold "Shopping" script), built as
-inline SVG in `src/components/brand/logo.tsx`. It was rebuilt from the supplied image
-because the original artwork was never added to the repository.
+The logo currently rendered by the app is a **vector redraw** of the Amanat Shopping
+logo (swallow mark + "Amanat" wordmark + gold "Shopping" script), built as inline SVG
+in `src/components/brand/logo.tsx`. It was redrawn from a picture of the logo because
+the original vector artwork was never added to the repository — so it matches the
+silhouette closely but is not the file the designer produced.
+
+`public/logo-mark.svg` carries the same path and must be kept in sync with it.
 
 ## To install the official artwork
 
