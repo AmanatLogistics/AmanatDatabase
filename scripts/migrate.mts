@@ -27,6 +27,31 @@ import {
 
 const optional = process.argv.includes("--optional");
 
+/*
+ * Preview deploys share the production database — there is only one. Left
+ * unguarded, opening a pull request that adds a migration would apply it to
+ * production before anybody had reviewed it, from a branch that might never be
+ * merged. Schema changes belong to the deploy that ships them.
+ *
+ * `VERCEL_ENV` is "production", "preview" or "development"; it is unset
+ * anywhere that is not Vercel, where this is somebody running it deliberately.
+ */
+const vercelEnv = process.env.VERCEL_ENV;
+if (optional && vercelEnv && vercelEnv !== "production") {
+  console.log(
+    [
+      "",
+      `  Skipping migrations: this is a ${vercelEnv} deploy.`,
+      "",
+      "  Preview builds share the production database, so they do not change",
+      "  its shape. Migrations run when the change reaches production.",
+      "  To apply one by hand: npm run db:migrate",
+      "",
+    ].join("\n"),
+  );
+  process.exit(0);
+}
+
 const found = findDatabaseUrl(DIRECT_URL_VARS);
 if (!found) {
   if (optional) {

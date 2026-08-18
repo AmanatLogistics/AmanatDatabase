@@ -82,6 +82,10 @@ Three things that can happen there, all deliberate:
   clearer signal than a working page that errors on every click.
 - **Two deploys at once** — the second waits on an advisory lock, then finds
   there is nothing left to apply.
+- **A preview deploy** — skipped. There is only one database, and preview
+  builds share it: applying a migration from an unmerged branch would change
+  production's shape before anybody reviewed it. Schema changes belong to the
+  deploy that ships them.
 
 To run it by hand anyway — after adding a migration locally, say:
 
