@@ -1,13 +1,16 @@
 /**
  * Apply pending migrations.
  *
- * Run with `npm run db:migrate`, against whatever DATABASE_URL points at. It is
- * safe to run twice: Drizzle records what it has already applied in a
- * `__drizzle_migrations` table and skips those.
+ * Run with `npm run db:migrate`. It is safe to run twice: Drizzle records what
+ * it has already applied and skips those.
  *
- * Use the *session* connection string here, not the transaction pooler — DDL
- * and the advisory lock the migrator takes both need a connection that stays
- * put for the whole run.
+ * It also runs on every deploy, from `vercel-build`, so nobody has to remember
+ * to create the tables by hand after connecting a database. That is what
+ * `--optional` is for: on a build with no connection string configured — a
+ * local `next build`, a CI check — it says so loudly and lets the build carry
+ * on, rather than failing over a database that was never meant to be there.
+ * With a connection string present, a failure is a real failure and stops the
+ * deploy: shipping an app whose tables do not exist helps nobody.
  */
 
 import { readFileSync } from "node:fs";
@@ -22,8 +25,52 @@ import {
   missingUrlMessage,
 } from "../src/db/url.ts";
 
+const optional = process.argv.includes("--optional");
+
+/*
+ * Preview deploys share the production database — there is only one. Left
+ * unguarded, opening a pull request that adds a migration would apply it to
+ * production before anybody had reviewed it, from a branch that might never be
+ * merged. Schema changes belong to the deploy that ships them.
+ *
+ * `VERCEL_ENV` is "production", "preview" or "development"; it is unset
+ * anywhere that is not Vercel, where this is somebody running it deliberately.
+ */
+const vercelEnv = process.env.VERCEL_ENV;
+if (optional && vercelEnv && vercelEnv !== "production") {
+  console.log(
+    [
+      "",
+      `  Skipping migrations: this is a ${vercelEnv} deploy.`,
+      "",
+      "  Preview builds share the production database, so they do not change",
+      "  its shape. Migrations run when the change reaches production.",
+      "  To apply one by hand: npm run db:migrate",
+      "",
+    ].join("\n"),
+  );
+  process.exit(0);
+}
+
 const found = findDatabaseUrl(DIRECT_URL_VARS);
 if (!found) {
+  if (optional) {
+    console.log(
+      [
+        "",
+        "  ─────────────────────────────────────────────────────────────",
+        "  Skipping migrations: no database connection string is set.",
+        "",
+        "  The build continues, but the deployed app will have no tables",
+        "  and will not work until one is configured.",
+        "",
+        `  Looked for: ${DIRECT_URL_VARS.join(", ")}`,
+        "  ─────────────────────────────────────────────────────────────",
+        "",
+      ].join("\n"),
+    );
+    process.exit(0);
+  }
   console.error(missingUrlMessage(DIRECT_URL_VARS));
   process.exit(1);
 }
@@ -46,22 +93,38 @@ if (pooled) {
       "DIRECT_DATABASE_URL if you hit trouble.",
   );
 }
-console.log("");
 
 const journal = JSON.parse(
   readFileSync(new URL("../drizzle/meta/_journal.json", import.meta.url), "utf8"),
 ) as { entries: { tag: string }[] };
 
-console.log(`${journal.entries.length} migration(s) on disk:`);
+console.log(`\n${journal.entries.length} migration(s) on disk:`);
 journal.entries.forEach((e) => console.log(`  - ${e.tag}`));
 
 const sql = postgres(found.url, { max: 1, prepare: false, onnotice: () => {} });
 
 try {
+  /*
+   * Two deploys building at the same moment would otherwise both try to create
+   * the same tables. The lock is held for this connection only and released
+   * when it closes, so the second build waits and then finds there is nothing
+   * left to apply.
+   */
+  await sql`SELECT pg_advisory_lock(hashtext('amanat:migrate'))`;
   await migrate(drizzle(sql), { migrationsFolder: "./drizzle" });
+
   const [{ count }] = await sql<{ count: string }[]>`
     SELECT count(*)::text AS count FROM drizzle.__drizzle_migrations`;
   console.log(`\nDone. ${count} migration(s) recorded as applied.`);
+} catch (error) {
+  console.error(`\nMigration failed: ${(error as Error).message}`);
+  /*
+   * Deliberately fatal even under --optional. A connection string was
+   * configured, so somebody meant this to work; carrying on would deploy an
+   * app that cannot read its own data.
+   */
+  await sql.end({ timeout: 5 });
+  process.exit(1);
 } finally {
-  await sql.end();
+  await sql.end({ timeout: 5 }).catch(() => {});
 }

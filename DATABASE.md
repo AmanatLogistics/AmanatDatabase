@@ -60,14 +60,40 @@ npx vercel env pull .env.local && npm run db:check
 
 ## Creating the tables
 
-Once, and again whenever a migration is added:
+**This happens on its own.** Every deploy runs the migrations before building,
+so connecting a database is the only step — the tables appear with the next
+deploy. Look for it in the Vercel build log:
 
-```bash
-DATABASE_URL="<the session string, port 5432>" npm run db:migrate
+```
+Using DATABASE_URL -> postgresql://postgres@db.xxxx.supabase.co:6543/postgres
+2 migration(s) on disk:
+  - 0000_init
+  - 0001_staff_lockout
+
+Done. 2 migration(s) recorded as applied.
 ```
 
-It prints what it is about to apply and what it recorded. It is safe to run
-twice — already-applied migrations are skipped.
+Three things that can happen there, all deliberate:
+
+- **No connection string configured** — it says so in the log and the build
+  carries on. That keeps a local `next build` working without a database.
+- **A connection string that does not work** — the deploy **fails**. Shipping an
+  app whose tables do not exist helps nobody, and a failed deploy is a much
+  clearer signal than a working page that errors on every click.
+- **Two deploys at once** — the second waits on an advisory lock, then finds
+  there is nothing left to apply.
+- **A preview deploy** — skipped. There is only one database, and preview
+  builds share it: applying a migration from an unmerged branch would change
+  production's shape before anybody reviewed it. Schema changes belong to the
+  deploy that ships them.
+
+To run it by hand anyway — after adding a migration locally, say:
+
+```bash
+npm run db:migrate
+```
+
+Safe to run twice; already-applied migrations are skipped.
 
 ## Working on it locally
 
