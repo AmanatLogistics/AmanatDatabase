@@ -157,10 +157,14 @@ export function DashboardScreen() {
             </p>
           </CardHeader>
           <CardContent>
-            <StatusDonut
-              data={data.ordersByStatus}
-              total={data.ordersByStatus.reduce((sum, s) => sum + s.count, 0)}
-            />
+            {data.ordersByStatus.length === 0 ? (
+              <BlankPanel>No orders yet.</BlankPanel>
+            ) : (
+              <StatusDonut
+                data={data.ordersByStatus}
+                total={data.ordersByStatus.reduce((sum, s) => sum + s.count, 0)}
+              />
+            )}
           </CardContent>
         </Card>
       </div>
@@ -228,6 +232,9 @@ export function DashboardScreen() {
             </p>
           </CardHeader>
           <CardContent className="space-y-3.5">
+            {data.salesByStore.length === 0 && (
+              <BlankPanel>Nothing bought yet.</BlankPanel>
+            )}
             {data.salesByStore.map((store, index) => (
               <div key={store.storeId} className="space-y-1.5">
                 <div className="flex items-center justify-between text-[13px]">
@@ -507,5 +514,20 @@ function QuickLink({
         </div>
       </Card>
     </Link>
+  );
+}
+
+/**
+ * Holds the shape of a panel that has nothing to draw yet.
+ *
+ * An empty card reads as a chart that failed to load. One line of text says the
+ * figure is genuinely zero, which is the honest answer on a database somebody
+ * has only just started filling.
+ */
+function BlankPanel({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="text-muted-foreground flex min-h-32 items-center justify-center text-center text-xs">
+      {children}
+    </div>
   );
 }

@@ -278,11 +278,10 @@ export const TEAM_ROLE_LABEL: Record<TeamRole, string> = {
 /**
  * The customer tracking page at /track. On by default.
  *
- * It was gated off when real orders lived in the JS bundle alongside the seed
- * data, where a public page would have exposed them. That is no longer how the
- * app stores anything: orders are written to the visitor's own localStorage and
- * are never bundled, so the only records a stranger's browser can hold are the
- * fabricated seeds. There is nothing real left to leak.
+ * It was gated off when orders lived in the JS bundle, where a public page
+ * would have exposed them. That is no longer how the app stores anything:
+ * orders are written to the visitor's own localStorage and are never bundled,
+ * so a stranger's browser starts empty. There is nothing to leak.
  *
  * Set NEXT_PUBLIC_PUBLIC_TRACKING_ENABLED=false to take the page down again.
  *

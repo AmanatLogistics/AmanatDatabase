@@ -3,7 +3,7 @@
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 
-import { seedData, TODAY } from "@/lib/mock/seed";
+import { initialData, SSR_TODAY } from "@/lib/initial-data";
 import type {
   AppNotification,
   CartLine,
@@ -19,10 +19,10 @@ import type {
 /**
  * Application state, kept in this browser.
  *
- * Seeded from the mock dataset the first time, then persisted to localStorage
- * so orders, tracking numbers and deletions survive a refresh. Before this the
- * store was memory-only and every reload wiped whatever the operator had just
- * done, which read as the app losing their work.
+ * Starts empty and is persisted to localStorage, so orders, tracking numbers
+ * and deletions survive a refresh. Before this the store was memory-only and
+ * every reload wiped whatever the operator had just done, which read as the app
+ * losing their work.
  *
  * The scope of that promise is one browser: this is not shared between devices
  * or between staff, and it is not a backend. When a real API lands, the
@@ -31,14 +31,8 @@ import type {
  * imports this module directly — they all go through `src/lib/api`.
  */
 
-/** The v1 shape of a catalogue product: one photo, not a gallery. */
-type LegacyProduct = Omit<StoreProduct, "imageUrls"> & {
-  imageUrl?: string;
-  imageUrls?: string[];
-};
-
 /** Bump to discard persisted data whose shape no longer matches the code. */
-const STORAGE_VERSION = 2;
+const STORAGE_VERSION = 3;
 const STORAGE_KEY = "amanat-shopping-data";
 
 export interface DataState {
@@ -92,21 +86,21 @@ export interface DataState {
 
   updateSettings: (patch: Partial<Settings>) => void;
 
-  /** Restore the seed dataset — used by the "Reset demo data" action. */
+  /** Erase everything and start over. Settings go back to their defaults too. */
   reset: () => void;
 }
 
 const initial = () => ({
-  clients: seedData.clients,
-  notifications: [] as AppNotification[],
-  storeProducts: seedData.storeProducts,
-  cart: [] as CartLine[],
-  webOrders: [] as WebOrder[],
-  orders: seedData.orders,
-  purchases: seedData.purchases,
-  payments: seedData.payments,
-  settings: seedData.settings,
-  today: TODAY,
+  clients: initialData.clients,
+  notifications: initialData.notifications,
+  storeProducts: initialData.storeProducts,
+  cart: initialData.cart,
+  webOrders: initialData.webOrders,
+  orders: initialData.orders,
+  purchases: initialData.purchases,
+  payments: initialData.payments,
+  settings: initialData.settings,
+  today: SSR_TODAY,
 });
 
 export const useDataStore = create<DataState>()(
@@ -271,22 +265,25 @@ export const useDataStore = create<DataState>()(
        */
       skipHydration: true,
       /*
-       * v1 stored a single `imageUrl` per product. Anyone who already has data
-       * saved keeps their photo — it becomes the first entry of the gallery
-       * rather than being dropped on the floor.
+       * Set the real date once, at the moment the browser's data is in.
+       *
+       * The server cannot know the visitor's clock, so the state above renders
+       * the HTML with a fixed date. This runs before `hasHydrated` flips, so
+       * every screen behind `StoreGate` sees the true date on its first render
+       * — no flash of a wrong "3 days late".
        */
-      migrate: (persisted, version) => {
-        const state = persisted as Record<string, unknown>;
-        if (version < 2 && Array.isArray(state.storeProducts)) {
-          state.storeProducts = (state.storeProducts as LegacyProduct[]).map(
-            ({ imageUrl, ...rest }) => ({
-              ...rest,
-              imageUrls: rest.imageUrls ?? (imageUrl ? [imageUrl] : []),
-            }),
-          );
-        }
-        return state as unknown as DataState;
+      onRehydrateStorage: () => () => {
+        useDataStore.setState({ today: new Date() });
       },
+      /*
+       * Everything saved before v3 was the demo dataset — invented clients,
+       * products and orders — possibly with a few real records typed on top
+       * while the app was being tried out. It is discarded wholesale, because
+       * the point of v3 is a database that holds only what its owner entered.
+       * Settings are reset with it; the demo ones carried invented phone
+       * numbers and staff.
+       */
+      migrate: () => initial() as DataState,
       /*
        * `today` is a frozen reference date, not the operator's data, and a Date
        * does not survive JSON — it would come back as a string and break every

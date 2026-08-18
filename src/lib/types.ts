@@ -3,7 +3,7 @@
  *
  * These types are the contract the future backend must satisfy. Everything the UI
  * renders is derived from them; nothing in `src/app` or `src/components` reaches
- * past this file into raw mock data.
+ * past this file into storage.
  *
  * Money convention
  * ----------------
@@ -208,9 +208,9 @@ export interface Payment {
 /**
  * Something we list for sale ourselves.
  *
- * Distinct from `CatalogProduct` in `src/lib/mock/*`, which is seed scaffolding
- * describing what a client might ask us to buy. This is a product *we* publish,
- * with a price a customer pays and a cost only staff see.
+ * A product *we* publish on the storefront, with a price a customer pays and a
+ * cost only staff see. Distinct from an `OrderItem`, which is something a client
+ * asked us to fetch and may never have been listed here at all.
  */
 export interface StoreProduct {
   id: ID;
