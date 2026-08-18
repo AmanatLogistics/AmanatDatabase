@@ -4,14 +4,25 @@ import * as React from "react";
 import Link from "next/link";
 import { notFound, useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { ArrowLeftIcon, ShoppingBagIcon } from "lucide-react";
+import {
+  ChevronLeftIcon,
+  ChevronRightIcon,
+  PackageCheckIcon,
+  PhoneCallIcon,
+  ShoppingBagIcon,
+  TruckIcon,
+  WalletIcon,
+} from "lucide-react";
 
 import { Money } from "@/components/shared/money";
 import { ProductThumb } from "@/components/shared/product-thumb";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { addToCart, useStoreProductBySlug } from "@/lib/api";
+import {
+  addToCart,
+  usePublishedProducts,
+  useStoreProductBySlug,
+} from "@/lib/api";
 import { PRODUCT_CATEGORY_LABEL } from "@/lib/constants";
 import { cn } from "@/lib/utils";
 import type { StoreProduct } from "@/lib/types";
@@ -22,14 +33,22 @@ export function ProductDetailScreen({ slug }: { slug: string }) {
   const router = useRouter();
   const hydrated = useStoreHydrated();
   const product = useStoreProductBySlug(slug);
+  const all = usePublishedProducts();
   const [qty, setQty] = React.useState(1);
+
+  const related = React.useMemo(() => {
+    if (!product) return [];
+    return all
+      .filter((p) => p.id !== product.id && p.category === product.category)
+      .slice(0, 5);
+  }, [all, product]);
 
   // The catalogue lives in the browser, so nothing is known until it has loaded.
   if (!hydrated) {
     return (
-      <div className="grid gap-6 sm:grid-cols-2">
-        <Skeleton className="aspect-square w-full" />
-        <div className="space-y-3">
+      <div className="grid gap-6 lg:grid-cols-12">
+        <Skeleton className="aspect-square w-full lg:col-span-5" />
+        <div className="space-y-3 lg:col-span-7">
           <Skeleton className="h-8 w-3/4" />
           <Skeleton className="h-20 w-full" />
           <Skeleton className="h-11 w-40" />
@@ -40,86 +59,223 @@ export function ProductDetailScreen({ slug }: { slug: string }) {
 
   if (!product) notFound();
 
+  const buy = () => {
+    addToCart(product.id, qty);
+    toast.success(`${product.name} added to your basket`);
+    router.push("/store/cart");
+  };
+
   return (
     <>
-      <Button variant="ghost" size="sm" asChild className="-ml-2 mb-4 w-fit">
-        <Link href="/store">
-          <ArrowLeftIcon />
-          All products
+      <nav
+        aria-label="Breadcrumb"
+        className="text-muted-foreground mb-4 flex flex-wrap items-center gap-1.5 text-xs"
+      >
+        <Link href="/store" className="hover:text-foreground">
+          Shop
         </Link>
-      </Button>
+        <ChevronRightIcon className="size-3" />
+        <Link
+          href={`/store?category=${product.category}`}
+          className="hover:text-foreground"
+        >
+          {PRODUCT_CATEGORY_LABEL[product.category]}
+        </Link>
+        <ChevronRightIcon className="size-3" />
+        <span className="text-foreground line-clamp-1">{product.name}</span>
+      </nav>
 
-      <div className="grid gap-6 sm:grid-cols-2">
-        <Gallery product={product} />
+      <div className="grid gap-6 lg:grid-cols-12 lg:gap-8">
+        <div className="lg:col-span-5">
+          <Gallery product={product} />
+        </div>
 
-        <div className="flex flex-col gap-3">
+        <div className="flex flex-col gap-4 lg:col-span-4">
           <div>
-            <p className="text-muted-foreground text-xs">
+            <p className="text-muted-foreground text-[11px] tracking-wide uppercase">
               {PRODUCT_CATEGORY_LABEL[product.category]}
             </p>
-            <h1 className="text-2xl font-semibold tracking-tight">
+            <h1 className="mt-1 text-2xl font-semibold tracking-tight text-balance sm:text-3xl">
               {product.name}
             </h1>
           </div>
 
-          <Money
-            value={product.priceAfn}
-            unit="suffix"
-            className="text-brand-700 dark:text-brand-300 text-3xl font-bold"
-          />
-          <p className="text-muted-foreground -mt-2 text-xs">
-            Pay when you collect. No deposit.
-          </p>
+          <div className="bg-brand-50/60 dark:bg-brand-950/40 border-brand-200/60 dark:border-brand-900 rounded-xl border px-4 py-3">
+            <Money
+              value={product.priceAfn}
+              unit="suffix"
+              className="text-brand-700 dark:text-brand-300 text-3xl font-bold"
+            />
+            <p className="text-muted-foreground mt-0.5 text-xs">
+              Pay when you collect. No deposit, no card needed.
+            </p>
+          </div>
 
-          <p className="text-muted-foreground text-sm">{product.description}</p>
-
-          <Card className="bg-muted/40">
-            <CardContent className="pt-6">
-              <p className="text-xs font-medium">How it works</p>
-              <ol className="text-muted-foreground mt-2 grid gap-1.5 text-xs">
-                <li>1. We confirm the price with you by phone.</li>
-                <li>2. We buy it from the store and bring it to Kabul.</li>
-                <li>3. We call you when it reaches our office.</li>
-                <li>4. You pay and collect. Usually 2–3 weeks.</li>
-              </ol>
-            </CardContent>
-          </Card>
-
-          <div className="mt-auto flex items-center gap-2">
-            <div className="flex items-center rounded-md border">
-              <button
-                type="button"
-                aria-label="Fewer"
-                className="hover:bg-muted px-3 py-2 text-lg leading-none"
-                onClick={() => setQty((q) => Math.max(1, q - 1))}
-              >
-                −
-              </button>
-              <span className="tabular w-10 text-center text-sm">{qty}</span>
-              <button
-                type="button"
-                aria-label="More"
-                className="hover:bg-muted px-3 py-2 text-lg leading-none"
-                onClick={() => setQty((q) => Math.min(20, q + 1))}
-              >
-                +
-              </button>
+          {product.description && (
+            <div>
+              <h2 className="text-sm font-medium">About this product</h2>
+              <p className="text-muted-foreground mt-1.5 text-sm whitespace-pre-line">
+                {product.description}
+              </p>
             </div>
-            <Button
-              className="h-11 flex-1"
-              onClick={() => {
-                addToCart(product.id, qty);
-                toast.success(`${product.name} added to your basket`);
-                router.push("/store/cart");
-              }}
-            >
+          )}
+
+          <div>
+            <h2 className="text-sm font-medium">How it works</h2>
+            <ol className="mt-2 grid gap-2.5">
+              <Step icon={PhoneCallIcon} n={1}>
+                We confirm the price with you by phone.
+              </Step>
+              <Step icon={ShoppingBagIcon} n={2}>
+                We buy it from the store abroad.
+              </Step>
+              <Step icon={TruckIcon} n={3}>
+                It travels to our office in Kabul — usually 2–3 weeks.
+              </Step>
+              <Step icon={WalletIcon} n={4}>
+                We call you, you pay and collect.
+              </Step>
+            </ol>
+          </div>
+        </div>
+
+        {/* The buy box: everything needed to decide, in one panel. */}
+        <div className="lg:col-span-3">
+          <div className="bg-card rounded-xl border p-4 lg:sticky lg:top-24">
+            <p className="text-muted-foreground text-xs">Total</p>
+            <Money
+              value={product.priceAfn * qty}
+              unit="suffix"
+              className="text-xl font-bold"
+            />
+
+            <div className="mt-3">
+              <p className="mb-1.5 text-xs font-medium">Quantity</p>
+              <QtyStepper value={qty} onChange={setQty} />
+            </div>
+
+            <Button className="mt-3 h-11 w-full" onClick={buy}>
               <ShoppingBagIcon />
               Add to basket
             </Button>
+
+            <ul className="text-muted-foreground mt-4 grid gap-2 border-t pt-3 text-xs">
+              <li className="flex items-center gap-2">
+                <WalletIcon className="text-brand-600 size-3.5 shrink-0" />
+                Pay on collection
+              </li>
+              <li className="flex items-center gap-2">
+                <TruckIcon className="text-brand-600 size-3.5 shrink-0" />
+                Usually 2–3 weeks
+              </li>
+              <li className="flex items-center gap-2">
+                <PackageCheckIcon className="text-brand-600 size-3.5 shrink-0" />
+                Track it the whole way
+              </li>
+            </ul>
           </div>
         </div>
       </div>
+
+      {related.length > 0 && (
+        <section className="mt-10">
+          <div className="mb-3 flex items-baseline justify-between">
+            <h2 className="text-lg font-semibold tracking-tight">
+              More in {PRODUCT_CATEGORY_LABEL[product.category]}
+            </h2>
+            <Link
+              href="/store"
+              className="text-brand-700 dark:text-brand-300 text-xs underline-offset-2 hover:underline"
+            >
+              See everything
+            </Link>
+          </div>
+          <div
+            className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-5"
+            data-testid="related-products"
+          >
+            {related.map((p) => (
+              <RelatedCard key={p.id} product={p} />
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/*
+       * On a phone the buy button would otherwise sit far below the fold, under
+       * the description and the four steps. It follows the customer down the
+       * page instead, the way a shop app does.
+       */}
+      <div className="bg-background/95 sticky bottom-0 z-20 -mx-4 mt-8 flex items-center gap-3 border-t px-4 py-3 backdrop-blur lg:hidden">
+        <div className="min-w-0">
+          <Money
+            value={product.priceAfn * qty}
+            unit="suffix"
+            className="text-brand-700 dark:text-brand-300 block text-base font-bold"
+          />
+          <p className="text-muted-foreground text-[10px]">Pay on collection</p>
+        </div>
+        <Button className="ml-auto h-11 flex-1" onClick={buy}>
+          <ShoppingBagIcon />
+          Add to basket
+        </Button>
+      </div>
     </>
+  );
+}
+
+function Step({
+  icon: Icon,
+  n,
+  children,
+}: {
+  icon: React.ComponentType<{ className?: string }>;
+  n: number;
+  children: React.ReactNode;
+}) {
+  return (
+    <li className="flex items-start gap-2.5 text-sm">
+      <span className="bg-brand-50 text-brand-700 dark:bg-brand-950 dark:text-brand-300 mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-full">
+        <Icon className="size-3.5" />
+      </span>
+      <span className="text-muted-foreground">
+        <span className="text-foreground font-medium">{n}.</span> {children}
+      </span>
+    </li>
+  );
+}
+
+function QtyStepper({
+  value,
+  onChange,
+}: {
+  value: number;
+  onChange: (n: number) => void;
+}) {
+  return (
+    <div className="flex w-fit items-center rounded-md border">
+      <button
+        type="button"
+        aria-label="Fewer"
+        className="hover:bg-muted rounded-l-md px-3 py-2 text-lg leading-none disabled:opacity-40"
+        disabled={value <= 1}
+        onClick={() => onChange(Math.max(1, value - 1))}
+      >
+        −
+      </button>
+      <span className="tabular w-10 text-center text-sm" aria-live="polite">
+        {value}
+      </span>
+      <button
+        type="button"
+        aria-label="More"
+        className="hover:bg-muted rounded-r-md px-3 py-2 text-lg leading-none disabled:opacity-40"
+        disabled={value >= 20}
+        onClick={() => onChange(Math.min(20, value + 1))}
+      >
+        +
+      </button>
+    </div>
   );
 }
 
@@ -138,18 +294,31 @@ function Gallery({ product }: { product: StoreProduct }) {
   }
 
   const images = product.imageUrls;
-  const current = images[Math.min(active, Math.max(0, images.length - 1))];
+  const index = Math.min(active, Math.max(0, images.length - 1));
+  const current = images[index];
+  const step = (by: number) =>
+    setActive((index + by + images.length) % images.length);
 
   return (
-    <div className="flex flex-col gap-2.5">
-      <div className="bg-muted/30 aspect-square overflow-hidden rounded-xl border">
+    <div className="flex flex-col gap-2.5 lg:sticky lg:top-24">
+      <div className="bg-muted/30 group relative aspect-square overflow-hidden rounded-xl border">
         <ProductThumb
-          size="lg"
+          size="fill"
           category={product.category}
           name={product.name}
           imageUrl={current}
           className="size-full rounded-none border-0"
         />
+
+        {images.length > 1 && (
+          <>
+            <ArrowButton side="left" onClick={() => step(-1)} />
+            <ArrowButton side="right" onClick={() => step(1)} />
+            <span className="bg-background/85 text-muted-foreground absolute right-2 bottom-2 rounded-full px-2 py-0.5 text-[11px] backdrop-blur">
+              {index + 1} / {images.length}
+            </span>
+          </>
+        )}
       </div>
 
       {images.length > 1 && (
@@ -157,18 +326,18 @@ function Gallery({ product }: { product: StoreProduct }) {
           className="scrollbar-thin flex gap-2 overflow-x-auto"
           data-testid="gallery-thumbs"
         >
-          {images.map((src, index) => (
+          {images.map((src, i) => (
             <button
-              key={index}
+              key={i}
               type="button"
-              onClick={() => setActive(index)}
-              aria-label={`Show photo ${index + 1}`}
-              aria-current={index === active}
+              onClick={() => setActive(i)}
+              aria-label={`Show photo ${i + 1}`}
+              aria-current={i === index}
               className={cn(
-                "size-16 shrink-0 overflow-hidden rounded-lg border-2 transition-colors",
-                index === active
+                "size-16 shrink-0 overflow-hidden rounded-lg border-2 transition-all",
+                i === index
                   ? "border-brand-600"
-                  : "border-transparent opacity-70 hover:opacity-100",
+                  : "border-transparent opacity-60 hover:opacity-100",
               )}
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -178,5 +347,56 @@ function Gallery({ product }: { product: StoreProduct }) {
         </div>
       )}
     </div>
+  );
+}
+
+/** Hidden until hover on a desktop; always there on touch, which has no hover. */
+function ArrowButton({
+  side,
+  onClick,
+}: {
+  side: "left" | "right";
+  onClick: () => void;
+}) {
+  const Icon = side === "left" ? ChevronLeftIcon : ChevronRightIcon;
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label={side === "left" ? "Previous photo" : "Next photo"}
+      className={cn(
+        "bg-background/85 hover:bg-background absolute top-1/2 flex size-8 -translate-y-1/2 items-center justify-center rounded-full border shadow-sm backdrop-blur transition-opacity",
+        "sm:opacity-0 sm:group-hover:opacity-100 sm:focus-visible:opacity-100",
+        side === "left" ? "left-2" : "right-2",
+      )}
+    >
+      <Icon className="size-4" />
+    </button>
+  );
+}
+
+function RelatedCard({ product }: { product: StoreProduct }) {
+  return (
+    <Link href={`/store/p/${product.slug}`} className="group">
+      <article className="bg-card hover:border-brand-600/50 flex h-full flex-col overflow-hidden rounded-xl border transition-all hover:-translate-y-0.5 hover:shadow-md">
+        <div className="bg-muted/30 aspect-square overflow-hidden">
+          <ProductThumb
+            size="fill"
+            category={product.category}
+            name={product.name}
+            imageUrl={product.imageUrls[0]}
+            className="size-full rounded-none border-0 transition-transform duration-200 group-hover:scale-[1.04]"
+          />
+        </div>
+        <div className="flex flex-1 flex-col gap-1 p-2.5">
+          <p className="line-clamp-2 text-[13px] leading-snug">{product.name}</p>
+          <Money
+            value={product.priceAfn}
+            unit="suffix"
+            className="text-brand-700 dark:text-brand-300 mt-auto pt-1 text-[15px] font-bold"
+          />
+        </div>
+      </article>
+    </Link>
   );
 }
