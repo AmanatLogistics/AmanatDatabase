@@ -23,9 +23,13 @@ export const APP_URL_VARS = [
 ] as const;
 
 /**
- * For migrations. Wants the **direct** connection: creating tables and taking
- * the migrator's advisory lock both need a connection that stays put, which a
+ * For migrations. Prefers the **direct** connection: creating tables and taking
+ * the migrator's advisory lock both want a connection that stays put, which a
  * transaction pooler is free to swap underneath you.
+ *
+ * Preference, not requirement — see `findMigrationUrl`. On Vercel the direct
+ * host cannot be reached at all, and a connection that works beats one that
+ * would have been marginally better.
  */
 export const DIRECT_URL_VARS = [
   "DIRECT_DATABASE_URL",
@@ -51,6 +55,38 @@ export function findDatabaseUrl(
     if (url && url.trim()) return { name, url: url.trim() };
   }
   return null;
+}
+
+/**
+ * The connection to migrate over.
+ *
+ * The obvious order — direct first, pooled as a fallback — is wrong on Vercel.
+ * Supabase's integration sets `POSTGRES_URL_NON_POOLING` to the direct host,
+ * which is IPv6-only, and Vercel is IPv4-only: preferring it there picks the
+ * one string guaranteed not to work, and the deploy fails on a database that
+ * is perfectly reachable through the pooler sitting right next to it.
+ *
+ * So: prefer direct, unless direct means a host this platform cannot resolve.
+ * Migrating over the transaction pooler is fine — Drizzle runs each migration
+ * in a transaction, and the pooler pins a connection for a transaction's
+ * lifetime.
+ */
+export function findMigrationUrl(env: EnvLike = process.env): FoundUrl | null {
+  const preferred = findDatabaseUrl(DIRECT_URL_VARS, env);
+  if (!preferred) return null;
+
+  if (onVercel(env) && isDirectSupabaseHost(preferred.url)) {
+    const reachable = findDatabaseUrl(
+      DIRECT_URL_VARS.filter((name) => {
+        const url = env[name];
+        return url && !isDirectSupabaseHost(url);
+      }),
+      env,
+    );
+    if (reachable) return reachable;
+  }
+
+  return preferred;
 }
 
 /** Everything except the password, for printing. */

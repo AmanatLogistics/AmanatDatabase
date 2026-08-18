@@ -22,7 +22,7 @@ import {
   DIRECT_URL_VARS,
   describeUrl,
   explainConnectionError,
-  findDatabaseUrl,
+  findMigrationUrl,
   missingUrlMessage,
 } from "../src/db/url.ts";
 
@@ -53,7 +53,7 @@ if (optional && vercelEnv && vercelEnv !== "production") {
   process.exit(0);
 }
 
-const found = findDatabaseUrl(DIRECT_URL_VARS);
+const found = findMigrationUrl();
 if (!found) {
   if (optional) {
     console.log(
