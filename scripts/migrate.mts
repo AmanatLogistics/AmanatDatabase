@@ -15,15 +15,20 @@ import { drizzle } from "drizzle-orm/postgres-js";
 import { migrate } from "drizzle-orm/postgres-js/migrator";
 import postgres from "postgres";
 
-const url = process.env.DATABASE_URL;
-if (!url) {
-  console.error(
-    "DATABASE_URL is not set.\n" +
-      "  Local:  DATABASE_URL=postgresql://… npm run db:migrate\n" +
-      "  Vercel: pull it with `vercel env pull .env.local` first.",
-  );
+import {
+  DIRECT_URL_VARS,
+  describeUrl,
+  findDatabaseUrl,
+  missingUrlMessage,
+} from "../src/db/url.ts";
+
+const found = findDatabaseUrl(DIRECT_URL_VARS);
+if (!found) {
+  console.error(missingUrlMessage(DIRECT_URL_VARS));
   process.exit(1);
 }
+
+console.log(`Using ${found.name} -> ${describeUrl(found.url)}\n`);
 
 const journal = JSON.parse(
   readFileSync(new URL("../drizzle/meta/_journal.json", import.meta.url), "utf8"),
@@ -32,7 +37,7 @@ const journal = JSON.parse(
 console.log(`${journal.entries.length} migration(s) on disk:`);
 journal.entries.forEach((e) => console.log(`  - ${e.tag}`));
 
-const sql = postgres(url, { max: 1, onnotice: () => {} });
+const sql = postgres(found.url, { max: 1, onnotice: () => {} });
 
 try {
   await migrate(drizzle(sql), { migrationsFolder: "./drizzle" });

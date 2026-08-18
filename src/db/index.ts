@@ -4,6 +4,7 @@ import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 
 import * as schema from "@/db/schema";
+import { APP_URL_VARS, findDatabaseUrl, missingUrlMessage } from "@/db/url";
 
 /**
  * The database connection.
@@ -24,13 +25,8 @@ declare global {
 type Database = ReturnType<typeof connect>;
 
 function connect() {
-  const url = process.env.DATABASE_URL;
-  if (!url) {
-    throw new Error(
-      "DATABASE_URL is not set. Copy .env.example to .env.local and put your " +
-        "Supabase connection string in it.",
-    );
-  }
+  const found = findDatabaseUrl(APP_URL_VARS);
+  if (!found) throw new Error(missingUrlMessage(APP_URL_VARS));
 
   /*
    * `max: 1` is not a typo. On Vercel every request can land in its own short
@@ -41,7 +37,7 @@ function connect() {
    * `prepare: false` is required by that pooler — prepared statements are bound
    * to a backend connection it is free to swap underneath us.
    */
-  const client = postgres(url, { max: 1, prepare: false });
+  const client = postgres(found.url, { max: 1, prepare: false });
   return drizzle(client, { schema });
 }
 

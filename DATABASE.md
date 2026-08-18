@@ -28,6 +28,36 @@ You have to do this part; I cannot create an account for you.
 
    Replace `[YOUR-PASSWORD]` in the string with the password from step 1.
 
+### Or: the Supabase integration on Vercel
+
+If you connect Supabase to Vercel through the marketplace integration instead,
+it adds the variables for you — but **it does not call any of them
+`DATABASE_URL`**. It typically adds `POSTGRES_URL` (pooled) and
+`POSTGRES_URL_NON_POOLING` (direct), among others.
+
+Both of those are read automatically, so there is nothing to rename. The app
+looks for, in order:
+
+- **App:** `DATABASE_URL`, `POSTGRES_URL`, `SUPABASE_DATABASE_URL`
+- **Migrations:** `DIRECT_DATABASE_URL`, `DATABASE_URL_UNPOOLED`,
+  `POSTGRES_URL_NON_POOLING`, then the app list
+
+A `DATABASE_URL` you set by hand always wins.
+
+## Checking it works
+
+```bash
+npm run db:check
+```
+
+It lists which connection variables are present (passwords masked), says which
+one the app would use, connects, counts the tables and tells you whether anyone
+has an account yet. To check against what your deployment actually has:
+
+```bash
+npx vercel env pull .env.local && npm run db:check
+```
+
 ## Creating the tables
 
 Once, and again whenever a migration is added:

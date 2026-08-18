@@ -11,7 +11,8 @@
     "test": "node --experimental-strip-types --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test --test-concurrency=1 \"tests/*.test.mjs\" \"tests/*.test.mts\"",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "node --experimental-strip-types --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/migrate.mts",
-    "db:studio": "drizzle-kit studio"
+    "db:studio": "drizzle-kit studio",
+    "db:check": "node --experimental-strip-types --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/db-check.mts"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.7.1",
