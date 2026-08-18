@@ -28,7 +28,25 @@ if (!found) {
   process.exit(1);
 }
 
-console.log(`Using ${found.name} -> ${describeUrl(found.url)}\n`);
+console.log(`Using ${found.name} -> ${describeUrl(found.url)}`);
+
+/*
+ * Supabase shows the transaction pooler (6543) most prominently, so that is
+ * usually what ends up in DATABASE_URL — and if it is the only variable set,
+ * this script gets it too. It works, but only with prepared statements off:
+ * the pooler is free to hand a later statement to a different backend, which
+ * has never seen the statement we prepared. Left on, migrating fails with
+ * "prepared statement does not exist".
+ */
+const pooled = /:6543|pooler/.test(found.url);
+if (pooled) {
+  console.log(
+    "\nThis looks like the pooled connection. It will work, but the direct\n" +
+      "one (port 5432) is the right tool for migrations — set it as\n" +
+      "DIRECT_DATABASE_URL if you hit trouble.",
+  );
+}
+console.log("");
 
 const journal = JSON.parse(
   readFileSync(new URL("../drizzle/meta/_journal.json", import.meta.url), "utf8"),
@@ -37,7 +55,7 @@ const journal = JSON.parse(
 console.log(`${journal.entries.length} migration(s) on disk:`);
 journal.entries.forEach((e) => console.log(`  - ${e.tag}`));
 
-const sql = postgres(found.url, { max: 1, onnotice: () => {} });
+const sql = postgres(found.url, { max: 1, prepare: false, onnotice: () => {} });
 
 try {
   await migrate(drizzle(sql), { migrationsFolder: "./drizzle" });
