@@ -25,11 +25,13 @@ export function TeamSettingsScreen() {
     <>
       <Alert variant="info">
         <InfoIcon />
-        <AlertTitle>Read-only until sign-in exists</AlertTitle>
+        <AlertTitle>Accounts live in the database now</AlertTitle>
         <AlertDescription>
-          Team members and their permissions will be editable once
-          authentication is built. For now the list drives the &ldquo;recorded
-          by&rdquo; names on payments, purchases and order activity.
+          Signing in is real: your account, your password, your own session. The
+          list below is the old browser-held one and no longer decides who can
+          get in — it still supplies the &ldquo;recorded by&rdquo; names on
+          payments and purchases until the rest of the data moves across.
+          Inviting staff arrives with that move.
         </AlertDescription>
       </Alert>
 

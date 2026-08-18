@@ -172,6 +172,14 @@ export const staff = pgTable(
     phone: text("phone"),
     active: boolean("active").notNull().default(true),
     passwordHash: text("password_hash"),
+    /*
+     * Brute-force protection, on the row rather than in memory: the app runs on
+     * serverless instances that do not share memory, so a counter held in a
+     * process would reset itself every few requests and protect nothing.
+     */
+    failedAttempts: integer("failed_attempts").notNull().default(0),
+    lockedUntil: timestamp("locked_until", { withTimezone: true }),
+    lastSignedInAt: timestamp("last_signed_in_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),

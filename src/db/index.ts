@@ -4,6 +4,7 @@ import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 
 import * as schema from "@/db/schema";
+import { APP_URL_VARS, findDatabaseUrl, missingUrlMessage } from "@/db/url";
 
 /**
  * The database connection.
@@ -18,17 +19,14 @@ import * as schema from "@/db/schema";
  */
 
 declare global {
-  var __amanatDb: ReturnType<typeof connect> | undefined;
+  var __amanatDb: Database | undefined;
 }
 
+type Database = ReturnType<typeof connect>;
+
 function connect() {
-  const url = process.env.DATABASE_URL;
-  if (!url) {
-    throw new Error(
-      "DATABASE_URL is not set. Copy .env.example to .env.local and put your " +
-        "Supabase connection string in it.",
-    );
-  }
+  const found = findDatabaseUrl(APP_URL_VARS);
+  if (!found) throw new Error(missingUrlMessage(APP_URL_VARS));
 
   /*
    * `max: 1` is not a typo. On Vercel every request can land in its own short
@@ -39,12 +37,34 @@ function connect() {
    * `prepare: false` is required by that pooler — prepared statements are bound
    * to a backend connection it is free to swap underneath us.
    */
-  const client = postgres(url, { max: 1, prepare: false });
+  const client = postgres(found.url, { max: 1, prepare: false });
   return drizzle(client, { schema });
 }
 
-export const db = globalThis.__amanatDb ?? connect();
+/**
+ * Connected on first use, not on import.
+ *
+ * This module is imported (transitively) by pages Next evaluates at build time,
+ * where DATABASE_URL is deliberately absent — a build must not need production
+ * credentials. Connecting eagerly turned that into "Failed to collect page data
+ * for /setup". The proxy defers it to the first query, which only ever happens
+ * while a request is being served.
+ */
+let instance: Database | undefined;
 
-if (process.env.NODE_ENV !== "production") globalThis.__amanatDb = db;
+function resolve(): Database {
+  instance ??= globalThis.__amanatDb ?? connect();
+  if (process.env.NODE_ENV !== "production") globalThis.__amanatDb = instance;
+  return instance;
+}
+
+export const db = new Proxy({} as Database, {
+  get(_target, property, receiver) {
+    return Reflect.get(resolve(), property, receiver);
+  },
+  has(_target, property) {
+    return Reflect.has(resolve(), property);
+  },
+});
 
 export { schema };

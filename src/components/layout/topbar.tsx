@@ -26,10 +26,10 @@ import {
   markNotificationsRead,
   useNavCounts,
   useNotifications,
-  useTeam,
   useToday,
   useUnreadNotificationCount,
 } from "@/lib/api";
+import { useSignedIn } from "@/components/auth/signed-in";
 import { formatAfn, formatRelative, initials } from "@/lib/format";
 import type { AppNotification } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -48,11 +48,10 @@ export function Topbar({
   onOpenMobileNav: () => void;
 }) {
   const pathname = usePathname();
-  const team = useTeam();
   const today = useToday();
   const nav = useNavCounts();
   const meta = usePageMeta();
-  const owner = team[0];
+  const owner = useSignedIn();
 
   /*
    * The bar carries the page identity for the whole app — the trail on top, the

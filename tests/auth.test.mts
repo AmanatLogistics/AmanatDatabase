@@ -1,0 +1,225 @@
+import { after, before, describe, test } from "node:test";
+import assert from "node:assert/strict";
+import { spawn } from "node:child_process";
+import { existsSync } from "node:fs";
+import { createServer } from "node:net";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+import { chromium, type Browser } from "playwright";
+import postgres from "postgres";
+
+import { SESSION_COOKIE, clearStaff, signInDirectly } from "./helpers/session.mjs";
+
+/**
+ * The door.
+ *
+ * Everything under `(app)`, `(shop)` and `(print)` holds real clients, real
+ * money and printable invoices with people's addresses on them. None of it may
+ * be reachable without signing in — and the customer surfaces must stay
+ * reachable without an account, because customers do not have one.
+ *
+ * These go through a real browser against a real database on purpose. The
+ * failure mode being guarded against is a route quietly ending up outside the
+ * guard, which only a request can prove.
+ */
+
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const DATABASE_URL = process.env.DATABASE_URL;
+const needsDatabase = { skip: DATABASE_URL ? false : "DATABASE_URL is not set" };
+
+/** Every route that must never answer to a stranger. */
+const PRIVATE = [
+  "/",
+  "/orders",
+  "/orders/new",
+  "/clients",
+  "/clients/new",
+  "/purchases",
+  "/payments",
+  "/finance",
+  "/finance/balances",
+  "/documents",
+  "/settings",
+  "/settings/team",
+  "/shop",
+  "/shop/products",
+  "/shop/orders",
+];
+
+/** Every route a customer must be able to reach without one. */
+const PUBLIC = ["/store", "/store/cart", "/store/checkout", "/track"];
+
+let server: ReturnType<typeof spawn> | undefined;
+let browser: Browser | undefined;
+let baseUrl: string;
+
+function freePort(): Promise<number> {
+  return new Promise((resolve, reject) => {
+    const probe = createServer();
+    probe.unref();
+    probe.on("error", reject);
+    probe.listen(0, () => {
+      const address = probe.address() as { port: number };
+      probe.close(() => resolve(address.port));
+    });
+  });
+}
+
+async function waitForServer(url: string, timeoutMs = 60_000) {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    try {
+      await fetch(url);
+      return;
+    } catch {
+      await new Promise((r) => setTimeout(r, 300));
+    }
+  }
+  throw new Error(`server at ${url} did not come up`);
+}
+
+async function launchChromium(): Promise<Browser> {
+  try {
+    return await chromium.launch();
+  } catch (error) {
+    const fallback = "/opt/pw-browsers/chromium";
+    if (!existsSync(fallback)) throw error;
+    return chromium.launch({ executablePath: fallback });
+  }
+}
+
+/** Where did a visit to `route` actually end up? */
+async function landsOn(route: string, token?: string): Promise<string> {
+  const context = await browser!.newContext();
+  if (token) {
+    await context.addCookies([
+      { name: SESSION_COOKIE, value: token, url: baseUrl },
+    ]);
+  }
+  const page = await context.newPage();
+  await page.goto(`${baseUrl}${route}`, { waitUntil: "networkidle" });
+  const landed = new URL(page.url()).pathname;
+  await context.close();
+  return landed;
+}
+
+before(async () => {
+  if (!DATABASE_URL) return;
+
+  if (!existsSync(path.join(ROOT, ".next", "BUILD_ID"))) {
+    await new Promise<void>((resolve, reject) => {
+      const child = spawn("npx", ["next", "build"], {
+        cwd: ROOT,
+        stdio: "inherit",
+      });
+      child.on("error", reject);
+      child.on("exit", (code) =>
+        code === 0 ? resolve() : reject(new Error(`build exited ${code}`)),
+      );
+    });
+  }
+
+  const port = await freePort();
+  baseUrl = `http://127.0.0.1:${port}`;
+  server = spawn("npx", ["next", "start", "-p", String(port)], {
+    cwd: ROOT,
+    stdio: "ignore",
+    env: { ...process.env, DATABASE_URL },
+  });
+
+  await waitForServer(baseUrl);
+  browser = await launchChromium();
+});
+
+after(async () => {
+  await browser?.close();
+  server?.kill();
+});
+
+describe("the staff login", needsDatabase, () => {
+  test("nothing private answers to a stranger", async () => {
+    // With an owner registered, a stranger is sent to sign in rather than set up.
+    await clearStaff(DATABASE_URL!);
+    await signInDirectly(DATABASE_URL!);
+
+    for (const route of PRIVATE) {
+      assert.equal(
+        await landsOn(route),
+        "/login",
+        `${route} answered without a session`,
+      );
+    }
+  });
+
+  test("the customer surfaces stay open", async () => {
+    await clearStaff(DATABASE_URL!);
+    await signInDirectly(DATABASE_URL!);
+
+    for (const route of PUBLIC) {
+      assert.equal(
+        await landsOn(route),
+        route,
+        `${route} was closed to a customer who has no account`,
+      );
+    }
+  });
+
+  test("a made-up session cookie is not a session", async () => {
+    await clearStaff(DATABASE_URL!);
+    await signInDirectly(DATABASE_URL!);
+
+    /*
+     * The guard in `proxy.ts` only checks that a cookie is present, which
+     * anyone can arrange. This is the case that proves something behind it
+     * actually verifies the token.
+     */
+    assert.equal(await landsOn("/clients", "not-a-real-token"), "/login");
+  });
+
+  test("a real session gets in", async () => {
+    await clearStaff(DATABASE_URL!);
+    const { token } = await signInDirectly(DATABASE_URL!);
+
+    assert.equal(await landsOn("/clients", token), "/clients");
+    assert.equal(await landsOn("/", token), "/");
+  });
+
+  test("signing out kills the token everywhere, not just in that browser", async () => {
+    await clearStaff(DATABASE_URL!);
+    const { token } = await signInDirectly(DATABASE_URL!);
+    assert.equal(await landsOn("/clients", token), "/clients");
+
+    // What signing out does: delete the row. A self-contained token could not
+    // be withdrawn like this, which is why sessions live in the database.
+    const sql = postgres(DATABASE_URL!, { max: 1, onnotice: () => {} });
+    await sql`DELETE FROM sessions`;
+    await sql.end();
+
+    assert.equal(await landsOn("/clients", token), "/login");
+  });
+
+  test("a deactivated account stops being able to sign in", async () => {
+    await clearStaff(DATABASE_URL!);
+    const { token, staffId } = await signInDirectly(DATABASE_URL!);
+    assert.equal(await landsOn("/clients", token), "/clients");
+
+    const sql = postgres(DATABASE_URL!, { max: 1, onnotice: () => {} });
+    await sql`UPDATE staff SET active = false WHERE id = ${staffId}`;
+    await sql.end();
+
+    // The session row still exists. It stops working anyway, which is what
+    // "remove someone's access this afternoon" has to mean.
+    assert.equal(await landsOn("/clients", token), "/login");
+  });
+
+  test("with nobody registered the app asks for an owner, and only once", async () => {
+    await clearStaff(DATABASE_URL!);
+    assert.equal(await landsOn("/"), "/setup");
+    assert.equal(await landsOn("/orders"), "/setup");
+
+    await signInDirectly(DATABASE_URL!);
+    // Now that somebody owns it, the page that mints an owner is gone.
+    assert.equal(await landsOn("/setup"), "/login");
+  });
+});
