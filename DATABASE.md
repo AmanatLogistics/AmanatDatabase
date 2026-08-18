@@ -4,8 +4,8 @@ Postgres, reached through [Drizzle](https://orm.drizzle.team). The schema lives
 in `src/db/schema.ts`; the SQL that creates it lives in `drizzle/` and is
 committed, so you can read exactly what runs.
 
-Nothing in the app talks to it yet — that lands in the next stage. This is the
-foundation and the setup instructions.
+Signing in already runs on it. The rest of the data moves across in the next
+stage.
 
 ## Setting up Supabase
 
@@ -87,3 +87,57 @@ differently from how the UI states them, both to avoid floats:
   array, so the database can enforce that every line referenced exists.
 
 The conversion between the two sits in one place, next to the money conversions.
+
+## Signing in
+
+Staff accounts live in the `staff` table and sessions in `sessions`. There is no
+password anywhere in the code and no shared login.
+
+### The first account
+
+Open the app with an empty database and it sends you to **`/setup`**, which
+creates the owner account and signs you in. That page then stops existing —
+once anyone owns the app, there is no way in without a password.
+
+If you ever need to start again, delete the rows and the setup page comes back:
+
+```sql
+TRUNCATE staff CASCADE;
+```
+
+### What is protected
+
+Everything except the storefront (`/store`), customer tracking (`/track`), and
+the two login pages. That includes printed invoices, which carry a client's name
+and address.
+
+Two checks, not one:
+
+- **`proxy.ts`** redirects a visitor with no session cookie to the login page.
+  It is a convenience — it only looks at whether a cookie exists, and anyone can
+  set a cookie.
+- **`requireStaff()`** in every protected layout asks the database. That is the
+  check that counts, and every server action that touches data will call it too.
+
+### How the session works
+
+The cookie holds a random token. The database stores only its SHA-256, so a leak
+of the `sessions` table cannot be replayed as somebody's login. Signing out
+deletes the row, which ends that session in every browser holding it — the
+reason sessions are in the database rather than inside a signed cookie. Deactivate
+an account and its existing sessions stop working on the next request.
+
+Passwords are hashed with scrypt from Node's standard library, cost parameters
+stored alongside each hash so they can be raised later without locking anyone
+out.
+
+### Against guessing
+
+Eight wrong passwords locks an account for 15 minutes. The counter is a column
+on the row, not a number in memory, because the app runs on serverless instances
+that do not share memory — an in-process counter would reset itself constantly
+and protect nothing.
+
+A wrong password and an email that does not exist return the same message, and
+take the same time, so the login cannot be used to find out which of your staff
+emails are real.

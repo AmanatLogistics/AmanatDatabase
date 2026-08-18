@@ -7,6 +7,7 @@ import { useTheme } from "next-themes";
 import {
   ChevronDownIcon,
   HelpCircleIcon,
+  LogOutIcon,
   MoonIcon,
   PanelLeftCloseIcon,
   SunIcon,
@@ -17,7 +18,9 @@ import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { navigation, type NavItem } from "@/components/layout/nav-config";
-import { useNavCounts, useTeam } from "@/lib/api";
+import { useNavCounts } from "@/lib/api";
+import { useSignedIn } from "@/components/auth/signed-in";
+import { signOut } from "@/lib/auth/actions";
 import { initials } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
@@ -41,8 +44,12 @@ export function Sidebar({
 }) {
   const pathname = usePathname();
   const nav = useNavCounts();
-  const team = useTeam();
-  const owner = team[0];
+  /*
+   * The person actually signed in, not the first row of the team list. Those
+   * were the same thing while everyone shared one browser; they are not once
+   * four people have their own accounts.
+   */
+  const owner = useSignedIn();
 
   const badgeCounts: Record<string, number> = {
     activeOrders: nav.activeOrders,
@@ -122,6 +129,7 @@ export function Sidebar({
             <span className="bg-brand-700 text-primary-foreground flex size-9 items-center justify-center rounded-full text-xs font-semibold">
               {initials(owner?.name ?? "AS")}
             </span>
+            <SignOutButton label="Sign out" />
             <ThemeToggle collapsed />
             <Button
               variant="ghost"
@@ -160,12 +168,38 @@ export function Sidebar({
                 </TooltipTrigger>
                 <TooltipContent>Settings &amp; help</TooltipContent>
               </Tooltip>
+              <SignOutButton label="Sign out" />
             </div>
             <ThemeToggle />
           </>
         )}
       </div>
     </aside>
+  );
+}
+
+/**
+ * Ends the session on the server, not just in this tab.
+ *
+ * A plain form posting to a server action, so it still works with JavaScript
+ * unavailable — the one control on the page that most needs to.
+ */
+function SignOutButton({ label }: { label: string }) {
+  return (
+    <form action={signOut}>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <button
+            type="submit"
+            aria-label={label}
+            className="text-muted-foreground hover:text-foreground flex size-7 items-center justify-center rounded"
+          >
+            <LogOutIcon className="size-4" />
+          </button>
+        </TooltipTrigger>
+        <TooltipContent>{label}</TooltipContent>
+      </Tooltip>
+    </form>
   );
 }
 

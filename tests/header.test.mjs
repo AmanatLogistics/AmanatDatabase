@@ -8,6 +8,8 @@ import { fileURLToPath } from "node:url";
 
 import { chromium } from "playwright";
 
+import { SESSION_COOKIE, signInDirectly } from "./helpers/session.mjs";
+
 /**
  * The app chrome — the Amanat Shopping logo in the sidebar rail and the top
  * header — must be on screen on the order detail route, whether the URL is
@@ -23,13 +25,21 @@ import { chromium } from "playwright";
  * exist, the *server* sends an empty body and the chrome is painted only after
  * hydration. See the note in the pull request. Asserting it today would commit a
  * failing test; it is written up instead.
+ *
+ * These routes are behind the staff login, so the suite needs a database to
+ * make an account in. Without DATABASE_URL it skips rather than fails.
  */
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const DATABASE_URL = process.env.DATABASE_URL;
+const needsDatabase = {
+  skip: DATABASE_URL ? false : "DATABASE_URL is not set",
+};
 
 let server;
 let browser;
 let baseUrl;
+let session;
 
 function run(command, args) {
   return new Promise((resolve, reject) => {
@@ -162,6 +172,11 @@ async function openPage(route, { javaScriptEnabled = true } = {}) {
     javaScriptEnabled,
     viewport: { width: 1440, height: 900 },
   });
+  // Signed in, because every one of these routes is now behind the login.
+  await context.addCookies([
+    { name: SESSION_COOKIE, value: session.token, url: baseUrl },
+  ]);
+
   const page = await context.newPage();
   // Runs before any app code on every document in this context.
   await page.addInitScript(
@@ -185,6 +200,8 @@ async function readChrome(page) {
 }
 
 before(async () => {
+  if (!DATABASE_URL) return;
+
   if (!existsSync(path.join(ROOT, ".next", "BUILD_ID"))) {
     await run("npx", ["next", "build"]);
   }
@@ -198,6 +215,7 @@ before(async () => {
 
   await waitForServer(baseUrl);
   browser = await launchChromium();
+  session = await signInDirectly(DATABASE_URL);
 });
 
 after(async () => {
@@ -205,7 +223,7 @@ after(async () => {
   server?.kill();
 });
 
-describe("app chrome on the order detail route", () => {
+describe("app chrome on the order detail route", needsDatabase, () => {
   test("is server-rendered, before any JavaScript runs", async () => {
     // JavaScript off, so this is exactly the HTML the server sent. If the route
     // ever falls outside (app)/layout.tsx, this is the case that notices.
