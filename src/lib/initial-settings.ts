@@ -6,19 +6,35 @@ import type {
   TeamMember,
 } from "@/lib/types";
 
+/**
+ * Reference data the app starts with.
+ *
+ * Not records — settings. The company profile, the shops we buy from, the ways
+ * money moves and who is on the team. All of it is editable in Settings; this is
+ * only what is there before anyone has edited anything.
+ *
+ * The account numbers and staff that used to live here were invented for the
+ * demo and have been removed. Fill in the real ones in Settings.
+ */
 export const company: CompanyProfile = {
   name: "Amanat Shopping",
   legalName: "Amanat Logistics & Trading Ltd.",
   tagline: "We buy it. We ship it. You receive it.",
-  phone: "+93 700 12 34 56",
-  whatsapp: "+93 700 12 34 56",
-  email: "orders@amanatshopping.af",
-  website: "amanatshopping.af",
-  addressLine1: "Shop 14, Zarnegar Plaza",
-  addressLine2: "Shahr-e-Naw, District 4",
+  /*
+   * Blank on purpose. The numbers that used to sit here were invented for the
+   * demo, and this profile is what a customer sees on the tracking page and on
+   * every printed invoice — a placeholder phone number reaching nobody is worse
+   * than an empty line. Fill them in at Settings -> Company.
+   */
+  phone: "",
+  whatsapp: "",
+  email: "",
+  website: "",
+  addressLine1: "",
+  addressLine2: "Shahr-e-Naw",
   city: "Kabul",
   country: "Afghanistan",
-  taxId: "9014-2287",
+  taxId: "",
   invoicePrefix: "INV",
   orderPrefix: "AS",
   currency: "AFN",
@@ -85,91 +101,49 @@ export const paymentMethods: PaymentMethod[] = [
     name: "Cash (AFN)",
     kind: "cash",
     usedFor: "both",
-    accountRef: "Shop counter",
     active: true,
   },
   {
-    id: "pm-azizi",
-    name: "Azizi Bank transfer",
+    id: "pm-bank",
+    name: "Bank transfer",
     kind: "bank",
     usedFor: "incoming",
-    accountRef: "0041 8829 3310",
     active: true,
   },
   {
-    id: "pm-aib",
-    name: "AIB transfer",
-    kind: "bank",
-    usedFor: "incoming",
-    accountRef: "1120 5567 0092",
-    active: true,
-  },
-  {
-    id: "pm-hesabpay",
-    name: "HesabPay wallet",
+    id: "pm-wallet",
+    name: "Mobile wallet",
     kind: "mobile_wallet",
     usedFor: "incoming",
-    accountRef: "+93 700 12 34 56",
     active: true,
   },
   {
     id: "pm-hawala",
-    name: "Hawala (Sarai Shahzada)",
+    name: "Hawala",
     kind: "hawala",
     usedFor: "outgoing",
-    accountRef: "Haji Rafi exchange",
     active: true,
   },
   {
-    id: "pm-visa",
-    name: "Business Visa card",
+    id: "pm-card",
+    name: "Business card",
     kind: "card",
     usedFor: "outgoing",
-    accountRef: "•••• 4417",
     active: true,
   },
 ];
 
+/**
+ * One row, so the app has an author for the events it records and somebody to
+ * show in the sidebar. Add the rest of the staff in Settings -> Team.
+ */
 export const team: TeamMember[] = [
   {
     id: "user-owner",
     name: "Bashir Khan",
-    email: "bashir@amanatshopping.af",
+    email: "owner@amanatshopping.af",
     role: "owner",
-    phone: "+93 700 12 34 56",
     active: true,
-  },
-  {
-    id: "user-manager",
-    name: "Sohaila Nazari",
-    email: "sohaila@amanatshopping.af",
-    role: "manager",
-    phone: "+93 744 88 12 09",
-    active: true,
-  },
-  {
-    id: "user-ops",
-    name: "Rahim Jan",
-    email: "rahim@amanatshopping.af",
-    role: "operator",
-    phone: "+93 771 40 55 62",
-    active: true,
-  },
-  {
-    id: "user-acct",
-    name: "Yalda Sediqi",
-    email: "yalda@amanatshopping.af",
-    role: "accountant",
-    phone: "+93 790 23 77 41",
-    active: true,
-  },
-  {
-    id: "user-ops2",
-    name: "Mustafa Amiri",
-    email: "mustafa@amanatshopping.af",
-    role: "operator",
-    phone: "+93 728 66 30 18",
-    active: false,
   },
 ];
 

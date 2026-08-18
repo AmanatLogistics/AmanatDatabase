@@ -837,8 +837,13 @@ export async function upsertPaymentMethod(
   return delay(undefined);
 }
 
-/** Restores the seeded demo dataset. */
-export async function resetDemoData(): Promise<void> {
+/**
+ * Erase every record and put the settings back to their defaults.
+ *
+ * Destructive and not undoable — the caller must confirm first. There is no
+ * server holding a copy: what is in this browser is the only copy there is.
+ */
+export async function eraseAllData(): Promise<void> {
   state().reset();
   return delay(undefined);
 }

@@ -50,8 +50,8 @@ export interface GenerateOptions {
   /** Company prefix, e.g. "AM". Falls back to "AS". */
   prefix?: string;
   /**
-   * Injected so the seed generator can pass its own deterministic source and
-   * keep the mock dataset stable between reloads.
+   * Injected so a caller can pass its own source — a test, or anything that
+   * needs the same number twice.
    */
   random?: () => number;
 }

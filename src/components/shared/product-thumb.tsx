@@ -47,9 +47,10 @@ const CATEGORY_TINT: Record<ProductCategory, string> = {
 /**
  * Product image with a branded fallback.
  *
- * The mock dataset carries no photography, so every item renders the category
- * tile. Once the backend supplies `imageUrl` values (client photos or store
- * images), they render here instead — add the host to `next.config.ts`.
+ * A product with no photo yet renders the category tile instead, so a fresh
+ * catalogue still looks deliberate. Photos come from the picker in Shop ->
+ * Products and are stored as data URLs; if a future backend serves them from a
+ * URL instead, add the host to `next.config.ts`.
  */
 export function ProductThumb({
   category,

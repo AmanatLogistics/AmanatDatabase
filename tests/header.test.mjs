@@ -87,12 +87,87 @@ async function launchChromium() {
   }
 }
 
+/**
+ * One order and the client it belongs to, written straight into the storage the
+ * app reads.
+ *
+ * The database ships empty — there is no seeded order to open — so these cases
+ * bring their own. Going through the UI to create one would test the create
+ * form, not the thing here, which is that the chrome survives on a detail route.
+ *
+ * Only the keys named are written: zustand's merge is shallow, so settings and
+ * every other slice keep their defaults.
+ */
+const ORDER_ID = "order-test-0001";
+const ORDER_NO = "AS-2026-0001";
+
+function seedPayload() {
+  const at = "2026-08-01T09:00:00.000Z";
+  return JSON.stringify({
+    version: 3,
+    state: {
+      clients: [
+        {
+          id: "client-test-0001",
+          code: "AMN-C-0001",
+          name: "Test Client",
+          type: "individual",
+          status: "active",
+          phone: "0700000001",
+          city: "Kabul",
+          preferredContact: "phone",
+          createdAt: at,
+        },
+      ],
+      orders: [
+        {
+          id: ORDER_ID,
+          orderNo: ORDER_NO,
+          trackingNumber: "AM-2026-TEST01",
+          clientId: "client-test-0001",
+          status: "confirmed",
+          source: "walk_in",
+          requestedAt: at,
+          items: [
+            {
+              id: "item-test-0001",
+              name: "Test item",
+              storeId: "store-amazon-us",
+              category: "other",
+              qty: 1,
+              unitPriceAfn: 1000,
+              unitCostAfn: 800,
+            },
+          ],
+          serviceFeeAfn: 0,
+          shippingChargedAfn: 0,
+          discountAfn: 0,
+          timeline: [
+            {
+              id: "event-test-0001",
+              at,
+              status: "requested",
+              title: "Order created",
+              actor: "Test",
+            },
+          ],
+        },
+      ],
+    },
+  });
+}
+
 async function openPage(route, { javaScriptEnabled = true } = {}) {
   const context = await browser.newContext({
     javaScriptEnabled,
     viewport: { width: 1440, height: 900 },
   });
   const page = await context.newPage();
+  // Runs before any app code on every document in this context.
+  await page.addInitScript(
+    ([key, value]) => window.localStorage.setItem(key, value),
+    ["amanat-shopping-data", seedPayload()],
+  );
   const response = await page.goto(`${baseUrl}${route}`, {
     waitUntil: javaScriptEnabled ? "networkidle" : "domcontentloaded",
   });
@@ -134,7 +209,7 @@ describe("app chrome on the order detail route", () => {
   test("is server-rendered, before any JavaScript runs", async () => {
     // JavaScript off, so this is exactly the HTML the server sent. If the route
     // ever falls outside (app)/layout.tsx, this is the case that notices.
-    const { context, page, response } = await openPage("/orders/order-0100", {
+    const { context, page, response } = await openPage(`/orders/${ORDER_ID}`, {
       javaScriptEnabled: false,
     });
 
@@ -147,14 +222,14 @@ describe("app chrome on the order detail route", () => {
   });
 
   test("is on screen when the URL is opened directly", async () => {
-    const { context, page, response } = await openPage("/orders/order-0100");
+    const { context, page, response } = await openPage(`/orders/${ORDER_ID}`);
 
     assert.equal(response.status(), 200);
     const chrome = await readChrome(page);
     assert.ok(chrome.logo > 0, "sidebar logo is not on screen");
     assert.equal(chrome.header, 1, "top header is not on screen");
     assert.equal(chrome.search, 1, "top bar search is not on screen");
-    assert.match(chrome.heading, /^AS-\d{4}-\d+$/);
+    assert.equal(chrome.heading, ORDER_NO);
 
     await context.close();
   });
@@ -163,13 +238,13 @@ describe("app chrome on the order detail route", () => {
     const { context, page } = await openPage("/orders");
 
     await page.locator("tbody tr").first().click();
-    await page.waitForURL(/\/orders\/order-/);
+    await page.waitForURL(new RegExp(`/orders/${ORDER_ID}`));
     await page.waitForTimeout(500);
 
     const chrome = await readChrome(page);
     assert.ok(chrome.logo > 0, "sidebar logo is not on screen");
     assert.equal(chrome.header, 1, "top header is not on screen");
-    assert.match(chrome.heading, /^AS-\d{4}-\d+$/);
+    assert.equal(chrome.heading, ORDER_NO);
 
     await context.close();
   });

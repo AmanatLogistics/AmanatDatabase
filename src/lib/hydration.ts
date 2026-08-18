@@ -7,10 +7,10 @@ import { useDataStore } from "@/lib/store";
 /**
  * Has the persisted store finished loading?
  *
- * The server renders from the seed data, because it cannot see the browser's
- * localStorage. If the first client render used the persisted data instead, the
- * two would disagree and React would report a hydration mismatch — so screens
- * hold off until this returns true.
+ * The server renders from the empty starting state, because it cannot see the
+ * browser's localStorage. If the first client render used the persisted data
+ * instead, the two would disagree and React would report a hydration mismatch —
+ * so screens hold off until this returns true.
  *
  * `useSyncExternalStore` is what makes that safe: its third argument is the
  * server snapshot, pinned to `false`, so hydration renders the same "not ready"

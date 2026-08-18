@@ -2,8 +2,19 @@
 
 import * as React from "react";
 import { toast } from "sonner";
-import { RotateCcwIcon, SaveIcon } from "lucide-react";
+import { SaveIcon, Trash2Icon } from "lucide-react";
 
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -11,7 +22,7 @@ import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
 import { Logo } from "@/components/brand/logo";
-import { resetDemoData, updateCompany, useCompany } from "@/lib/api";
+import { eraseAllData, updateCompany, useCompany } from "@/lib/api";
 import type { CompanyProfile } from "@/lib/types";
 
 export function CompanySettingsScreen() {
@@ -19,9 +30,9 @@ export function CompanySettingsScreen() {
   const [draft, setDraft] = React.useState<CompanyProfile>(company);
   const [saving, setSaving] = React.useState(false);
 
-  // Re-seed the form whenever the stored profile changes (a save, or a reset of
-  // the demo data). Adjusting during render keeps the inputs from flashing the
-  // stale values for a frame.
+  // Re-seed the form whenever the stored profile changes (a save, or an erase).
+  // Adjusting during render keeps the inputs from flashing the stale values for
+  // a frame.
   const [lastCompany, setLastCompany] = React.useState(company);
   if (lastCompany !== company) {
     setLastCompany(company);
@@ -211,19 +222,38 @@ export function CompanySettingsScreen() {
       </Card>
 
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={async () => {
-            await resetDemoData();
-            toast.success("Demo data restored", {
-              description: "All screens are back to the seeded dataset.",
-            });
-          }}
-        >
-          <RotateCcwIcon />
-          Reset demo data
-        </Button>
+        <AlertDialog>
+          <AlertDialogTrigger asChild>
+            <Button variant="outline" size="sm">
+              <Trash2Icon />
+              Erase all data
+            </Button>
+          </AlertDialogTrigger>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Erase everything?</AlertDialogTitle>
+              <AlertDialogDescription>
+                This deletes every client, order, purchase, payment and product,
+                and puts the settings back to their defaults. It cannot be
+                undone, and there is no copy anywhere else — the data lives in
+                this browser only.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Keep my data</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={async () => {
+                  await eraseAllData();
+                  toast.success("Everything erased", {
+                    description: "The app is back to an empty database.",
+                  });
+                }}
+              >
+                Erase everything
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
 
         <div className="flex items-center gap-2">
           {dirty && (
