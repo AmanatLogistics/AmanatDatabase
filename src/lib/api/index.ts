@@ -6,4 +6,5 @@
  * `src/components` should import `@/lib/store` or `@/lib/initial-*` directly.
  */
 export * from "@/lib/api/queries";
+export * from "@/lib/api/where";
 export * from "@/lib/api/mutations";

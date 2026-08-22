@@ -1,6 +1,11 @@
 "use client";
 
-import { ORDER_STATUS } from "@/lib/constants";
+import {
+  ORDER_STATUS,
+  PURCHASE_STATUS,
+  PURCHASE_STATUS_DESCRIPTION,
+} from "@/lib/constants";
+import { actorName } from "@/lib/api/actor";
 import { orderRevenue } from "@/lib/finance";
 import { useDataStore } from "@/lib/store";
 import {
@@ -95,7 +100,7 @@ function event(
   status: OrderEvent["status"],
   title: string,
   description: string,
-  actor = "Rahim Jan",
+  actor = actorName(),
 ): OrderEvent {
   return {
     id: `${orderId}-evt-${index}`,
@@ -696,7 +701,7 @@ export async function createPurchase(
     id: `purchase-new-${Date.now()}`,
     purchaseNo: `PO-${at.getUTCFullYear()}-${pad(seq)}`,
     purchasedAt: at.toISOString(),
-    purchasedBy: "Rahim Jan",
+    purchasedBy: actorName(),
     ...input,
   };
 
@@ -729,6 +734,65 @@ export async function createPurchase(
   return delay(purchase);
 }
 
+/**
+ * Move a purchase along the pipeline. PATCH /api/purchases/:id
+ *
+ * A purchase was previously frozen at whatever status it was logged with, which
+ * left every parcel sitting at "Placed" forever — the pipeline has four real
+ * stages and a parcel passes through all of them.
+ *
+ * Reaching `received` carries the order to `arrived`, the same way logging a
+ * purchase already carries it to `purchased`: the goods being with us is the
+ * thing that makes an order arrived, and asking an operator to record it twice
+ * is how the two drift apart. Orders already delivered, cancelled or refunded
+ * are left alone.
+ */
+export async function updatePurchaseStatus(
+  id: ID,
+  status: PurchaseStatus,
+  note?: string,
+): Promise<void> {
+  const { purchases, updatePurchase, orders, updateOrder } = state();
+  const purchase = purchases.find((p) => p.id === id);
+  if (!purchase || purchase.status === status) return delay(undefined);
+
+  updatePurchase(id, { status });
+
+  const order = orders.find((o) => o.id === purchase.orderId);
+  if (order) {
+    const timeline = [
+      ...order.timeline,
+      event(
+        order.id,
+        order.timeline.length + 1,
+        "purchase",
+        `${purchase.purchaseNo} is now ${PURCHASE_STATUS[status].label.toLowerCase()}`,
+        note ?? PURCHASE_STATUS_DESCRIPTION[status],
+      ),
+    ];
+
+    const carriesOrderToArrived =
+      status === "received" &&
+      !["arrived", "ready_for_pickup", "delivered", "cancelled", "refunded"].includes(
+        order.status,
+      );
+
+    updateOrder(order.id, {
+      timeline,
+      ...(carriesOrderToArrived ? { status: "arrived" as const } : {}),
+    });
+  }
+
+  notify(
+    "purchase",
+    `${purchase.purchaseNo} is now ${PURCHASE_STATUS[status].label.toLowerCase()}`,
+    note ?? PURCHASE_STATUS_DESCRIPTION[status],
+    `/purchases/${id}`,
+  );
+
+  return delay(undefined);
+}
+
 /* -------------------------------------------------------------------------- */
 /* Payments — POST /api/payments                                               */
 /* -------------------------------------------------------------------------- */
@@ -757,7 +821,7 @@ export async function createPayment(
     id: `payment-new-${Date.now()}`,
     receiptNo: `RCT-${at.getUTCFullYear()}-${pad(seq)}`,
     at: at.toISOString(),
-    recordedBy: "Yalda Sediqi",
+    recordedBy: actorName(),
     ...input,
   };
 
@@ -790,7 +854,7 @@ export async function createPayment(
             0,
             revenue.totalAfn - paidAfter,
           ).toLocaleString()} AFN.`,
-          "Yalda Sediqi",
+          actorName(),
         ),
       ],
     });

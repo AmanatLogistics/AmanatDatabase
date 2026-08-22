@@ -221,6 +221,22 @@ export const PURCHASE_STATUS: Record<
  * whom? These sentences are shown next to the choice so the answer never has to
  * be guessed.
  */
+/**
+ * The order a purchase moves through, when nothing goes wrong.
+ *
+ * Cancelled and refunded are outcomes, not stages, so they sit outside it — a
+ * parcel does not pass through "cancelled" on its way to arriving.
+ */
+export const PURCHASE_PIPELINE: PurchaseStatus[] = [
+  "pending",
+  "placed",
+  "shipped_to_warehouse",
+  "received",
+];
+
+/** The two ways a purchase can end without arriving. */
+export const PURCHASE_TERMINAL: PurchaseStatus[] = ["cancelled", "refunded"];
+
 export const PURCHASE_STATUS_DESCRIPTION: Record<PurchaseStatus, string> = {
   pending: "Decided to buy it, but the store order is not placed yet.",
   placed: "Ordered from the store. Our money has left.",

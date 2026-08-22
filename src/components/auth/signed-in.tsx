@@ -2,6 +2,7 @@
 
 import * as React from "react";
 
+import { setActor } from "@/lib/api/actor";
 import type { SignedInStaff } from "@/lib/auth/session";
 
 /**
@@ -24,6 +25,14 @@ export function SignedInProvider({
   staff: SignedInStaff;
   children: React.ReactNode;
 }) {
+  /*
+   * Also parked where the mutation layer can reach it, so a purchase or a
+   * payment is credited to the person who actually made it. `setActor` ignores
+   * the call on the server, where a module-level value would be shared between
+   * everyone's requests.
+   */
+  setActor(staff.name);
+
   return (
     <SignedInContext.Provider value={staff}>
       {children}

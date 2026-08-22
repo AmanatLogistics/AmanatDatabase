@@ -23,15 +23,16 @@ import { createClient, useClients } from "@/lib/api";
 import { CONTACT_CHANNEL_LABEL } from "@/lib/constants";
 import type { ClientType, ContactChannel } from "@/lib/types";
 
+/** Home city first — it is most of the list in practice. */
 const CITIES = [
+  "Kandahar",
   "Kabul",
   "Herat",
+  "Lashkargah",
   "Mazar-i-Sharif",
   "Jalalabad",
-  "Kandahar",
   "Kunduz",
   "Ghazni",
-  "Bamyan",
 ];
 
 export function NewClientScreen() {
