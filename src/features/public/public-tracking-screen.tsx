@@ -136,8 +136,13 @@ export function PublicTrackingScreen({
 
       <footer className="border-t">
         <div className="text-muted-foreground mx-auto w-full max-w-3xl px-4 py-6 text-center text-xs">
-          {pickup.companyName} · {pickup.addressLine1}, {pickup.city} · Call or
-          WhatsApp {pickup.whatsapp}
+          {[
+            pickup.companyName,
+            pickup.address,
+            pickup.whatsapp && `Call or WhatsApp ${pickup.whatsapp}`,
+          ]
+            .filter(Boolean)
+            .join(" · ")}
         </div>
       </footer>
     </div>
@@ -160,7 +165,10 @@ function BeforeSearch({ pickup }: { pickup: PublicPickupDetails }) {
           {[
             ["We confirm", "We check your order and call you with the price."],
             ["We buy it", "We order it from the store and pay for it."],
-            ["It travels", "It comes to Kabul, which usually takes 2–3 weeks."],
+            [
+              "It travels",
+              `It comes to ${pickup.city || "our office"}, which usually takes 2–3 weeks.`,
+            ],
             ["You collect", "We call you when it reaches our office."],
           ].map(([title, body], i) => (
             <li key={title} className="flex gap-3">
@@ -178,15 +186,18 @@ function BeforeSearch({ pickup }: { pickup: PublicPickupDetails }) {
         <div className="mt-6 flex flex-wrap items-center gap-2 border-t pt-4">
           <MapPinIcon className="text-muted-foreground size-4" />
           <p className="text-muted-foreground text-xs">
-            Collect from {pickup.addressLine1}, {pickup.addressLine2},{" "}
-            {pickup.city}
+            {pickup.address
+              ? `Collect from ${pickup.address}`
+              : "Collect from our office"}
           </p>
-          <Button variant="outline" size="sm" asChild className="ml-auto">
-            <a href={`tel:${pickup.phone.replace(/\s/g, "")}`}>
-              <PhoneIcon />
-              {pickup.phone}
-            </a>
-          </Button>
+          {pickup.phone && (
+            <Button variant="outline" size="sm" asChild className="ml-auto">
+              <a href={`tel:${pickup.phone.replace(/\s/g, "")}`}>
+                <PhoneIcon />
+                {pickup.phone}
+              </a>
+            </Button>
+          )}
         </div>
       </CardContent>
     </Card>
@@ -449,18 +460,19 @@ function Result({
                 <MapPinIcon className="text-muted-foreground mt-0.5 size-4 shrink-0" />
                 <div className="text-sm">
                   <p className="font-medium">{pickup.companyName}</p>
-                  <p className="text-muted-foreground">{pickup.addressLine1}</p>
-                  <p className="text-muted-foreground">
-                    {pickup.addressLine2}, {pickup.city}
-                  </p>
+                  {pickup.address && (
+                    <p className="text-muted-foreground">{pickup.address}</p>
+                  )}
                 </div>
               </div>
-              <Button variant="outline" size="sm" asChild>
-                <a href={`tel:${pickup.phone.replace(/\s/g, "")}`}>
-                  <PhoneIcon />
-                  {pickup.phone}
-                </a>
-              </Button>
+              {pickup.phone && (
+                <Button variant="outline" size="sm" asChild>
+                  <a href={`tel:${pickup.phone.replace(/\s/g, "")}`}>
+                    <PhoneIcon />
+                    {pickup.phone}
+                  </a>
+                </Button>
+              )}
             </div>
           </CardContent>
         </Card>

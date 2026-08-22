@@ -32,7 +32,7 @@ export function CheckoutScreen() {
 
   const [name, setName] = React.useState("");
   const [phone, setPhone] = React.useState("+93 ");
-  const [city, setCity] = React.useState("Kabul");
+  const [city, setCity] = React.useState("Kandahar");
   const [address, setAddress] = React.useState("");
   const [note, setNote] = React.useState("");
   const [placing, setPlacing] = React.useState(false);

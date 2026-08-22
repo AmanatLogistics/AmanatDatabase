@@ -22,6 +22,7 @@ import {
   addToCart,
   usePublishedProducts,
   useStoreProductBySlug,
+  useWhereWeAre,
 } from "@/lib/api";
 import { PRODUCT_CATEGORY_LABEL } from "@/lib/constants";
 import { cn } from "@/lib/utils";
@@ -34,6 +35,7 @@ export function ProductDetailScreen({ slug }: { slug: string }) {
   const hydrated = useStoreHydrated();
   const product = useStoreProductBySlug(slug);
   const all = usePublishedProducts();
+  const where = useWhereWeAre();
   const [qty, setQty] = React.useState(1);
 
   const related = React.useMemo(() => {
@@ -130,7 +132,7 @@ export function ProductDetailScreen({ slug }: { slug: string }) {
                 We buy it from the store abroad.
               </Step>
               <Step icon={TruckIcon} n={3}>
-                It travels to our office in Kabul — usually 2–3 weeks.
+                It travels to our office in {where.city} — usually 2–3 weeks.
               </Step>
               <Step icon={WalletIcon} n={4}>
                 We call you, you pay and collect.

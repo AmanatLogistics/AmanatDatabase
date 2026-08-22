@@ -27,7 +27,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
-import { usePublishedProducts } from "@/lib/api";
+import { usePublishedProducts, useWhereWeAre } from "@/lib/api";
 import { PRODUCT_CATEGORY_LABEL } from "@/lib/constants";
 import { useStoreHydrated } from "@/lib/hydration";
 import { cn } from "@/lib/utils";
@@ -250,6 +250,8 @@ export function StorefrontScreen() {
  * along the bottom of the same panel rather than in their own row of cards.
  */
 function Hero() {
+  const where = useWhereWeAre();
+
   return (
     <div className="brand-gradient text-primary-foreground relative mb-4 overflow-hidden rounded-2xl">
       <div
@@ -258,14 +260,14 @@ function Hero() {
       />
       <div className="relative px-5 py-7 sm:px-9 sm:py-12">
         <p className="text-gold-300 text-[11px] font-medium tracking-[0.18em] uppercase">
-          Amanat Shopping · Kabul
+          Amanat Shopping · {where.city}
         </p>
         <h1 className="mt-2 max-w-xl text-2xl font-semibold tracking-tight text-balance sm:text-4xl">
-          Anything you want, brought to Kabul
+          Anything you want, brought to {where.city}
         </h1>
         <p className="text-primary-foreground/85 mt-2 max-w-lg text-sm sm:text-base">
-          Order here, we buy it from the store abroad for you, and you collect it
-          from our office in Shahr-e-Naw.
+          Order here, we buy it from the store abroad for you, and you collect
+          it from our office in {where.address}.
         </p>
 
         <div className="border-primary-foreground/20 mt-6 flex flex-wrap gap-x-6 gap-y-2 border-t pt-4 text-xs sm:text-[13px]">

@@ -3,11 +3,14 @@
 import Link from "next/link";
 import { CheckCircleIcon } from "lucide-react";
 
+import { useWhereWeAre } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 
 /** Confirmation. Says what happens next, in the order it happens. */
 export function ThanksScreen({ reference }: { reference: string }) {
+  const where = useWhereWeAre();
+
   return (
     <Card className="mx-auto max-w-lg">
       <CardContent className="flex flex-col items-center gap-4 pt-8 text-center">
@@ -27,7 +30,7 @@ export function ThanksScreen({ reference }: { reference: string }) {
           <p className="font-medium">What happens next</p>
           <ol className="text-muted-foreground mt-2 grid gap-1.5">
             <li>1. We check your order and call you to confirm the price.</li>
-            <li>2. We buy it and bring it to Kabul.</li>
+            <li>2. We buy it and bring it to {where.city}.</li>
             <li>
               3. We send you a tracking number — until then, this reference
               works on the tracking page.

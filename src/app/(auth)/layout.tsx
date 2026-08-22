@@ -14,7 +14,7 @@ export default function AuthLayout({
     <div className="bg-muted/30 flex min-h-dvh flex-col items-center justify-center px-4 py-10">
       <div className="w-full max-w-sm">{children}</div>
       <p className="text-muted-foreground mt-8 text-center text-xs">
-        Amanat Shopping · Kabul
+        Amanat Shopping
       </p>
     </div>
   );

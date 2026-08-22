@@ -310,6 +310,8 @@ export interface PublicPickupDetails {
   city: string;
   phone: string;
   whatsapp: string;
+  /** The lines that are filled in, joined. Never has dangling commas. */
+  address: string;
 }
 
 export function usePublicPickupDetails(): PublicPickupDetails {
@@ -322,6 +324,15 @@ export function usePublicPickupDetails(): PublicPickupDetails {
       city: company.city,
       phone: company.phone,
       whatsapp: company.whatsapp,
+      /*
+       * Composed here rather than in the page, from whichever lines are filled
+       * in. A profile with no street used to render "Collect from , , Kandahar"
+       * — the punctuation for fields that were not there.
+       */
+      address: [company.addressLine1, company.addressLine2, company.city]
+        .map((line) => line.trim())
+        .filter(Boolean)
+        .join(", "),
     }),
     [company],
   );

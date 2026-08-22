@@ -7,7 +7,7 @@ import { PackageSearchIcon, ShoppingBagIcon } from "lucide-react";
 import { Logo } from "@/components/brand/logo";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { useCart } from "@/lib/api";
+import { useCart, useWhereWeAre } from "@/lib/api";
 import { startHydration, useStoreHydrated } from "@/lib/hydration";
 
 startHydration();
@@ -26,6 +26,7 @@ startHydration();
 export function StorefrontShell({ children }: { children: React.ReactNode }) {
   const hydrated = useStoreHydrated();
   const { count } = useCart();
+  const where = useWhereWeAre();
 
   return (
     <div className="bg-background flex min-h-dvh flex-col">
@@ -68,7 +69,7 @@ export function StorefrontShell({ children }: { children: React.ReactNode }) {
         <div className="mx-auto flex w-full max-w-7xl flex-col gap-1 px-4 py-8 text-center">
           <p className="text-sm font-medium">Amanat Shopping</p>
           <p className="text-muted-foreground text-xs">
-            Shahr-e-Naw, Kabul · We buy it for you abroad and you collect it from
+            {where.address} · We buy it for you abroad and you collect it from
             our office.
           </p>
           <p className="text-muted-foreground mt-2 text-xs">
