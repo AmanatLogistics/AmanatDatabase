@@ -6,7 +6,7 @@ import { InboxIcon, PackageIcon, TagsIcon } from "lucide-react";
 import { Money } from "@/components/shared/money";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { useStoreProducts, useWebOrders } from "@/lib/api";
+import type { StoreProduct, WebOrder } from "@/lib/types";
 import { formatRelative } from "@/lib/format";
 
 /**
@@ -15,9 +15,13 @@ import { formatRelative } from "@/lib/format";
  * Deliberately thin. The operations dashboard already answers the money
  * questions; this one only answers "is there anything for me to do here".
  */
-export function ShopOverviewScreen() {
-  const products = useStoreProducts();
-  const webOrders = useWebOrders();
+export function ShopOverviewScreen({
+  products,
+  webOrders,
+}: {
+  products: StoreProduct[];
+  webOrders: WebOrder[];
+}) {
 
   const published = products.filter((p) => p.active).length;
   const newOrders = webOrders.filter((o) => o.status === "new");

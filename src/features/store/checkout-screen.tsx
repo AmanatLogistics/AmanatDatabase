@@ -4,7 +4,6 @@ import * as React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { InfoIcon } from "lucide-react";
 
 import { Money } from "@/components/shared/money";
 import { Button } from "@/components/ui/button";
@@ -13,17 +12,22 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
-import { placeWebOrder, useCart } from "@/lib/api";
+import { clearCart, useCart } from "@/lib/api";
+import { placeOrder } from "@/lib/server/shop";
 import { useStoreHydrated } from "@/lib/hydration";
 
 /**
  * Checkout. No payment — the customer pays on collection, which is how the
  * business already works.
  *
- * The demo notice is deliberate and must stay until a backend exists. Without
- * one this order is written to the customer's own browser and the shop never
- * sees it, so letting someone believe they had bought something would be the
- * worst failure this app could have.
+ * This used to carry a notice saying orders did not reach the shop, because
+ * they did not: an order was written to the customer's own browser and nobody
+ * at Amanat ever saw it. The notice is gone because the reason for it is —
+ * `placeOrder` writes to the database and raises a notification in the same
+ * transaction.
+ *
+ * The basket sends product ids and quantities. Every price is read server-side,
+ * so what the customer is quoted is what the shop actually charges.
  */
 export function CheckoutScreen() {
   const router = useRouter();
@@ -43,20 +47,32 @@ export function CheckoutScreen() {
     if (invalid || lines.length === 0) return;
     setPlacing(true);
     try {
-      const order = await placeWebOrder({
-        customerName: name,
-        customerPhone: phone,
-        customerCity: city,
-        customerAddress: address,
+      /*
+       * Ids and quantities only. The prices shown on this page are for the
+       * customer to read; the server reads its own, because a total the
+       * browser computed is a total the browser could choose.
+       */
+      const result = await placeOrder({
+        name,
+        phone,
+        city,
+        address,
         note,
+        lines: lines.map((line) => ({
+          productId: line.product.id,
+          qty: line.qty,
+        })),
       });
-      router.push(`/store/thanks?ref=${order.reference}`);
-    } catch (error) {
-      toast.error(
-        error instanceof Error
-          ? error.message
-          : "Could not place your order. Please try again.",
-      );
+
+      if (result.error || !result.reference) {
+        toast.error(result.error ?? "Could not place your order.");
+        return;
+      }
+
+      clearCart();
+      router.push(`/store/thanks?ref=${result.reference}`);
+    } catch {
+      toast.error("Could not place your order. Please try again.");
     } finally {
       setPlacing(false);
     }
@@ -80,20 +96,6 @@ export function CheckoutScreen() {
   return (
     <>
       <h1 className="mb-4 text-2xl font-semibold tracking-tight">Checkout</h1>
-
-      <div
-        className="border-warning/40 bg-warning/10 mb-5 flex items-start gap-2.5 rounded-lg border p-3"
-        data-testid="demo-notice"
-      >
-        <InfoIcon className="text-warning mt-0.5 size-4 shrink-0" />
-        <div className="text-sm">
-          <p className="font-medium">This shop is a demonstration.</p>
-          <p className="text-muted-foreground">
-            Orders placed here are saved in this browser only and do not reach
-            Amanat Shopping. Please contact us directly to order for real.
-          </p>
-        </div>
-      </div>
 
       <div className="grid gap-4 lg:grid-cols-[1fr_320px]">
         <Card>

@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { PencilIcon, PlusIcon, TagsIcon, Trash2Icon } from "lucide-react";
 
@@ -31,19 +32,26 @@ import {
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  createStoreProduct,
-  deleteStoreProduct,
-  updateStoreProduct,
-  useStoreProducts,
-  useStores,
-} from "@/lib/api";
+import { useStores } from "@/lib/api";
+import { deleteProduct, saveProduct } from "@/lib/server/catalogue";
 import { PRODUCT_CATEGORY_LABEL } from "@/lib/constants";
 import type { ProductCategory, StoreProduct } from "@/lib/types";
 
-/** What we sell. Publishing is the switch between staff-only and customer-visible. */
-export function ShopProductsScreen() {
-  const products = useStoreProducts();
+/**
+ * What we sell. Publishing is the switch between staff-only and
+ * customer-visible.
+ *
+ * The catalogue is fetched by the page and arrives as a prop. After a save or a
+ * delete the route is refreshed rather than the list patched by hand: the
+ * server is the only thing that knows what is in there, and a local copy edited
+ * to match is a second version of the truth waiting to disagree.
+ */
+export function ShopProductsScreen({
+  products,
+}: {
+  products: StoreProduct[];
+}) {
+  const router = useRouter();
   const [editing, setEditing] = React.useState<StoreProduct | null>(null);
   const [creating, setCreating] = React.useState(false);
   const [deleting, setDeleting] = React.useState<StoreProduct | null>(null);
@@ -137,17 +145,25 @@ export function ShopProductsScreen() {
                       variant="ghost"
                       size="sm"
                       className="h-7 px-2 text-xs"
-                      onClick={() =>
-                        void updateStoreProduct(product.id, {
+                      onClick={async () => {
+                        await saveProduct({
+                          id: product.id,
+                          name: product.name,
+                          description: product.description,
+                          category: product.category,
+                          priceAfn: product.priceAfn,
+                          costAfn: product.costAfn,
+                          storeId: product.storeId,
+                          imageUrls: product.imageUrls,
                           active: !product.active,
-                        }).then(() =>
-                          toast.success(
-                            product.active
-                              ? `${product.name} hidden from the storefront`
-                              : `${product.name} is now on the storefront`,
-                          ),
-                        )
-                      }
+                        });
+                        toast.success(
+                          product.active
+                            ? `${product.name} hidden from the storefront`
+                            : `${product.name} is now on the storefront`,
+                        );
+                        router.refresh();
+                      }}
                     >
                       {product.active ? "Unpublish" : "Publish"}
                     </Button>
@@ -188,7 +204,10 @@ export function ShopProductsScreen() {
           ]}
           confirmLabel="Delete product"
           successMessage={`${deleting.name} deleted`}
-          onConfirm={() => deleteStoreProduct(deleting.id)}
+          onConfirm={async () => {
+            await deleteProduct(deleting.id);
+            router.refresh();
+          }}
         />
       )}
     </>
@@ -202,6 +221,7 @@ function ProductDialog({
   product: StoreProduct | null;
   onDone: () => void;
 }) {
+  const router = useRouter();
   const stores = useStores().filter((s) => s.active);
 
   const [name, setName] = React.useState(product?.name ?? "");
@@ -244,14 +264,10 @@ function ProductDialog({
         imageUrls,
         active,
       };
-      if (product) {
-        await updateStoreProduct(product.id, payload);
-        toast.success(`${payload.name} updated`);
-      } else {
-        await createStoreProduct(payload);
-        toast.success(`${payload.name} added`);
-      }
+      await saveProduct({ ...payload, id: product?.id });
+      toast.success(product ? `${payload.name} updated` : `${payload.name} added`);
       onDone();
+      router.refresh();
     } catch (error) {
       toast.error(
         error instanceof Error ? error.message : "Could not save the product.",

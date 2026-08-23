@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { notFound, useRouter } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { ArrowLeftIcon, CheckIcon, PhoneIcon, XIcon } from "lucide-react";
 
@@ -12,13 +12,14 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
+import { convertWebOrder } from "@/lib/api";
 import {
-  convertWebOrder,
   deleteWebOrder,
   dismissWebOrder,
-  useWebOrder,
-} from "@/lib/api";
+  markWebOrderConverted,
+} from "@/lib/server/intake";
 import { formatDateTime } from "@/lib/format";
+import type { WebOrder } from "@/lib/types";
 
 /**
  * One website order, and the decision to make about it.
@@ -28,19 +29,22 @@ import { formatDateTime } from "@/lib/format";
  * that point the shop is out of the picture and the existing status lifecycle
  * takes over.
  */
-export function WebOrderDetailScreen({ webOrderId }: { webOrderId: string }) {
+export function WebOrderDetailScreen({ order }: { order: WebOrder }) {
   const router = useRouter();
-  const order = useWebOrder(webOrderId);
   const [busy, setBusy] = React.useState(false);
   const [deleting, setDeleting] = React.useState(false);
 
-  if (!order) notFound();
-
   async function handleConvert() {
-    if (!order) return;
     setBusy(true);
     try {
       const created = await convertWebOrder(order.id);
+      /*
+       * The operations order is still held in the browser, so the web order is
+       * marked converted on the server separately. That status is what the
+       * customer's tracking reads — without it they would still be told nobody
+       * had looked at their order.
+       */
+      await markWebOrderConverted(order.id);
       toast.success(`Converted to ${created.orderNo}`, {
         description: `Tracking ${created.trackingNumber} — give this to the customer.`,
       });
@@ -99,11 +103,12 @@ export function WebOrderDetailScreen({ webOrderId }: { webOrderId: string }) {
             <Button
               variant="outline"
               disabled={busy}
-              onClick={() =>
-                void dismissWebOrder(order.id).then(() =>
-                  toast.success(`${order.reference} dismissed`),
-                )
-              }
+              onClick={async () => {
+                await dismissWebOrder(order.id);
+                toast.success(`${order.reference} dismissed`);
+                // The status came from the server, so re-read it from there.
+                router.refresh();
+              }}
             >
               <XIcon />
               Dismiss

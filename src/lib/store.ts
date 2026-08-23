@@ -12,6 +12,7 @@ import type {
   Payment,
   Purchase,
   Settings,
+  PublicProduct,
   StoreProduct,
   WebOrder,
 } from "@/lib/types";
@@ -38,8 +39,17 @@ const STORAGE_KEY = "amanat-shopping-data";
 export interface DataState {
   clients: Client[];
   notifications: AppNotification[];
-  /** The storefront catalogue. Staff-managed, customer-visible when active. */
+  /** The storefront catalogue as staff see it, cost prices and all. */
   storeProducts: StoreProduct[];
+  /**
+   * The published catalogue as a customer sees it.
+   *
+   * Deliberately a separate slice rather than a filter over `storeProducts`:
+   * that one carries cost prices, and a customer's browser must never hold
+   * them. This is seeded from the server on the storefront and is the only
+   * product data the shop pages read.
+   */
+  catalogue: PublicProduct[];
   /** The visitor's basket. Theirs alone — never seen by staff. */
   cart: CartLine[];
   /** Orders placed on the storefront, awaiting a human decision. */
@@ -66,6 +76,9 @@ export interface DataState {
   removePurchase: (id: string) => void;
 
   addPayment: (payment: Payment) => void;
+
+  /** Replace the customer-visible catalogue with what the server just sent. */
+  setCatalogue: (products: PublicProduct[]) => void;
 
   addStoreProduct: (product: StoreProduct) => void;
   updateStoreProduct: (id: string, patch: Partial<StoreProduct>) => void;
@@ -94,6 +107,7 @@ const initial = () => ({
   clients: initialData.clients,
   notifications: initialData.notifications,
   storeProducts: initialData.storeProducts,
+  catalogue: [] as PublicProduct[],
   cart: initialData.cart,
   webOrders: initialData.webOrders,
   orders: initialData.orders,
@@ -176,6 +190,8 @@ export const useDataStore = create<DataState>()(
 
       addPayment: (payment) =>
         set((state) => ({ payments: [payment, ...state.payments] })),
+
+      setCatalogue: (products) => set({ catalogue: products }),
 
       addStoreProduct: (product) =>
         set((state) => ({ storeProducts: [product, ...state.storeProducts] })),

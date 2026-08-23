@@ -26,15 +26,17 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Skeleton } from "@/components/ui/skeleton";
-import { usePublishedProducts, useWhereWeAre } from "@/lib/api";
+import { useWhereWeAre } from "@/lib/api";
 import { PRODUCT_CATEGORY_LABEL } from "@/lib/constants";
-import { useStoreHydrated } from "@/lib/hydration";
 import { cn } from "@/lib/utils";
-import type { StoreProduct } from "@/lib/types";
+import type { ProductCategory, PublicProduct } from "@/lib/types";
 
 /**
  * The shop window.
+ *
+ * The catalogue is rendered by the server and arrives as a prop. It used to be
+ * read from the visitor's own browser storage, which meant a customer saw the
+ * shop as it looked on the machine that created it — for anyone else, empty.
  *
  * Laid out the way a marketplace is, because that is what customers already
  * know how to read: a hero that says what we actually do, a search-and-sort bar
@@ -55,9 +57,7 @@ const SORT_LABEL: Record<Sort, string> = {
   name: "Name: A to Z",
 };
 
-export function StorefrontScreen() {
-  const hydrated = useStoreHydrated();
-  const products = usePublishedProducts();
+export function StorefrontScreen({ products }: { products: PublicProduct[] }) {
   const params = useSearchParams();
   const [search, setSearch] = React.useState("");
   /*
@@ -173,19 +173,13 @@ export function StorefrontScreen() {
               onClick={() => setCategory(c)}
               count={count}
             >
-              {PRODUCT_CATEGORY_LABEL[c as StoreProduct["category"]]}
+              {PRODUCT_CATEGORY_LABEL[c as ProductCategory]}
             </CategoryChip>
           ))}
         </div>
       </div>
 
-      {!hydrated ? (
-        <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
-          {Array.from({ length: 10 }).map((_, i) => (
-            <Skeleton key={i} className="aspect-[3/4] w-full rounded-xl" />
-          ))}
-        </div>
-      ) : filtered.length === 0 ? (
+      {filtered.length === 0 ? (
         <Card>
           <EmptyState
             icon={StoreIcon}
@@ -213,7 +207,7 @@ export function StorefrontScreen() {
             <p className="text-muted-foreground text-xs">
               {filtered.length} product{filtered.length > 1 ? "s" : ""}
               {category !== "all" &&
-                ` in ${PRODUCT_CATEGORY_LABEL[category as StoreProduct["category"]]}`}
+                ` in ${PRODUCT_CATEGORY_LABEL[category as ProductCategory]}`}
             </p>
             {narrowed && (
               <button
@@ -307,7 +301,7 @@ function Promise({
  * click. A count badge says the same thing on touch screens, where there is no
  * hover to discover.
  */
-function ProductCard({ product }: { product: StoreProduct }) {
+function ProductCard({ product }: { product: PublicProduct }) {
   const [main, second] = product.imageUrls;
 
   return (

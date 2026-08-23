@@ -1,4 +1,7 @@
+import { notFound } from "next/navigation";
+
 import { WebOrderDetailScreen } from "@/features/shop/web-order-detail-screen";
+import { getWebOrder } from "@/lib/server/intake";
 
 export default async function WebOrderDetailPage({
   params,
@@ -6,5 +9,8 @@ export default async function WebOrderDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  return <WebOrderDetailScreen webOrderId={id} />;
+  const order = await getWebOrder(id);
+  if (!order) notFound();
+
+  return <WebOrderDetailScreen order={order} />;
 }

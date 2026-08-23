@@ -37,7 +37,7 @@ function connect() {
    * `prepare: false` is required by that pooler — prepared statements are bound
    * to a backend connection it is free to swap underneath us.
    */
-  const client = postgres(found.url, { max: 1, prepare: false });
+  client = postgres(found.url, { max: 1, prepare: false });
   return drizzle(client, { schema });
 }
 
@@ -51,6 +51,7 @@ function connect() {
  * while a request is being served.
  */
 let instance: Database | undefined;
+let client: ReturnType<typeof postgres> | undefined;
 
 function resolve(): Database {
   instance ??= globalThis.__amanatDb ?? connect();
@@ -66,5 +67,20 @@ export const db = new Proxy({} as Database, {
     return Reflect.has(resolve(), property);
   },
 });
+
+/**
+ * Close the connection.
+ *
+ * Nothing in the app calls this — a serverless instance is torn down, not shut
+ * down politely. It exists for tests, which otherwise hang forever after the
+ * last assertion because an open socket keeps Node's event loop alive, and the
+ * failure reads as "the test timed out" rather than "the test finished".
+ */
+export async function closeDb(): Promise<void> {
+  await client?.end({ timeout: 5 });
+  client = undefined;
+  instance = undefined;
+  globalThis.__amanatDb = undefined;
+}
 
 export { schema };

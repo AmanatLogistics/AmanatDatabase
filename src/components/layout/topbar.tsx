@@ -22,14 +22,14 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { usePageMeta } from "@/components/layout/use-page-meta";
 import {
-  clearNotifications,
-  markNotificationsRead,
+
   useNavCounts,
-  useNotifications,
+
   useToday,
-  useUnreadNotificationCount,
+
 } from "@/lib/api";
 import { useSignedIn } from "@/components/auth/signed-in";
+import { useServerNotifications } from "@/components/layout/use-server-notifications";
 import { formatAfn, formatRelative, initials } from "@/lib/format";
 import type { AppNotification } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -64,8 +64,12 @@ export function Topbar({
    */
   const isDashboard = pathname === "/";
 
-  const events = useNotifications();
-  const unread = useUnreadNotificationCount();
+  const {
+    events,
+    unread,
+    markRead,
+    clear: clearAllNotifications,
+  } = useServerNotifications();
   /*
    * Two different things share this bell: events that happened (appended when
    * they happen) and the derived "needs attention" list (computed from current
@@ -158,7 +162,7 @@ export function Topbar({
       <DropdownMenu
         onOpenChange={(open) => {
           // Seen is seen: opening the panel clears the unread badge.
-          if (open && unread > 0) void markNotificationsRead();
+          if (open && unread > 0) void markRead();
         }}
       >
         <DropdownMenuTrigger asChild>
@@ -183,7 +187,7 @@ export function Topbar({
                 <DropdownMenuLabel className="p-0">Activity</DropdownMenuLabel>
                 <button
                   type="button"
-                  onClick={() => void clearNotifications()}
+                  onClick={() => void clearAllNotifications()}
                   className="text-muted-foreground hover:text-foreground text-xs"
                 >
                   Clear

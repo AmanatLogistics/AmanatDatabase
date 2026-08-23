@@ -44,6 +44,7 @@ import type {
   Store,
   StoreProduct,
   WebOrder,
+  PublicProduct,
 } from "@/lib/types";
 
 /**
@@ -455,14 +456,20 @@ export function useStoreProductBySlug(slug: string): StoreProduct | undefined {
 }
 
 export interface CartRow {
-  product: StoreProduct;
+  /** Public shape: a basket is a customer surface and holds no cost prices. */
+  product: PublicProduct;
   qty: number;
   lineTotalAfn: number;
 }
 
 export function useCart(): { lines: CartRow[]; totalAfn: number; count: number } {
   const cart = useDataStore((s) => s.cart);
-  const products = useDataStore((s) => s.storeProducts);
+  /*
+   * The customer-visible catalogue, seeded from the server by the storefront
+   * layout — not `storeProducts`, which carries cost prices and is staff data.
+   * The totals here are for display; checkout re-reads every price server-side.
+   */
+  const products = useDataStore((s) => s.catalogue);
 
   return useMemo(() => {
     const byId = new Map(products.map((p) => [p.id, p]));
