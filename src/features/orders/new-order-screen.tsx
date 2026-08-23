@@ -73,7 +73,14 @@ export function NewOrderScreen() {
     emptyItem(stores[0]?.id ?? "store-amazon-us"),
   ]);
   const [serviceFee, setServiceFee] = React.useState("");
-  const [shipping, setShipping] = React.useState("400");
+  /*
+   * Empty, not 400.
+   *
+   * A number already in the box is a number that gets sent: it read as the
+   * delivery charge rather than as a suggestion, and orders went out carrying
+   * it whether or not anybody had decided to charge for delivery.
+   */
+  const [shipping, setShipping] = React.useState("");
   const [discount, setDiscount] = React.useState("0");
   const [notes, setNotes] = React.useState("");
   const [saving, setSaving] = React.useState(false);
@@ -320,12 +327,18 @@ export function NewOrderScreen() {
           <Card className="xl:sticky xl:top-20">
             <CardHeader>
               <CardTitle className="text-sm">Quotation</CardTitle>
+              <p className="text-muted-foreground text-xs">
+                The client price you set on each item is what they pay for the
+                goods. These three are on top of that, and all three are
+                optional — leave them at zero if the item price is the whole
+                quote.
+              </p>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid grid-cols-3 gap-2">
                 <div className="grid gap-1.5">
                   <Label htmlFor="order-fee" className="text-xs">
-                    Fee (AFN)
+                    Extra fee
                   </Label>
                   <Input
                     id="order-fee"
@@ -340,7 +353,7 @@ export function NewOrderScreen() {
                 </div>
                 <div className="grid gap-1.5">
                   <Label htmlFor="order-shipping" className="text-xs">
-                    Shipping
+                    Delivery
                   </Label>
                   <Input
                     id="order-shipping"
@@ -372,8 +385,8 @@ export function NewOrderScreen() {
 
               <div className="space-y-1.5 text-sm">
                 <Line label={`Items (${validItems.length})`} value={itemsAfn} />
-                <Line label="Service fee" value={serviceFeeAfn} />
-                <Line label="Shipping" value={shippingAfn} />
+                <Line label="Extra fee" value={serviceFeeAfn} />
+                <Line label="Delivery" value={shippingAfn} />
                 {discountAfn > 0 && <Line label="Discount" value={-discountAfn} />}
                 <Separator className="my-2" />
                 <div className="flex items-center justify-between text-base font-semibold">
@@ -588,18 +601,16 @@ function ItemFields({
               inputMode="numeric"
               value={item.unitCostAfn || ""}
               onChange={(e) => {
-                const cost = Number(e.target.value.replace(/[^\d]/g, ""));
                 /*
-                 * Suggest a client price straight away: the store cost plus the
-                 * ~15% that store tax and domestic shipping typically add before
-                 * the item reaches us, rounded to the nearest 50 AFN the way the
-                 * team quotes.
+                 * The cost, and nothing else.
+                 *
+                 * This used to fill in a client price of cost + 15%. Nobody
+                 * chose that number, and a price already in the box is a price
+                 * that gets quoted — so the margin on an order was whatever the
+                 * form had guessed, silently. What the client pays is a
+                 * decision, and it stays one.
                  */
-                const suggested = Math.round((cost * 1.15) / 50) * 50;
-                onPatch({
-                  unitCostAfn: cost,
-                  unitPriceAfn: item.unitPriceAfn || suggested,
-                });
+                onPatch({ unitCostAfn: Number(e.target.value.replace(/[^\d]/g, "")) });
               }}
               className="tabular"
               placeholder="14000"

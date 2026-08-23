@@ -74,9 +74,28 @@ npx vercel env pull .env.local && npm run db:check
 
 ## Creating the tables
 
-**This happens on its own.** Every deploy runs the migrations before building,
-so connecting a database is the only step — the tables appear with the next
-deploy. Look for it in the Vercel build log:
+**This happens on its own, twice over.**
+
+1. **At deploy.** Every production deploy runs the migrations before building.
+2. **At runtime, if that did not happen.** The first request to touch the
+   database checks whether the tables exist and creates them if they do not.
+
+The second exists because the first can be missed — the connection string
+arrived after the build, the database was swapped, a preview was promoted. Miss
+it and every page used to answer `relation "staff" does not exist`: a 500 with
+no clue in it, on the first visit, before there was even an account to sign in
+with. Now the app brings its own schema up and carries on. Watch for this line
+in the runtime log:
+
+```
+[amanat] The database has no tables. Applying migrations now — this normally happens at build time.
+[amanat] Migrations applied.
+```
+
+It is serialised with an advisory lock, so several functions waking at once
+cannot race each other into creating the same tables.
+
+Look for the deploy-time run in the Vercel build log:
 
 ```
 Using DATABASE_URL -> postgresql://postgres@db.xxxx.supabase.co:6543/postgres

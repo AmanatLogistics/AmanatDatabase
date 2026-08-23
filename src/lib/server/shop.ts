@@ -12,6 +12,7 @@ import {
   webOrderLines,
   webOrders,
 } from "@/db/schema";
+import { ensureSchema } from "@/db/ensure-schema";
 import { toPublicProduct } from "@/db/map";
 import {
   CLIENT_STATUS_MESSAGE,
@@ -36,6 +37,9 @@ import type { PublicProduct } from "@/lib/types";
 
 /** Published products, without the cost prices. */
 export async function listPublishedProducts(): Promise<PublicProduct[]> {
+  // The storefront is public, so it can be the first thing to touch a database
+  // nobody has migrated.
+  await ensureSchema();
   const rows = await db.query.storeProducts.findMany({
     where: eq(storeProducts.active, true),
     with: { images: true },
@@ -47,6 +51,7 @@ export async function listPublishedProducts(): Promise<PublicProduct[]> {
 export async function getPublishedProduct(
   slug: string,
 ): Promise<PublicProduct | null> {
+  await ensureSchema();
   const row = await db.query.storeProducts.findFirst({
     where: and(eq(storeProducts.slug, slug), eq(storeProducts.active, true)),
     with: { images: true },
@@ -89,6 +94,7 @@ const MAX_QTY = 50;
  * has to be ours to compute.
  */
 export async function placeOrder(input: CheckoutInput): Promise<CheckoutResult> {
+  await ensureSchema();
   const name = input.name?.trim() ?? "";
   const phone = input.phone?.trim() ?? "";
   const city = input.city?.trim() ?? "";
@@ -213,6 +219,8 @@ export async function findWebOrder(
   const ref = reference.trim().toUpperCase();
   if (!/^WEB-\d{4}-\d{1,6}$/.test(ref)) return null;
 
+  await ensureSchema();
+
   const row = await db.query.webOrders.findFirst({
     where: eq(webOrders.reference, ref),
     with: {
@@ -279,6 +287,8 @@ async function findByTrackingNumber(
 ): Promise<TrackingResult | null> {
   const number = normaliseTrackingNumber(reference);
   if (!number) return null;
+
+  await ensureSchema();
 
   const row = await db.query.orders.findFirst({
     where: eq(orders.trackingNumber, number),

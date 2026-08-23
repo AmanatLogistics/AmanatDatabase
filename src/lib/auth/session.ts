@@ -7,6 +7,7 @@ import { redirect } from "next/navigation";
 import { and, eq, gt, lt } from "drizzle-orm";
 
 import { db } from "@/db";
+import { ensureSchema } from "@/db/ensure-schema";
 import { sessions, staff } from "@/db/schema";
 import { SESSION_COOKIE } from "@/lib/auth/cookie";
 import type { TeamRole } from "@/lib/types";
@@ -72,6 +73,10 @@ export async function createSession(staffId: string): Promise<void> {
 export const readSession = cache(async (): Promise<SignedInStaff | null> => {
   const token = (await cookies()).get(SESSION_COOKIE)?.value;
   if (!token) return null;
+
+  // Cheap after the first call, and the difference between a working app and
+  // `relation "staff" does not exist` on a database nobody migrated.
+  await ensureSchema();
 
   const rows = await db
     .select({

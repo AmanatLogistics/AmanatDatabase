@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { eq, sql as raw } from "drizzle-orm";
 
 import { db } from "@/db";
+import { ensureSchema } from "@/db/ensure-schema";
 import { staff } from "@/db/schema";
 import { hashPassword, verifyPassword } from "@/lib/auth/password";
 import { passwordProblem } from "@/lib/auth/policy";
@@ -49,6 +50,8 @@ export async function signIn(
   const password = String(formData.get("password") ?? "");
 
   if (!email || !password) return { error: "Enter your email and password." };
+
+  await ensureSchema();
 
   const [person] = await db
     .select()
@@ -112,6 +115,9 @@ export async function signOut(): Promise<void> {
 
 /** Is there nobody at all yet? Decides whether /setup is open. */
 export async function needsFirstOwner(): Promise<boolean> {
+  // The very first thing the app ever asks the database. If the tables are not
+  // there yet, this is where they get made.
+  await ensureSchema();
   const [row] = await db
     .select({ count: raw<number>`count(*)::int` })
     .from(staff);
