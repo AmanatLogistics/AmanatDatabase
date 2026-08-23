@@ -68,6 +68,45 @@ try {
   process.exit(1);
 }
 
+/*
+ * A stuck advisory lock, checked before the tables — because the symptom it
+ * causes is "there are no tables and nothing will create them".
+ *
+ * Earlier versions of this project took `pg_advisory_lock` around migrations.
+ * Over Supabase's transaction pooler the unlock is asked of a different backend
+ * than the one holding it, so it is refused and the lock survives on a pooled
+ * session forever. Nothing takes that lock any more, so a leftover is now
+ * harmless — but it will sit in the database until somebody clears it, and it
+ * explains any build or request that hung with no error at all.
+ */
+const stuck = await sql<{ pid: number; state: string | null; seconds: number }[]>`
+  SELECT l.pid,
+         a.state,
+         COALESCE(EXTRACT(EPOCH FROM (now() - a.state_change)), 0)::int AS seconds
+  FROM pg_locks l
+  LEFT JOIN pg_stat_activity a USING (pid)
+  WHERE l.locktype = 'advisory' AND l.granted`;
+
+if (stuck.length > 0) {
+  console.log(`\n${stuck.length} advisory lock(s) still held:`);
+  stuck.forEach((l) =>
+    console.log(`  pid ${l.pid}  ${l.state ?? "unknown"}  for ${l.seconds}s`),
+  );
+  if (process.argv.includes("--clear-locks")) {
+    const cleared = await sql<{ pid: number }[]>`
+      SELECT pg_terminate_backend(l.pid), l.pid
+      FROM pg_locks l WHERE l.locktype = 'advisory' AND l.granted`;
+    console.log(`\nCleared. Terminated ${cleared.length} session(s).`);
+  } else {
+    console.log(
+      "\n  Nothing in this app takes an advisory lock any more, so these are\n" +
+        "  leftovers from an older deploy. They are what makes a migration\n" +
+        "  hang with no error. To end the sessions holding them:\n" +
+        "    npm run db:check -- --clear-locks",
+    );
+  }
+}
+
 const tables = await sql<{ table_name: string }[]>`
   SELECT table_name FROM information_schema.tables
   WHERE table_schema = 'public' ORDER BY table_name`;

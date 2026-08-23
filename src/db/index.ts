@@ -6,10 +6,12 @@ import postgres from "postgres";
 import * as schema from "@/db/schema";
 import {
   APP_URL_VARS,
+  explainConnectionError,
   findDatabaseUrl,
   isDirectSupabaseHost,
   missingUrlMessage,
   onVercel,
+  type FoundUrl,
 } from "@/db/url";
 
 /**
@@ -31,8 +33,9 @@ declare global {
 type Database = ReturnType<typeof connect>;
 
 function connect() {
-  const found = findDatabaseUrl(APP_URL_VARS);
-  if (!found) throw new Error(missingUrlMessage(APP_URL_VARS));
+  const url = findDatabaseUrl(APP_URL_VARS);
+  if (!url) throw new Error(missingUrlMessage(APP_URL_VARS));
+  found = url;
 
   /*
    * `max: 1` is not a typo. On Vercel every request can land in its own short
@@ -49,12 +52,12 @@ function connect() {
    * "getaddrinfo ENOTFOUND db.xxxx.supabase.co", which sends you hunting for a
    * typo in a hostname that is spelled correctly.
    */
-  if (onVercel() && isDirectSupabaseHost(found.url)) {
+  if (onVercel() && isDirectSupabaseHost(url.url)) {
     console.error(
       [
         "",
         "  ╭──────────────────────────────────────────────────────────╮",
-        `  │ ${found.name} is Supabase's DIRECT connection, which is       `,
+        `  │ ${url.name} is Supabase's DIRECT connection, which is       `,
         "  │ IPv6-only. Vercel's functions are IPv4-only, so every query  ",
         "  │ here will fail with ENOTFOUND.                               ",
         "  │                                                              ",
@@ -72,7 +75,20 @@ function connect() {
    * below has something to close. Both halves of this are wanted: the warning
    * came from the IPv6 fix, the assignment from making tests able to exit.
    */
-  client = postgres(found.url, { max: 1, prepare: false });
+  client = postgres(url.url, {
+    max: 1,
+    prepare: false,
+    /*
+     * Both of these are about failing out loud. postgres.js waits 30 seconds
+     * for a connection by default, which is longer than a serverless function
+     * is allowed to live: an unreachable database produced a request that was
+     * killed by the platform mid-wait, so the log said nothing at all. Ten
+     * seconds leaves room to report the real error.
+     */
+    connect_timeout: 10,
+    idle_timeout: 20,
+    onnotice: () => {},
+  });
   return drizzle(client, { schema });
 }
 
@@ -87,6 +103,22 @@ function connect() {
  */
 let instance: Database | undefined;
 let client: ReturnType<typeof postgres> | undefined;
+let found: FoundUrl | undefined;
+
+/**
+ * Turn a driver error into something worth reading, without ever handing the
+ * connection string — password and all — to the caller.
+ *
+ * `explainConnectionError` knows what ENOTFOUND against Supabase's direct host
+ * really means, and what a rejected password looks like. That knowledge used to
+ * live only in the CLI scripts, so the running app answered a misconfigured
+ * database with the driver's own unhelpful text. This is how it reaches the
+ * runtime logs, which is where somebody debugging a deployment actually looks.
+ */
+export function explainDbFailure(error: unknown): string {
+  if (!found) return (error as Error)?.message ?? String(error);
+  return explainConnectionError(error, found.url);
+}
 
 function resolve(): Database {
   instance ??= globalThis.__amanatDb ?? connect();
@@ -115,6 +147,7 @@ export async function closeDb(): Promise<void> {
   await client?.end({ timeout: 5 });
   client = undefined;
   instance = undefined;
+  found = undefined;
   globalThis.__amanatDb = undefined;
 }
 

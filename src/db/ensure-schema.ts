@@ -1,9 +1,12 @@
 import "server-only";
 
+import { existsSync } from "node:fs";
+import path from "node:path";
+
 import { sql as raw } from "drizzle-orm";
 import { migrate } from "drizzle-orm/postgres-js/migrator";
 
-import { db } from "@/db";
+import { db, explainDbFailure } from "@/db";
 
 /**
  * Make sure the tables exist before anything tries to read them.
@@ -25,7 +28,7 @@ import { db } from "@/db";
 let inFlight: Promise<void> | undefined;
 
 export function ensureSchema(): Promise<void> {
-  inFlight ??= run().catch((error) => {
+  inFlight ??= run().catch((error: unknown) => {
     /*
      * Not cached on failure. A database that was briefly unreachable would
      * otherwise stay "broken" for the life of the instance, long after it came
@@ -37,6 +40,16 @@ export function ensureSchema(): Promise<void> {
   return inFlight;
 }
 
+/**
+ * How many times to re-enter the race before giving up.
+ *
+ * Losing it is not a failure — it means somebody else is creating the very
+ * tables we wanted — so a loser waits and looks again rather than reporting a
+ * broken database. Bounded, because a migration that is genuinely wrong fails
+ * the same way every time and should say so rather than spin.
+ */
+const ATTEMPTS = 5;
+
 async function run(): Promise<void> {
   if (await schemaExists()) return;
 
@@ -45,21 +58,34 @@ async function run(): Promise<void> {
       "normally happens at build time.",
   );
 
-  /*
-   * Serialised across every instance. On a cold start several functions can
-   * wake at once, and all of them would otherwise try to create the same
-   * tables. The lock is released when the connection returns to the pool.
-   */
-  await db.execute(raw`SELECT pg_advisory_lock(hashtext('amanat:migrate'))`);
-  try {
-    // Checked again inside the lock: whoever held it before us may have just
-    // done the work.
-    if (!(await schemaExists())) {
-      await migrate(db, { migrationsFolder: "./drizzle" });
+  const folder = migrationsFolder();
+
+  for (let attempt = 1; ; attempt++) {
+    try {
+      await migrate(db, { migrationsFolder: folder });
       console.warn("[amanat] Migrations applied.");
+      return;
+    } catch (error) {
+      /*
+       * Two instances waking together both try to create the same tables. One
+       * wins; the other lands here. Drizzle runs the migration inside a
+       * transaction, so the loser rolled back cleanly and the winner's tables
+       * are either already visible — in which case there is nothing left to do
+       * and this was a success — or still uncommitted, in which case looking
+       * again in a moment will find them.
+       *
+       * This replaces an advisory lock, which cannot work here: see the note in
+       * `scripts/migrate.mts`.
+       */
+      if (await schemaExists()) return;
+
+      if (attempt >= ATTEMPTS) {
+        console.error(`[amanat] Could not create the schema.\n\n${explainDbFailure(error)}`);
+        throw error;
+      }
+
+      await new Promise((resolve) => setTimeout(resolve, attempt * 250));
     }
-  } finally {
-    await db.execute(raw`SELECT pg_advisory_unlock(hashtext('amanat:migrate'))`);
   }
 }
 
@@ -75,4 +101,46 @@ async function schemaExists(): Promise<boolean> {
   );
   const row = Array.isArray(rows) ? rows[0] : (rows as { rows?: unknown[] }).rows?.[0];
   return Boolean((row as { present?: string | null } | undefined)?.present);
+}
+
+/**
+ * Where the migration SQL is, on this machine.
+ *
+ * Drizzle reads the files with plain `fs`, resolved against the working
+ * directory — so a hard-coded `"./drizzle"` is a bet on what the working
+ * directory happens to be, and a serverless bundle is not obliged to run from
+ * the project root. Losing that bet reads as `Can't find meta/_journal.json`,
+ * which sounds like the files were never deployed even when they were.
+ *
+ * So: look, rather than assume. `MIGRATIONS_DIR` is the escape hatch for a
+ * layout none of these guesses cover.
+ */
+function migrationsFolder(): string {
+  const candidates = [
+    process.env.MIGRATIONS_DIR,
+    path.join(process.cwd(), "drizzle"),
+    path.join(process.cwd(), "..", "drizzle"),
+    path.join(process.cwd(), "..", "..", "drizzle"),
+  ].filter((dir): dir is string => Boolean(dir));
+
+  const found = candidates.find((dir) =>
+    existsSync(path.join(dir, "meta", "_journal.json")),
+  );
+  if (found) return found;
+
+  throw new Error(
+    [
+      "The migration files are missing from this deployment.",
+      "",
+      `Working directory: ${process.cwd()}`,
+      "Looked in:",
+      ...candidates.map((dir) => `  ${dir}`),
+      "",
+      "`drizzle/` is read from disk at runtime, so nothing imports it and Next",
+      "will leave it behind unless it is traced. next.config.ts should have:",
+      '  outputFileTracingIncludes: { "/**": ["./drizzle/**"] }',
+      "",
+      "Or set MIGRATIONS_DIR to wherever the folder ended up.",
+    ].join("\n"),
+  );
 }
