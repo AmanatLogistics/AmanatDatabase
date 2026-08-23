@@ -6,11 +6,19 @@ import { and, asc, desc, eq, inArray, sql as raw } from "drizzle-orm";
 import { db } from "@/db";
 import {
   notifications,
+  orderEvents,
+  orders,
   storeProducts,
   webOrderLines,
   webOrders,
 } from "@/db/schema";
 import { toPublicProduct } from "@/db/map";
+import {
+  CLIENT_STATUS_MESSAGE,
+  ORDER_STATUS,
+  clientProgressIndex,
+} from "@/lib/constants";
+import { normaliseTrackingNumber } from "@/lib/tracking";
 import type { PublicProduct } from "@/lib/types";
 
 /**
@@ -258,11 +266,74 @@ export interface TrackingResult {
  * still live in a browser; this is the one place that gains a second lookup
  * when they move across, and the page above it will not need touching.
  */
+/**
+ * One order, by the tracking number printed on the customer's receipt.
+ *
+ * A projection, not the order. What comes back is a status, a position on the
+ * five customer-facing stages, the item names and the dates — and never the
+ * client record, the phone number, the address, what we paid, or the margin.
+ * Holding a tracking number is not permission to read a client file.
+ */
+async function findByTrackingNumber(
+  reference: string,
+): Promise<TrackingResult | null> {
+  const number = normaliseTrackingNumber(reference);
+  if (!number) return null;
+
+  const row = await db.query.orders.findFirst({
+    where: eq(orders.trackingNumber, number),
+    with: { items: true, timeline: { orderBy: [asc(orderEvents.at)] } },
+  });
+  if (!row) return null;
+
+  const arrived = ["arrived", "ready_for_pickup", "delivered"].includes(row.status);
+
+  return {
+    trackingNumber: row.trackingNumber,
+    statusLabel: ORDER_STATUS[row.status].label,
+    statusMessage: CLIENT_STATUS_MESSAGE[row.status],
+    progressIndex: clientProgressIndex(row.status),
+    arrivedAtOffice: arrived,
+    delivered: row.status === "delivered",
+    placedAt: row.requestedAt.toISOString(),
+    deliveredAt: row.deliveredAt?.toISOString(),
+    items: row.items
+      .slice()
+      .sort((a, b) => a.position - b.position)
+      .map((item) => ({
+        name: item.name,
+        qty: item.qty,
+        imageUrl: item.imageUrl ?? undefined,
+      })),
+    /*
+     * Status changes only. Notes, payments and purchases are internal — a
+     * customer reading "held until the client confirms the colour" is being
+     * shown the office's own conversation.
+     */
+    timeline: row.timeline
+      .filter((event) => event.kind in ORDER_STATUS)
+      .map((event) => ({
+        at: event.at.toISOString(),
+        statusLabel: ORDER_STATUS[event.kind as keyof typeof ORDER_STATUS].label,
+      })),
+  };
+}
+
 export async function trackByReference(
   reference: string,
 ): Promise<TrackingResult | null> {
+  const direct = await findByTrackingNumber(reference);
+  if (direct) return direct;
+
   const web = await findWebOrder(reference);
   if (!web) return null;
+
+  // A website order that became a real one follows through to it, so the
+  // customer sees actual progress rather than "received" forever.
+  if (web.trackingNumber) {
+    const followed = await findByTrackingNumber(web.trackingNumber);
+    if (followed) return followed;
+  }
 
   const converted = Boolean(web.convertedOrderId) || Boolean(web.trackingNumber);
 

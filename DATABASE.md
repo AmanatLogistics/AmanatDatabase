@@ -236,8 +236,34 @@ browser:
   their reference. It returns a status, a progress position and item names —
   never a phone number, an address, or a price you paid.
 
-**Still in the browser:** clients, orders, purchases and payments. That is the
-next piece. Until it lands, converting a website order creates an operations
-order held locally — the website order is marked converted on the server so the
-customer sees progress, but the `AM-…` tracking number does not resolve for
-them yet.
+**The operations database.** Clients, orders, purchases, payments and the
+settings all live in Postgres:
+
+- **Two people, two machines, one set of records.** What one member of staff
+  enters, the other sees. This is the whole point, and it was the one thing the
+  app could not do.
+- **Every write records who made it**, taken from the session rather than from
+  the browser — a caller who could name the actor could name somebody else.
+- **Reference numbers are allocated under a lock** inside the transaction that
+  uses them, so two operators creating an order in the same second cannot be
+  handed the same one.
+- **Updates take an allow-list, not a patch.** These are POST endpoints:
+  whatever is spread into an `UPDATE` is whatever the caller chose to send, so a
+  column is editable only by being named. Status and tracking number have their
+  own actions, because both do more than write a column.
+- **A customer can track a real tracking number** from their own phone. They get
+  a status, a position on five stages and item names — never the client record,
+  the phone number, the address, what we paid, or the margin.
+
+### How the app reads it
+
+The browser keeps a copy in memory as a cache, loaded once per page and reloaded
+after every write. Screens read the cache, so they did not have to change.
+
+What the cache does **not** do is notice somebody else's change while you sit on
+a page — for that, reload. A shop where two people edit the same order in the
+same minute would need more than this; this one does not.
+
+**Only the basket is persisted in the browser now.** It is genuinely the
+visitor's own. Everything else would be a second version of the truth, read
+before the server answered.

@@ -305,17 +305,15 @@ export const useDataStore = create<DataState>()(
        * does not survive JSON — it would come back as a string and break every
        * ageing calculation. It is rebuilt from the constant each load instead.
        */
-      partialize: (state) => ({
-        clients: state.clients,
-        notifications: state.notifications,
-        storeProducts: state.storeProducts,
-        cart: state.cart,
-        webOrders: state.webOrders,
-        orders: state.orders,
-        purchases: state.purchases,
-        payments: state.payments,
-        settings: state.settings,
-      }),
+      /*
+       * Only the basket is persisted now.
+       *
+       * Everything else is a copy of what the database holds, and a copy kept
+       * in localStorage would be read before the server answered — showing
+       * yesterday's orders, or another member of staff's, as though they were
+       * current. The basket is genuinely this visitor's own and belongs here.
+       */
+      partialize: (state) => ({ cart: state.cart }),
     },
   ),
 );
