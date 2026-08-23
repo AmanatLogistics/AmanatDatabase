@@ -92,8 +92,22 @@ in the runtime log:
 [amanat] Migrations applied.
 ```
 
-It is serialised with an advisory lock, so several functions waking at once
-cannot race each other into creating the same tables.
+Several functions waking at once cannot corrupt this. Drizzle applies the
+migration inside a transaction, so of two instances racing, one commits and the
+other rolls back whole, looks again, finds the tables and carries on.
+
+> **Not an advisory lock — and this matters.** An earlier version took
+> `pg_advisory_lock` around the migration. That is safe on a direct connection
+> and quietly catastrophic over a transaction pooler, which is what Supabase
+> gives you and what this app is told to use. The pooler routes each statement
+> to whichever backend is free, so the lock is taken on one server session and
+> the unlock is asked of a different one — which does not own it and refuses.
+> Postgres even says so: *"you don't own a lock of type ExclusiveLock"*. The
+> lock then belongs for ever to a pooled backend nobody can reach, and
+> everything that later asks for it waits without end: a build that hangs and
+> applies no migrations, a request that dies when the platform's clock runs out,
+> and no error anywhere explaining why. If you ever see a migration hang with no
+> output, look for a stranded lock — `npm run db:check` reports them.
 
 Look for the deploy-time run in the Vercel build log:
 
@@ -113,8 +127,8 @@ Three things that can happen there, all deliberate:
 - **A connection string that does not work** — the deploy **fails**. Shipping an
   app whose tables do not exist helps nobody, and a failed deploy is a much
   clearer signal than a working page that errors on every click.
-- **Two deploys at once** — the second waits on an advisory lock, then finds
-  there is nothing left to apply.
+- **Two deploys at once** — one wins, the other's transaction rolls back, it
+  looks again and finds there is nothing left to apply.
 - **A preview deploy** — skipped. There is only one database, and preview
   builds share it: applying a migration from an unmerged branch would change
   production's shape before anybody reviewed it. Schema changes belong to the
@@ -127,6 +141,23 @@ npm run db:migrate
 ```
 
 Safe to run twice; already-applied migrations are skipped.
+
+### If a migration hangs
+
+Almost always a lock left behind by a pre-2026 deploy of this app (see the note
+above). `npm run db:check` lists any that are still held:
+
+```
+1 advisory lock(s) still held:
+  pid 7031  idle  for 30s
+```
+
+Nothing here takes one any more, so a leftover is harmless to the running app —
+but it will sit in the database until somebody ends the session holding it:
+
+```bash
+npm run db:check -- --clear-locks
+```
 
 ## Working on it locally
 

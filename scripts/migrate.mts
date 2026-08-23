@@ -104,15 +104,39 @@ journal.entries.forEach((e) => console.log(`  - ${e.tag}`));
 
 const sql = postgres(found.url, { max: 1, prepare: false, onnotice: () => {} });
 
+/**
+ * Deliberately no advisory lock.
+ *
+ * This used to take `pg_advisory_lock` so two deploys building at once could
+ * not create the same tables twice. Over a transaction pooler that is not just
+ * useless, it is a trap: the pooler routes each statement to whichever backend
+ * is free, so the lock is taken on one server session and the unlock is asked
+ * of a different one, which does not own it and refuses — Postgres even says
+ * so, "you don't own a lock of type ExclusiveLock". The lock is then held for
+ * good by a pooled backend nobody can reach, and every later build blocks on
+ * `pg_advisory_lock` forever. A hung build applies no migrations, which leaves
+ * exactly the empty database this script exists to prevent.
+ *
+ * Concurrency is handled where it is actually safe instead: Drizzle runs the
+ * migration inside a transaction, so of two racing builds one commits and the
+ * other rolls back whole and retries, finding nothing left to do.
+ */
+const RETRIES = 5;
+
 try {
-  /*
-   * Two deploys building at the same moment would otherwise both try to create
-   * the same tables. The lock is held for this connection only and released
-   * when it closes, so the second build waits and then finds there is nothing
-   * left to apply.
-   */
-  await sql`SELECT pg_advisory_lock(hashtext('amanat:migrate'))`;
-  await migrate(drizzle(sql), { migrationsFolder: "./drizzle" });
+  for (let attempt = 1; ; attempt++) {
+    try {
+      await migrate(drizzle(sql), { migrationsFolder: "./drizzle" });
+      break;
+    } catch (error) {
+      const applied = await sql<{ present: string | null }[]>`
+        SELECT to_regclass('public.staff')::text AS present`;
+      if (applied[0]?.present) break;
+      if (attempt >= RETRIES) throw error;
+      console.log(`  Migration attempt ${attempt} lost a race; retrying.`);
+      await new Promise((resolve) => setTimeout(resolve, attempt * 250));
+    }
+  }
 
   const [{ count }] = await sql<{ count: string }[]>`
     SELECT count(*)::text AS count FROM drizzle.__drizzle_migrations`;
