@@ -69,20 +69,27 @@ export interface OperationsData {
 export async function loadOperations(): Promise<OperationsData> {
   await requireStaff();
 
-  const [clientRows, orderRows, purchaseRows, paymentRows, settings] =
-    await Promise.all([
-      db.select().from(clients).orderBy(desc(clients.createdAt)),
-      db.query.orders.findMany({
-        with: { items: true, timeline: true },
-        orderBy: [desc(orders.requestedAt)],
-      }),
-      db.query.purchases.findMany({
-        with: { items: true },
-        orderBy: [desc(purchases.purchasedAt)],
-      }),
-      db.select().from(payments).orderBy(desc(payments.at)),
-      loadSettings(),
-    ]);
+  /*
+   * Settings first, on its own. It may open a transaction to seed the
+   * reference data, and a transaction inside a `Promise.all` on a one
+   * connection pool is the shape that deadlocked product saving: the
+   * transaction holds the connection the other queries are queued for.
+   * Cheap to be certain about.
+   */
+  const settings = await loadSettings();
+
+  const [clientRows, orderRows, purchaseRows, paymentRows] = await Promise.all([
+    db.select().from(clients).orderBy(desc(clients.createdAt)),
+    db.query.orders.findMany({
+      with: { items: true, timeline: true },
+      orderBy: [desc(orders.requestedAt)],
+    }),
+    db.query.purchases.findMany({
+      with: { items: true },
+      orderBy: [desc(purchases.purchasedAt)],
+    }),
+    db.select().from(payments).orderBy(desc(payments.at)),
+  ]);
 
   return {
     clients: clientRows.map(toClient),

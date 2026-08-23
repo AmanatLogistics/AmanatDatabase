@@ -218,7 +218,7 @@ export function FinanceScreen() {
           accent={pnl.profitAfn >= 0 ? "success" : "destructive"}
         />
         <StatCard
-          label="Service fees earned"
+          label="Extra fees earned"
           value={formatAfn(pnl.serviceFeeAfn, { unit: "suffix" })}
           delta={deltaPercent(pnl.serviceFeeAfn, previousPnl.serviceFeeAfn)}
           deltaSuffix="vs previous period"

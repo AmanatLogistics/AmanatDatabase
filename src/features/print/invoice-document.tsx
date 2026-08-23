@@ -135,10 +135,10 @@ export function InvoiceDocument({
             value={economics.revenue.itemsAfn}
           />
           <TotalRow
-            label="Service fee"
+            label="Extra fee"
             value={economics.revenue.serviceFeeAfn}
           />
-          <TotalRow label="Shipping & handling" value={economics.revenue.shippingAfn} />
+          <TotalRow label="Delivery charge" value={economics.revenue.shippingAfn} />
           {economics.revenue.discountAfn > 0 && (
             <TotalRow label="Discount" value={-economics.revenue.discountAfn} />
           )}

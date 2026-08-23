@@ -396,10 +396,10 @@ export function OrderDetailScreen({ orderId }: { orderId: string }) {
                 <div className="bg-muted/25 space-y-1.5 border-t px-4 py-3.5 text-sm">
                   <SummaryLine label="Items subtotal" value={economics.revenue.itemsAfn} />
                   <SummaryLine
-                    label="Service fee"
+                    label="Extra fee"
                     value={economics.revenue.serviceFeeAfn}
                   />
-                  <SummaryLine label="Shipping charged" value={economics.revenue.shippingAfn} />
+                  <SummaryLine label="Delivery charge" value={economics.revenue.shippingAfn} />
                   {economics.revenue.discountAfn > 0 && (
                     <SummaryLine
                       label="Discount"
