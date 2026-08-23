@@ -13,11 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { convertWebOrder } from "@/lib/api";
-import {
-  deleteWebOrder,
-  dismissWebOrder,
-  markWebOrderConverted,
-} from "@/lib/server/intake";
+import { deleteWebOrder, dismissWebOrder } from "@/lib/server/intake";
 import { formatDateTime } from "@/lib/format";
 import type { WebOrder } from "@/lib/types";
 
@@ -37,14 +33,7 @@ export function WebOrderDetailScreen({ order }: { order: WebOrder }) {
   async function handleConvert() {
     setBusy(true);
     try {
-      const created = await convertWebOrder(order.id);
-      /*
-       * The operations order is still held in the browser, so the web order is
-       * marked converted on the server separately. That status is what the
-       * customer's tracking reads — without it they would still be told nobody
-       * had looked at their order.
-       */
-      await markWebOrderConverted(order.id);
+      const created = await convertWebOrder(order);
       toast.success(`Converted to ${created.orderNo}`, {
         description: `Tracking ${created.trackingNumber} — give this to the customer.`,
       });

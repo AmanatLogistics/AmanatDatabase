@@ -36,18 +36,19 @@ export async function getWebOrder(id: string): Promise<WebOrder | null> {
 /**
  * Record that staff have turned this into a real order.
  *
- * `convertedOrderId` stays null for now: operations orders are still held in
- * the browser, so there is no row here to point at. The status is what the
- * customer's tracking reads, and "converted" is true and useful on its own —
- * it is the difference between "we have your order" and "we are working on it".
- * When orders move to the database this gains the id and the tracking number
- * follows automatically.
+ * The id of the order it became is recorded, which is what lets a customer
+ * holding only their `WEB-…` reference follow through to the real order and see
+ * its actual progress. Without it they would be told "we have your order"
+ * forever, however far along it got.
  */
-export async function markWebOrderConverted(id: string): Promise<void> {
+export async function markWebOrderConverted(
+  id: string,
+  convertedOrderId: string,
+): Promise<void> {
   await requireStaff();
   await db
     .update(webOrders)
-    .set({ status: "converted" })
+    .set({ status: "converted", convertedOrderId })
     .where(eq(webOrders.id, id));
 }
 
