@@ -12,7 +12,9 @@ import {
   APP_URL_VARS,
   DIRECT_URL_VARS,
   describeUrl,
+  explainConnectionError,
   findDatabaseUrl,
+  isDirectSupabaseHost,
 } from "../src/db/url.ts";
 
 const CANDIDATES = [...new Set([...APP_URL_VARS, ...DIRECT_URL_VARS])];
@@ -44,7 +46,16 @@ if (!anyPresent) {
 }
 
 const found = findDatabaseUrl(APP_URL_VARS)!;
-console.log(`\nThe app would use: ${found.name}\n`);
+console.log(`\nThe app would use: ${found.name}`);
+
+if (isDirectSupabaseHost(found.url)) {
+  console.log(
+    "\n  WARNING: that is Supabase's direct connection, which is IPv6-only.\n" +
+      "  It may work from here and still fail on Vercel, whose functions are\n" +
+      "  IPv4-only. Prefer the transaction pooler string for DATABASE_URL.",
+  );
+}
+console.log("");
 
 const sql = postgres(found.url, { max: 1, prepare: false, onnotice: () => {} });
 
@@ -52,12 +63,8 @@ try {
   const [{ version }] = await sql<{ version: string }[]>`SELECT version()`;
   console.log(`Connected.  ${version.split(" on ")[0]}`);
 } catch (error) {
-  console.error(`\nCould not connect: ${(error as Error).message}`);
-  console.error(
-    "\nCommon causes: the password still says [YOUR-PASSWORD], the project is\n" +
-      "paused in Supabase, or this network cannot reach that host.",
-  );
-  await sql.end();
+  console.error(`\n${explainConnectionError(error, found.url)}`);
+  await sql.end({ timeout: 5 }).catch(() => {});
   process.exit(1);
 }
 
