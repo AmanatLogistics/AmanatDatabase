@@ -21,7 +21,8 @@ import postgres from "postgres";
 import {
   DIRECT_URL_VARS,
   describeUrl,
-  findDatabaseUrl,
+  explainConnectionError,
+  findMigrationUrl,
   missingUrlMessage,
 } from "../src/db/url.ts";
 
@@ -52,7 +53,7 @@ if (optional && vercelEnv && vercelEnv !== "production") {
   process.exit(0);
 }
 
-const found = findDatabaseUrl(DIRECT_URL_VARS);
+const found = findMigrationUrl();
 if (!found) {
   if (optional) {
     console.log(
@@ -117,7 +118,7 @@ try {
     SELECT count(*)::text AS count FROM drizzle.__drizzle_migrations`;
   console.log(`\nDone. ${count} migration(s) recorded as applied.`);
 } catch (error) {
-  console.error(`\nMigration failed: ${(error as Error).message}`);
+  console.error(`\nMigration failed.\n\n${explainConnectionError(error, found.url)}`);
   /*
    * Deliberately fatal even under --optional. A connection string was
    * configured, so somebody meant this to work; carrying on would deploy an

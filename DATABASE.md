@@ -15,11 +15,25 @@ You have to do this part; I cannot create an account for you.
    to Kabul — **Frankfurt (eu-central-1)** is the nearest sensible one. Save the
    database password it gives you; it is shown once.
 2. In the project, go to **Project Settings → Database → Connection string**.
+
+   > **Use a pooler string. Not the direct connection.**
+   >
+   > The direct host, `db.<ref>.supabase.co`, resolves to an **IPv6 address
+   > only**. Vercel's functions are **IPv4-only**, so every query from a
+   > deployed app fails with `getaddrinfo ENOTFOUND db.<ref>.supabase.co` —
+   > which reads as a wrong hostname when the hostname is perfectly correct.
+   >
+   > The pooler hosts (`aws-0-<region>.pooler.supabase.com`) are IPv4 and exist
+   > for exactly this. **Their username is different too:
+   > `postgres.<project-ref>`, not plain `postgres`** — copying only the host
+   > across is the usual second mistake.
+
    You need **two** of the strings there:
    - **Transaction pooler**, port `6543` — this is the one the app uses. It
      survives serverless, where each request may arrive on its own instance.
-   - **Session pooler** or **Direct connection**, port `5432` — this is the one
-     migrations use. Creating tables needs a connection that stays put.
+   - **Session pooler**, port `5432`, same host — this is the one migrations
+     prefer. Creating tables needs a connection that stays put. Set it as
+     `DIRECT_DATABASE_URL`.
 3. In **Vercel → your project → Settings → Environment Variables**, add:
 
    | Name           | Value                                   | Environments |

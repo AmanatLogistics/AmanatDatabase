@@ -4,7 +4,13 @@ import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 
 import * as schema from "@/db/schema";
-import { APP_URL_VARS, findDatabaseUrl, missingUrlMessage } from "@/db/url";
+import {
+  APP_URL_VARS,
+  findDatabaseUrl,
+  isDirectSupabaseHost,
+  missingUrlMessage,
+  onVercel,
+} from "@/db/url";
 
 /**
  * The database connection.
@@ -36,6 +42,35 @@ function connect() {
    *
    * `prepare: false` is required by that pooler — prepared statements are bound
    * to a backend connection it is free to swap underneath us.
+   */
+  /*
+   * Said once, at startup, where somebody reading the runtime logs will find
+   * it. The alternative is what this replaces: every request failing with
+   * "getaddrinfo ENOTFOUND db.xxxx.supabase.co", which sends you hunting for a
+   * typo in a hostname that is spelled correctly.
+   */
+  if (onVercel() && isDirectSupabaseHost(found.url)) {
+    console.error(
+      [
+        "",
+        "  ╭──────────────────────────────────────────────────────────╮",
+        `  │ ${found.name} is Supabase's DIRECT connection, which is       `,
+        "  │ IPv6-only. Vercel's functions are IPv4-only, so every query  ",
+        "  │ here will fail with ENOTFOUND.                               ",
+        "  │                                                              ",
+        "  │ Use the transaction pooler string instead:                   ",
+        "  │   postgres.<ref>:<password>@aws-0-<region>.pooler            ",
+        "  │       .supabase.com:6543/postgres                            ",
+        "  ╰──────────────────────────────────────────────────────────╯",
+        "",
+      ].join("\n"),
+    );
+  }
+
+  /*
+   * Assigned to the module-level binding rather than a local, so `closeDb`
+   * below has something to close. Both halves of this are wanted: the warning
+   * came from the IPv6 fix, the assignment from making tests able to exit.
    */
   client = postgres(found.url, { max: 1, prepare: false });
   return drizzle(client, { schema });
