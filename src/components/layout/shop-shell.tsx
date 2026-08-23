@@ -13,7 +13,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { StoreGate } from "@/components/shared/store-gate";
-import { useNewWebOrderCount } from "@/lib/api";
+import { countNewWebOrders } from "@/lib/server/intake";
 import { cn } from "@/lib/utils";
 
 /**
@@ -31,9 +31,44 @@ const NAV = [
   { href: "/shop/orders", label: "Website orders", icon: InboxIcon, badge: true },
 ];
 
+/**
+ * How many website orders are waiting, kept current without a reload.
+ *
+ * Same reasoning as the bell: an order arrives on a customer's phone, and the
+ * person who needs to know is looking at a different screen entirely.
+ */
+function useNewWebOrders(): number {
+  const [count, setCount] = React.useState(0);
+
+  React.useEffect(() => {
+    let cancelled = false;
+    const load = () =>
+      void countNewWebOrders()
+        .then((next) => {
+          if (!cancelled) setCount(next);
+        })
+        .catch(() => {});
+
+    // Scheduled, not called in the effect body — see the note in
+    // `use-server-notifications.ts`.
+    const first = setTimeout(load, 0);
+    const timer = setInterval(load, 30_000);
+    window.addEventListener("focus", load);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(first);
+      clearInterval(timer);
+      window.removeEventListener("focus", load);
+    };
+  }, []);
+
+  return count;
+}
+
 export function ShopShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const newOrders = useNewWebOrderCount();
+  const newOrders = useNewWebOrders();
 
   return (
     <div className="bg-muted/30 min-h-dvh">

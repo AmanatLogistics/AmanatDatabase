@@ -8,7 +8,7 @@ import { EmptyState } from "@/components/shared/empty-state";
 import { Money } from "@/components/shared/money";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
-import { useWebOrders } from "@/lib/api";
+import type { WebOrder } from "@/lib/types";
 import { formatDateTime } from "@/lib/format";
 import type { WebOrderStatus } from "@/lib/types";
 
@@ -26,8 +26,7 @@ const TONE: Record<WebOrderStatus, "warning" | "success" | "muted"> = {
 };
 
 /** The inbox. Everything a customer has ordered on the website. */
-export function WebOrdersScreen() {
-  const orders = useWebOrders();
+export function WebOrdersScreen({ orders }: { orders: WebOrder[] }) {
   const [tab, setTab] = React.useState<WebOrderStatus | "all">("new");
 
   const filtered =

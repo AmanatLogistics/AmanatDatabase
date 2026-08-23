@@ -8,6 +8,8 @@ import { Logo } from "@/components/brand/logo";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useCart, useWhereWeAre } from "@/lib/api";
+import { useDataStore } from "@/lib/store";
+import type { PublicProduct } from "@/lib/types";
 import { startHydration, useStoreHydrated } from "@/lib/hydration";
 
 startHydration();
@@ -23,7 +25,21 @@ startHydration();
  * offset against. Change the height here and change `top-14 sm:top-16` in
  * `storefront-screen.tsx` with it.
  */
-export function StorefrontShell({ children }: { children: React.ReactNode }) {
+export function StorefrontShell({
+  catalogue,
+  children,
+}: {
+  catalogue: PublicProduct[];
+  children: React.ReactNode;
+}) {
+  /*
+   * Seeded during render, not in an effect: the basket reads it on the very
+   * first paint, and an effect would leave a customer's own basket empty for
+   * a frame on every navigation.
+   */
+  const seeded = useDataStore((s) => s.catalogue);
+  if (seeded !== catalogue) useDataStore.setState({ catalogue });
+
   const hydrated = useStoreHydrated();
   const { count } = useCart();
   const where = useWhereWeAre();

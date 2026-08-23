@@ -238,6 +238,16 @@ export interface StoreProduct {
   createdAt: ISODate;
 }
 
+/**
+ * A product as a customer may see it.
+ *
+ * `costAfn` is what we pay to source it and `storeId` is where from — neither is
+ * a customer's business. Stripping them at the server boundary is the only
+ * reliable place: a component that does not render a field still ships it in
+ * the page source for anyone who opens developer tools.
+ */
+export type PublicProduct = Omit<StoreProduct, "costAfn" | "storeId">;
+
 /** A line in the customer's basket. Lives in their browser until checkout. */
 export interface CartLine {
   productId: ID;

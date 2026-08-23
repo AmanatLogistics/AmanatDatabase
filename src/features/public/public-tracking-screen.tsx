@@ -8,6 +8,7 @@ import {
   MapPinIcon,
   PackageCheckIcon,
   PhoneIcon,
+  Loader2Icon,
   SearchIcon,
   ShoppingBagIcon,
 } from "lucide-react";
@@ -19,10 +20,10 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import {
   usePublicPickupDetails,
-  usePublicTracking,
   type PublicPickupDetails,
   type PublicTrackingResult,
 } from "@/lib/api";
+import { trackByReference } from "@/lib/server/shop";
 import { CLIENT_PROGRESS_STAGES } from "@/lib/constants";
 import { formatDate, formatDateTime } from "@/lib/format";
 import { startHydration, useStoreHydrated } from "@/lib/hydration";
@@ -38,10 +39,9 @@ startHydration();
  * customer can see. No prices, no other clients, no internal notes.
  *
  * WIRING THE BACKEND — the one thing to change later:
- * `usePublicTracking` is the only order data this page reads. Replace that
- * hook's body with a fetch of `GET /api/track/:reference` returning the same
- * shape, and the page starts working for real customers with nothing here
- * touched.
+ * `trackByReference` is the only order data this page reads, and it runs on the
+ * server. It returns a projection — a status, a progress position, item names —
+ * and never a client record, a phone number, an address or a price we paid.
  */
 export function PublicTrackingScreen({
   initialNumber = "",
@@ -53,9 +53,37 @@ export function PublicTrackingScreen({
   const [input, setInput] = React.useState(initialNumber.toUpperCase());
   /** Only set on submit, so the page does not search as the client types. */
   const [submitted, setSubmitted] = React.useState(initialNumber.toUpperCase());
+  const [result, setResult] = React.useState<PublicTrackingResult | null>(null);
+  const [searching, setSearching] = React.useState(false);
 
-  const result = usePublicTracking(submitted);
   const pickup = usePublicPickupDetails();
+
+  /*
+   * The lookup runs on the server against the shop's database. It used to read
+   * the visitor's own browser storage, which meant it could only ever find an
+   * order for the person who created it — never for the customer holding the
+   * reference, which is the only person who needs it.
+   */
+  const search = React.useCallback(async (reference: string) => {
+    if (!reference) {
+      setResult(null);
+      return;
+    }
+    setSearching(true);
+    try {
+      setResult(await trackByReference(reference));
+    } catch {
+      setResult(null);
+    } finally {
+      setSearching(false);
+    }
+  }, []);
+
+  const [lastSearched, setLastSearched] = React.useState<string | null>(null);
+  if (submitted !== lastSearched) {
+    setLastSearched(submitted);
+    void search(submitted);
+  }
 
   function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
@@ -127,6 +155,8 @@ export function PublicTrackingScreen({
       <main className="mx-auto -mt-10 w-full max-w-3xl flex-1 px-4 pb-12 sm:-mt-16">
         {!hydrated || !submitted ? (
           <BeforeSearch pickup={pickup} />
+        ) : searching ? (
+          <Searching />
         ) : !result ? (
           <NotFound />
         ) : (
@@ -199,6 +229,23 @@ function BeforeSearch({ pickup }: { pickup: PublicPickupDetails }) {
             </Button>
           )}
         </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+/**
+ * The lookup crosses the network now, so there is a moment to fill.
+ *
+ * Deliberately the same shape as the card that replaces it, so the page does
+ * not jump when the answer arrives.
+ */
+function Searching() {
+  return (
+    <Card className="shadow-sm">
+      <CardContent className="flex items-center justify-center gap-3 py-14">
+        <Loader2Icon className="text-muted-foreground size-4 animate-spin" />
+        <p className="text-muted-foreground text-sm">Looking that up…</p>
       </CardContent>
     </Card>
   );

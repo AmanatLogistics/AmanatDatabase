@@ -211,3 +211,33 @@ and protect nothing.
 A wrong password and an email that does not exist return the same message, and
 take the same time, so the login cannot be used to find out which of your staff
 emails are real.
+
+## What runs on the database now
+
+**The shop.** A customer's order reaches you rather than sitting in their
+browser:
+
+- **Products** are stored in the database. The shop admin writes them; the
+  storefront reads them, server-rendered, so a stranger sees what you published
+  rather than an empty page.
+- **Cost prices never leave the server.** `PublicProduct` is built by naming
+  what a customer may have, not by deleting what they may not — a column added
+  to the schema later is absent from it by default rather than leaking until
+  somebody remembers.
+- **Checkout writes a real order** and raises a notification **in the same
+  transaction**, so there is no version of events where an order exists that
+  nobody was told about.
+- **Prices are read server-side.** The basket sends product ids and quantities;
+  a caller who sends their own price is describing a product we do not sell.
+- **The bell polls** every 30 seconds and on returning to the tab. A shop takes
+  a handful of orders a day, and a websocket for that is a connection to keep
+  alive on a platform that does not want to hold one.
+- **Tracking runs on the server**, so a customer on their own phone can look up
+  their reference. It returns a status, a progress position and item names —
+  never a phone number, an address, or a price you paid.
+
+**Still in the browser:** clients, orders, purchases and payments. That is the
+next piece. Until it lands, converting a website order creates an operations
+order held locally — the website order is marked converted on the server so the
+customer sees progress, but the `AM-…` tracking number does not resolve for
+them yet.

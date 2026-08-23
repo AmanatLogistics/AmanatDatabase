@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { notFound, useRouter } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import {
   ChevronLeftIcon,
@@ -17,49 +17,28 @@ import {
 import { Money } from "@/components/shared/money";
 import { ProductThumb } from "@/components/shared/product-thumb";
 import { Button } from "@/components/ui/button";
-import { Skeleton } from "@/components/ui/skeleton";
-import {
-  addToCart,
-  usePublishedProducts,
-  useStoreProductBySlug,
-  useWhereWeAre,
-} from "@/lib/api";
+import { addToCart, useWhereWeAre } from "@/lib/api";
 import { PRODUCT_CATEGORY_LABEL } from "@/lib/constants";
 import { cn } from "@/lib/utils";
-import type { StoreProduct } from "@/lib/types";
-import { useStoreHydrated } from "@/lib/hydration";
+import type { PublicProduct } from "@/lib/types";
 
-/** One product, and the decision to buy it. */
-export function ProductDetailScreen({ slug }: { slug: string }) {
+/**
+ * One product, and the decision to buy it.
+ *
+ * The product and its neighbours are fetched by the server and arrive as
+ * props — the page 404s before this renders if there is nothing to show, so
+ * there is no "not found" state to hold here.
+ */
+export function ProductDetailScreen({
+  product,
+  related,
+}: {
+  product: PublicProduct;
+  related: PublicProduct[];
+}) {
   const router = useRouter();
-  const hydrated = useStoreHydrated();
-  const product = useStoreProductBySlug(slug);
-  const all = usePublishedProducts();
   const where = useWhereWeAre();
   const [qty, setQty] = React.useState(1);
-
-  const related = React.useMemo(() => {
-    if (!product) return [];
-    return all
-      .filter((p) => p.id !== product.id && p.category === product.category)
-      .slice(0, 5);
-  }, [all, product]);
-
-  // The catalogue lives in the browser, so nothing is known until it has loaded.
-  if (!hydrated) {
-    return (
-      <div className="grid gap-6 lg:grid-cols-12">
-        <Skeleton className="aspect-square w-full lg:col-span-5" />
-        <div className="space-y-3 lg:col-span-7">
-          <Skeleton className="h-8 w-3/4" />
-          <Skeleton className="h-20 w-full" />
-          <Skeleton className="h-11 w-40" />
-        </div>
-      </div>
-    );
-  }
-
-  if (!product) notFound();
 
   const buy = () => {
     addToCart(product.id, qty);
@@ -287,7 +266,7 @@ function QtyStepper({
  * The selection is keyed on the product id so navigating from one product to
  * another does not leave the previous product's third photo selected.
  */
-function Gallery({ product }: { product: StoreProduct }) {
+function Gallery({ product }: { product: PublicProduct }) {
   const [active, setActive] = React.useState(0);
   const [seenId, setSeenId] = React.useState(product.id);
   if (seenId !== product.id) {
@@ -377,7 +356,7 @@ function ArrowButton({
   );
 }
 
-function RelatedCard({ product }: { product: StoreProduct }) {
+function RelatedCard({ product }: { product: PublicProduct }) {
   return (
     <Link href={`/store/p/${product.slug}`} className="group">
       <article className="bg-card hover:border-brand-600/50 flex h-full flex-col overflow-hidden rounded-xl border transition-all hover:-translate-y-0.5 hover:shadow-md">

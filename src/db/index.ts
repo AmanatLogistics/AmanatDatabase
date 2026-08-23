@@ -53,7 +53,7 @@ function connect() {
     console.error(
       [
         "",
-        "  ╭──────────────────────────────────────────────────────────────╮",
+        "  ╭──────────────────────────────────────────────────────────╮",
         `  │ ${found.name} is Supabase's DIRECT connection, which is       `,
         "  │ IPv6-only. Vercel's functions are IPv4-only, so every query  ",
         "  │ here will fail with ENOTFOUND.                               ",
@@ -61,13 +61,18 @@ function connect() {
         "  │ Use the transaction pooler string instead:                   ",
         "  │   postgres.<ref>:<password>@aws-0-<region>.pooler            ",
         "  │       .supabase.com:6543/postgres                            ",
-        "  ╰──────────────────────────────────────────────────────────────╯",
+        "  ╰──────────────────────────────────────────────────────────╯",
         "",
       ].join("\n"),
     );
   }
 
-  const client = postgres(found.url, { max: 1, prepare: false });
+  /*
+   * Assigned to the module-level binding rather than a local, so `closeDb`
+   * below has something to close. Both halves of this are wanted: the warning
+   * came from the IPv6 fix, the assignment from making tests able to exit.
+   */
+  client = postgres(found.url, { max: 1, prepare: false });
   return drizzle(client, { schema });
 }
 
@@ -81,6 +86,7 @@ function connect() {
  * while a request is being served.
  */
 let instance: Database | undefined;
+let client: ReturnType<typeof postgres> | undefined;
 
 function resolve(): Database {
   instance ??= globalThis.__amanatDb ?? connect();
@@ -96,5 +102,20 @@ export const db = new Proxy({} as Database, {
     return Reflect.has(resolve(), property);
   },
 });
+
+/**
+ * Close the connection.
+ *
+ * Nothing in the app calls this — a serverless instance is torn down, not shut
+ * down politely. It exists for tests, which otherwise hang forever after the
+ * last assertion because an open socket keeps Node's event loop alive, and the
+ * failure reads as "the test timed out" rather than "the test finished".
+ */
+export async function closeDb(): Promise<void> {
+  await client?.end({ timeout: 5 });
+  client = undefined;
+  instance = undefined;
+  globalThis.__amanatDb = undefined;
+}
 
 export { schema };
