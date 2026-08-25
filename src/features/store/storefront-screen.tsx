@@ -304,6 +304,15 @@ function Promise({
 function ProductCard({ product }: { product: PublicProduct }) {
   const [main, second] = product.imageUrls;
 
+  /*
+   * A shop with no photographs should look like a price list, not like a shop
+   * whose photographs failed to load. Reserving the square and filling it with
+   * a placeholder icon does the latter: twenty identical grey tiles read as
+   * broken. So when there is no photo the card drops the image area entirely
+   * and leads with the name instead, which is the part that carries meaning.
+   */
+  if (!main) return <TextCard product={product} />;
+
   return (
     <Link
       href={`/store/p/${product.slug}`}
@@ -355,6 +364,41 @@ function ProductCard({ product }: { product: PublicProduct }) {
             />
             <p className="text-muted-foreground text-[10px]">Pay on collection</p>
           </div>
+        </div>
+      </article>
+    </Link>
+  );
+}
+
+/**
+ * The same card with the photograph taken out.
+ *
+ * The name moves up to be the loudest thing after the price and gets room to
+ * breathe over three lines; the category becomes a quiet label above it. A thin
+ * brand rule along the top gives a grid of these some rhythm without pretending
+ * to be an image.
+ */
+function TextCard({ product }: { product: PublicProduct }) {
+  return (
+    <Link
+      href={`/store/p/${product.slug}`}
+      className="focus-visible:ring-ring group rounded-xl focus-visible:ring-2 focus-visible:outline-none"
+    >
+      <article className="bg-card hover:border-brand-600/50 flex h-full min-h-36 flex-col gap-2 overflow-hidden rounded-xl border p-3.5 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg">
+        <span aria-hidden className="bg-brand-600/70 -mx-3.5 -mt-3.5 mb-1 h-1" />
+        <p className="text-muted-foreground text-[10px] tracking-wide uppercase">
+          {PRODUCT_CATEGORY_LABEL[product.category]}
+        </p>
+        <p className="group-hover:text-brand-700 dark:group-hover:text-brand-300 line-clamp-3 text-sm leading-snug font-medium transition-colors">
+          {product.name}
+        </p>
+        <div className="mt-auto">
+          <Money
+            value={product.priceAfn}
+            unit="suffix"
+            className="text-brand-700 dark:text-brand-300 text-base font-bold"
+          />
+          <p className="text-muted-foreground text-[10px]">Pay on collection</p>
         </div>
       </article>
     </Link>

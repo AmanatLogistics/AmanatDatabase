@@ -5,7 +5,7 @@ a photo and a quantity; we buy the item abroad, bring it in, and they collect it
 from our office. This tracks the order and the money at every step, and gives
 the client a page to check on it themselves.
 
-It runs on Postgres (Supabase in production) with server actions, staff logins
+It runs on Postgres (Neon in production) with server actions, staff logins
 and a public storefront. There is no mock data and nothing lives in the browser:
 open it on a fresh database and it will take you to `/setup` to create the first
 account.

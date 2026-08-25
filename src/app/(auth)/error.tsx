@@ -48,18 +48,23 @@ export default function AuthError({ reset }: { reset: () => void }) {
                 only Preview.
               </li>
               <li>
-                2. <span className="font-medium">Is it the pooler one?</span>{" "}
-                Supabase&rsquo;s direct host is IPv6-only and cannot be reached
-                from Vercel at all. The pooler host ends{" "}
+                2. <span className="font-medium">Is it the pooled one?</span> On
+                Neon the host has <code className="text-[11px]">-pooler</code> in
+                it and the string needs{" "}
+                <code className="text-[11px]">sslmode=require</code>. On Supabase
+                the direct host is IPv6-only and cannot be reached from Vercel at
+                all — its pooler host ends{" "}
                 <code className="text-[11px]">pooler.supabase.com</code>.
               </li>
               <li>
                 3. <span className="font-medium">Is the password current?</span>{" "}
-                Resetting it in Supabase does not update Vercel.
+                Resetting it in the database console does not update Vercel.
               </li>
               <li>
-                4. <span className="font-medium">Is the project awake?</span> A
-                free Supabase project pauses when it is left alone for a while.
+                4. <span className="font-medium">Is the database awake?</span> A
+                free Neon compute suspends when it is left alone, and wakes on
+                the next request — so this may clear on its own. A free Supabase
+                project pauses and has to be resumed by hand.
               </li>
             </ol>
           </div>

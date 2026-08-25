@@ -1,11 +1,13 @@
 /**
  * Finding the connection string, whatever it happens to be called.
  *
- * Supabase's Vercel integration does not create `DATABASE_URL`. It creates
- * `POSTGRES_URL` (pooled) and `POSTGRES_URL_NON_POOLING` (direct), among
- * others. Reading only `DATABASE_URL` meant a correctly connected project
- * still came up with "DATABASE_URL is not set", which looks like the
- * integration failed when it did not.
+ * Every managed Postgres names these differently, and some name them several
+ * ways at once. Neon's Vercel integration sets `DATABASE_URL` and
+ * `DATABASE_URL_UNPOOLED`; Supabase's sets `POSTGRES_URL` and
+ * `POSTGRES_URL_NON_POOLING` and never `DATABASE_URL` at all. Reading only
+ * `DATABASE_URL` meant a correctly connected project still came up with
+ * "DATABASE_URL is not set", which looks like the integration failed when it
+ * did not.
  *
  * So: look for the names that actually turn up, in order, and say which one
  * was used when something goes wrong.
@@ -18,7 +20,7 @@
  */
 export const APP_URL_VARS = [
   "DATABASE_URL", // set by hand, wins if present
-  "POSTGRES_URL", // Supabase/Vercel integration, pooled
+  "POSTGRES_URL", // set by both the Neon and Supabase integrations
   "SUPABASE_DATABASE_URL",
 ] as const;
 
@@ -33,7 +35,7 @@ export const APP_URL_VARS = [
  */
 export const DIRECT_URL_VARS = [
   "DIRECT_DATABASE_URL",
-  "DATABASE_URL_UNPOOLED",
+  "DATABASE_URL_UNPOOLED", // Neon/Vercel integration, direct
   "POSTGRES_URL_NON_POOLING", // Supabase/Vercel integration, direct
   ...APP_URL_VARS,
 ] as const;
