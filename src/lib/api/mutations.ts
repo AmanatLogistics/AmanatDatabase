@@ -49,6 +49,23 @@ export async function refreshOperations(): Promise<void> {
   if (!result.ok) throw new Error(result.message);
   const data = result.data;
   useDataStore.setState({
+    /*
+     * The real date, every time data arrives.
+     *
+     * `today` starts as a fixed reference so the server and the first client
+     * render agree, and it was only ever replaced by the store's rehydration
+     * callback — which the admin never triggers, because `startHydration()` is
+     * called by the storefront and the tracking page and nothing else. So the
+     * whole operations side believed it was permanently the 1st of January,
+     * and every figure filtered by period — revenue this month, profit, orders
+     * this month, the six-month chart — measured a month with nothing in it
+     * while the order sat plainly in the list.
+     *
+     * Setting it here ties the date to the data rather than to browser storage:
+     * it is right on first load and right again after every write, which is
+     * also what makes the figures move when you enter something.
+     */
+    today: new Date(),
     clients: data.clients,
     orders: data.orders,
     purchases: data.purchases,

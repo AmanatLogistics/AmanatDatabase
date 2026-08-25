@@ -314,7 +314,24 @@ export async function createOrder(input: NewOrder): Promise<Order> {
       orderNo,
       trackingNumber: input.trackingNumber,
       clientId: input.clientId,
-      status: "requested",
+      /*
+       * Confirmed, not requested.
+       *
+       * `requested` and `quoted` mean an enquiry — somebody asking what a thing
+       * would cost. Nothing there is revenue, so `BILLABLE_ORDER_STATUSES`
+       * leaves them out, and rightly.
+       *
+       * But this form is not how an enquiry arrives. It asks for a client, the
+       * products, what we will pay and what we will charge, and a member of
+       * staff filling all that in has taken the job. Starting those orders at
+       * `requested` meant every order entered by hand was invisible to the
+       * dashboard, the P&L and the client's balance: you could log an order and
+       * a purchase against it and still be told you had earned nothing.
+       *
+       * It remains a status like any other — move it back on the order page if
+       * a job really is only quoted.
+       */
+      status: "confirmed",
       source: input.source,
       serviceFeeAfn: Math.round(input.serviceFeeAfn),
       shippingChargedAfn: Math.round(input.shippingChargedAfn),

@@ -10,7 +10,7 @@ import { withDeadline } from "@/db/deadline";
 import { staff } from "@/db/schema";
 import { hashPassword, verifyPassword } from "@/lib/auth/password";
 import { passwordProblem } from "@/lib/auth/policy";
-import { createSession, destroySession, requireStaff } from "@/lib/auth/session";
+import { createSession, destroySession } from "@/lib/auth/session";
 
 /**
  * Signing in, signing out, and creating the very first account.
@@ -186,7 +186,3 @@ export async function createFirstOwner(
 /* Who am I                                                                    */
 /* -------------------------------------------------------------------------- */
 
-/** For client components that need the signed-in person after first render. */
-export async function whoAmI() {
-  return requireStaff();
-}
