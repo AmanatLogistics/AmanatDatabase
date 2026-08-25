@@ -63,7 +63,7 @@ export function toClient(row: Row<typeof schema.clients>): Client {
 /* Orders                                                                      */
 /* -------------------------------------------------------------------------- */
 
-export function toOrderItem(row: Row<typeof schema.orderItems>): OrderItem {
+function toOrderItem(row: Row<typeof schema.orderItems>): OrderItem {
   return {
     id: row.id,
     name: row.name,
@@ -81,7 +81,7 @@ export function toOrderItem(row: Row<typeof schema.orderItems>): OrderItem {
   };
 }
 
-export function toOrderEvent(row: Row<typeof schema.orderEvents>): OrderEvent {
+function toOrderEvent(row: Row<typeof schema.orderEvents>): OrderEvent {
   return {
     id: row.id,
     at: row.at.toISOString(),

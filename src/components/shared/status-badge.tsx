@@ -51,16 +51,3 @@ export function StatusBadge({
   );
 }
 
-/** Compact coloured dot + label, for dense lists where a pill is too loud. */
-export function StatusDot({
-  className,
-  ...input
-}: Registry & { className?: string }) {
-  const meta = resolve(input);
-  return (
-    <span className={cn("flex items-center gap-2 text-sm", className)}>
-      <span className={cn("size-2 shrink-0 rounded-full", meta.dot)} />
-      {meta.label}
-    </span>
-  );
-}

@@ -1,7 +1,7 @@
 "use server";
 
 import { randomUUID } from "node:crypto";
-import { asc, desc, eq, sql as raw } from "drizzle-orm";
+import { desc, eq, sql as raw } from "drizzle-orm";
 
 import { db } from "@/db";
 import {
@@ -27,7 +27,6 @@ import type {
   Client,
   NotificationKind,
   Order,
-  OrderEvent,
   OrderItem,
   OrderStatus,
   Payment,
@@ -642,19 +641,3 @@ export async function eraseEverything(): Promise<void> {
 /* Timeline, for one order                                                     */
 /* -------------------------------------------------------------------------- */
 
-export async function orderTimeline(orderId: string): Promise<OrderEvent[]> {
-  await requireStaff();
-  const rows = await db
-    .select()
-    .from(orderEvents)
-    .where(eq(orderEvents.orderId, orderId))
-    .orderBy(asc(orderEvents.at));
-  return rows.map((row) => ({
-    id: row.id,
-    at: row.at.toISOString(),
-    status: row.kind,
-    title: row.title,
-    description: row.description ?? undefined,
-    actor: row.actor,
-  }));
-}

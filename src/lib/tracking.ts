@@ -19,12 +19,12 @@
  */
 
 /** Crockford-style base 32: no I, L, O or U. */
-export const TRACKING_ALPHABET = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
+const TRACKING_ALPHABET = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
 
 const SUFFIX_LENGTH = 6;
 
 /** Fallback when the company profile has not set one. */
-export const DEFAULT_TRACKING_PREFIX = "AS";
+const DEFAULT_TRACKING_PREFIX = "AS";
 
 /**
  * What a typed tracking number may look like.
@@ -34,7 +34,7 @@ export const DEFAULT_TRACKING_PREFIX = "AS";
  * things refused are values that would break a URL or a lookup: blanks,
  * spaces and punctuation.
  */
-export const TRACKING_NUMBER_PATTERN = /^[A-Z0-9][A-Z0-9-]{2,31}$/;
+const TRACKING_NUMBER_PATTERN = /^[A-Z0-9][A-Z0-9-]{2,31}$/;
 
 export function isValidTrackingNumber(value: string): boolean {
   return TRACKING_NUMBER_PATTERN.test(value);

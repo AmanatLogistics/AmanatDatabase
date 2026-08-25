@@ -34,14 +34,12 @@ startHydration();
 /**
  * The customer's page — the only screen anyone outside the business ever sees.
  *
- * It renders `PublicTrackingResult` and never touches the raw order, so the
- * allowlist in `src/lib/api/queries.ts` is the whole story about what a
- * customer can see. No prices, no other clients, no internal notes.
- *
- * WIRING THE BACKEND — the one thing to change later:
- * `trackByReference` is the only order data this page reads, and it runs on the
- * server. It returns a projection — a status, a progress position, item names —
- * and never a client record, a phone number, an address or a price we paid.
+ * It renders `PublicTrackingResult` and never touches the raw order.
+ * `trackByReference` in `src/lib/server/shop.ts` is the only order data this
+ * page can reach, it runs on the server, and it builds its answer by naming the
+ * fields a customer may see rather than by removing the ones they may not — so
+ * a column added to `orders` tomorrow is absent here by default. No prices, no
+ * other clients, no phone numbers, no internal notes.
  */
 export function PublicTrackingScreen({
   initialNumber = "",

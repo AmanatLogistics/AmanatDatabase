@@ -120,7 +120,7 @@ export interface OrderCost {
  * projected from the unit costs captured on the quotation, so a freshly-created
  * order does not read as 100% margin on the dashboard.
  */
-export function orderCost(
+function orderCost(
   order: Order,
   index: LedgerIndex,
 ): OrderCost {
@@ -484,8 +484,3 @@ export function startOfMonth(date: Date): Date {
   return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), 1));
 }
 
-export function endOfMonth(date: Date): Date {
-  return new Date(
-    Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + 1, 0, 23, 59, 59, 999),
-  );
-}
