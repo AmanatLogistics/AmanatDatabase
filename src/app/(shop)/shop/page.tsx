@@ -7,9 +7,10 @@ import { listWebOrders } from "@/lib/server/intake";
 export const metadata: Metadata = { title: "Shop overview" };
 
 export default async function ShopPage() {
-  const [products, webOrders] = await Promise.all([
-    listProducts(),
-    listWebOrders(),
-  ]);
+  // Sequential, like every other read — see the note in
+  // `src/lib/server/operations.ts`. Two at once against a transaction
+  // pooler is the thing that stopped pages loading.
+  const products = await listProducts();
+  const webOrders = await listWebOrders();
   return <ShopOverviewScreen products={products} webOrders={webOrders} />;
 }
