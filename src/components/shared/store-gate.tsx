@@ -23,6 +23,14 @@ export function StoreGate({ children }: { children: React.ReactNode }) {
   const [status, setStatus] = React.useState<"loading" | "ready" | "failed">(
     "loading",
   );
+  /*
+   * Kept and shown, not swallowed. "Could not reach the database" is true and
+   * useless — it is the same sentence whether the password is wrong, the
+   * project is asleep or a query took too long, and those need different
+   * answers. This screen is behind a staff login, so the person reading it is
+   * the person who can act on it.
+   */
+  const [reason, setReason] = React.useState<string>("");
 
   React.useEffect(() => {
     let cancelled = false;
@@ -47,8 +55,10 @@ export function StoreGate({ children }: { children: React.ReactNode }) {
           ),
         ]);
         if (!cancelled) setStatus("ready");
-      } catch {
-        if (!cancelled) setStatus("failed");
+      } catch (error) {
+        if (cancelled) return;
+        setReason((error as Error)?.message ?? String(error));
+        setStatus("failed");
       }
     }
 
@@ -67,7 +77,22 @@ export function StoreGate({ children }: { children: React.ReactNode }) {
         <p className="font-medium">Could not reach the database.</p>
         <p className="text-muted-foreground mt-1 text-sm">
           Nothing has been lost — this screen simply has nothing to show until
-          the connection comes back. Try reloading in a moment.
+          the connection comes back.
+        </p>
+        {reason && (
+          <pre className="bg-muted/50 text-muted-foreground mt-3 max-h-48 overflow-auto rounded-lg p-3 text-left text-[11px] whitespace-pre-wrap">
+            {reason}
+          </pre>
+        )}
+        <p className="text-muted-foreground mt-3 text-xs">
+          For the full picture — every step timed, and which one failed — open{" "}
+          <a
+            href="/api/health"
+            className="text-brand-700 dark:text-brand-300 underline-offset-2 hover:underline"
+          >
+            /api/health
+          </a>
+          .
         </p>
         <button
           type="button"
