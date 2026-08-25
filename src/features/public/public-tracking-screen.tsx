@@ -183,6 +183,25 @@ export function PublicTrackingScreen({
           ]
             .filter(Boolean)
             .join(" · ")}
+          {/*
+           * The way in for staff.
+           *
+           * This page is the front door now — a signed-out visit to the site
+           * lands here rather than on a login form, because a stranger arriving
+           * wants to find their parcel, not an account. That leaves the people
+           * who run the business with nowhere obvious to click, so: quiet, at
+           * the bottom, out of a customer's way and exactly where somebody who
+           * works here would think to look.
+           */}
+          <span className="mt-2 block">
+            <Link
+              href="/login"
+              className="underline-offset-2 hover:underline"
+              prefetch={false}
+            >
+              Staff sign in
+            </Link>
+          </span>
         </div>
       </footer>
     </div>
