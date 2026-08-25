@@ -1,14 +1,19 @@
 "use client";
 
 import * as React from "react";
+import dynamic from "next/dynamic";
+
+import { Skeleton } from "@/components/ui/skeleton";
+
+/* Loaded after the page, like the dashboard's — see the note in that module. */
+const FinanceTrendChart = dynamic(
+  () =>
+    import("@/features/finance/finance-trend-chart").then(
+      (m) => m.FinanceTrendChart,
+    ),
+  { ssr: false, loading: () => <Skeleton className="h-[260px] w-full" /> },
+);
 import Link from "next/link";
-import {
-  Bar,
-  BarChart,
-  CartesianGrid,
-  XAxis,
-  YAxis,
-} from "recharts";
 import { ArrowRightIcon, BanknoteIcon } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -21,14 +26,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
-import {
-  ChartContainer,
-  ChartLegend,
-  ChartLegendContent,
-  ChartTooltip,
-  ChartTooltipContent,
-  type ChartConfig,
-} from "@/components/ui/chart";
+import type { ChartConfig } from "@/components/ui/chart";
 import { Money } from "@/components/shared/money";
 import { PageHeader } from "@/components/shared/page-header";
 import { StatCard } from "@/components/shared/stat-card";
@@ -42,7 +40,6 @@ import {
 import { AGING_BUCKET_LABEL, deltaPercent, isBillable } from "@/lib/finance";
 import {
   formatAfn,
-  formatAfnCompact,
   formatDate,
   formatPercent,
 } from "@/lib/format";
@@ -286,61 +283,7 @@ export function FinanceScreen() {
             </p>
           </CardHeader>
           <CardContent>
-            <ChartContainer
-              config={trendConfig}
-              className="aspect-auto h-[260px] w-full"
-            >
-              <BarChart data={monthly} margin={{ left: 4, right: 8, top: 8 }}>
-                <CartesianGrid
-                  vertical={false}
-                  strokeDasharray="3 3"
-                  opacity={0.35}
-                />
-                <XAxis
-                  dataKey="label"
-                  tickLine={false}
-                  axisLine={false}
-                  tickMargin={10}
-                  fontSize={11}
-                />
-                <YAxis
-                  tickLine={false}
-                  axisLine={false}
-                  width={44}
-                  fontSize={11}
-                  tickFormatter={(value: number) => formatAfnCompact(value)}
-                />
-                <ChartTooltip
-                  cursor={{ fill: "var(--color-muted)", opacity: 0.4 }}
-                  content={
-                    <ChartTooltipContent
-                      formatter={(value) =>
-                        formatAfn(Number(value), { unit: "suffix" })
-                      }
-                    />
-                  }
-                />
-                <ChartLegend content={<ChartLegendContent />} />
-                <Bar
-                  dataKey="revenueAfn"
-                  fill="var(--color-chart-1)"
-                  radius={[4, 4, 0, 0]}
-                  maxBarSize={18}
-                />
-                <Bar
-                  dataKey="cogsAfn"
-                  fill="var(--color-chart-3)"
-                  radius={[4, 4, 0, 0]}
-                  maxBarSize={18}
-                />
-                <Bar
-                  dataKey="profitAfn"
-                  fill="var(--color-chart-2)"
-                  radius={[4, 4, 0, 0]}
-                  maxBarSize={18}
-                />
-              </BarChart>
-            </ChartContainer>
+            <FinanceTrendChart monthly={monthly} config={trendConfig} />
           </CardContent>
         </Card>
         </div>
