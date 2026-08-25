@@ -38,14 +38,23 @@ function connect() {
   found = url;
 
   /*
-   * `max: 1` is not a typo. On Vercel every request can land in its own short
-   * lived instance, and a pool of ten per instance exhausts Postgres long
-   * before the traffic justifies it. The provider's transaction pooler — Neon's
-   * `-pooler` endpoint, Supabase's port 6543 — does the real pooling; this side
-   * only needs one connection each.
+   * A small pool, not a single connection.
    *
-   * `prepare: false` is required by that pooler — prepared statements are bound
-   * to a backend connection it is free to swap underneath us.
+   * This was `max: 1` on the usual serverless reasoning — many short lived
+   * instances, do not exhaust Postgres. The reasoning is sound and the number
+   * was wrong, because one connection means one queue: while a transaction is
+   * open on it, every other query in the process waits behind that transaction,
+   * however unrelated. Seeding the reference data, minting a tracking number
+   * and writing a session all open one, and the app issues concurrent reads
+   * around them by design.
+   *
+   * That is head-of-line blocking, and it turned a slow write into a stalled
+   * page. Three connections is still modest — the pooler in front of this
+   * reports sixty available and eleven in use — and it means a transaction
+   * blocks itself rather than everything.
+   *
+   * `prepare: false` is still required: the pooler is free to hand a later
+   * statement to a different backend, which has never seen what we prepared.
    */
   /*
    * Said once, at startup, where somebody reading the runtime logs will find
@@ -77,7 +86,7 @@ function connect() {
    * came from the IPv6 fix, the assignment from making tests able to exit.
    */
   client = postgres(url.url, {
-    max: 1,
+    max: 3,
     prepare: false,
     /*
      * Both of these are about failing out loud. postgres.js waits 30 seconds
@@ -140,6 +149,33 @@ export const db = new Proxy({} as Database, {
     return Reflect.has(resolve(), property);
   },
 });
+
+/**
+ * Throw the connection away, because something on it is stuck.
+ *
+ * A query that a deadline gave up on does not stop existing — the driver is
+ * still holding a slot for it, and everything issued afterwards queues behind
+ * it. Reusing that connection is how one slow query became a permanently broken
+ * instance: every later request waited on the orphan, timed out in its turn and
+ * left another one, and the process never recovered. The health check ran fine
+ * throughout, because it is a different route and got a different instance —
+ * which is precisely how misleading this failure was to read.
+ *
+ * So a deadline discards rather than reuses. The next query opens a fresh
+ * connection, which costs a handshake and is the cheapest thing here by a wide
+ * margin.
+ *
+ * Deliberately not awaited: the caller is already returning an error to
+ * somebody, and waiting on a socket that is not answering is the very thing
+ * being escaped.
+ */
+export function resetConnection(): void {
+  const stale = client;
+  client = undefined;
+  instance = undefined;
+  globalThis.__amanatDb = undefined;
+  void stale?.end({ timeout: 0 }).catch(() => {});
+}
 
 /**
  * Close the connection.

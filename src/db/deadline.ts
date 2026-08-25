@@ -1,5 +1,7 @@
 import "server-only";
 
+import { resetConnection } from "@/db";
+
 /**
  * Give a database call a deadline it cannot talk its way out of.
  *
@@ -65,7 +67,16 @@ export async function withDeadline<T>(
   let timer: ReturnType<typeof setTimeout>;
 
   const expiry = new Promise<never>((_, reject) => {
-    timer = setTimeout(() => reject(new DatabaseUnreachableError(what, ms)), ms);
+    timer = setTimeout(() => {
+      /*
+       * Before rejecting, not after. The query we are abandoning still occupies
+       * its slot on the pool, and anything issued next would queue behind it —
+       * so the connection goes, and the next caller gets a clean one. Without
+       * this the first timeout is permanent for the life of the instance.
+       */
+      resetConnection();
+      reject(new DatabaseUnreachableError(what, ms));
+    }, ms);
   });
 
   try {
