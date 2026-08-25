@@ -39,7 +39,46 @@ const COMPANY_FIELDS = [
   "termsAndConditions",
 ] as const satisfies readonly (keyof Settings["company"])[];
 
+/**
+ * Has this process already established that the reference data is there?
+ *
+ * Once true it stays true: rows are never deleted back to empty by anything the
+ * app can do, and a fresh instance re-checks anyway.
+ */
+let seeded = false;
+
 async function seedIfEmpty(): Promise<void> {
+  if (seeded) return;
+
+  /*
+   * Ask first, in one round trip, and open a transaction only if the answer is
+   * "nothing is there".
+   *
+   * This used to go straight into the transaction every single time — BEGIN, an
+   * advisory lock, three counts, COMMIT. Six round trips that cannot pipeline,
+   * because a transaction is by definition sequential, paid on every load of
+   * every screen even when all three tables had been full for weeks.
+   *
+   * That is invisible against a database in the next rack and brutal against
+   * one on another continent: at eighty milliseconds a trip it is half a second
+   * of pure waiting before the screen has asked for anything it actually needs.
+   * Three sub-selects in one statement answer the same question for one trip.
+   */
+  const [counts] = await db.execute<{
+    company: number;
+    stores: number;
+    methods: number;
+  }>(raw`
+    SELECT (SELECT count(*)::int FROM company_profile) AS company,
+           (SELECT count(*)::int FROM stores) AS stores,
+           (SELECT count(*)::int FROM payment_methods) AS methods
+  `);
+
+  if (counts && counts.company > 0 && counts.stores > 0 && counts.methods > 0) {
+    seeded = true;
+    return;
+  }
+
   await db.transaction(async (tx) => {
     // Serialised, so two people opening the app at once cannot both seed it.
     await tx.execute(raw`SELECT pg_advisory_xact_lock(hashtext('amanat:seed-settings'))`);
@@ -73,6 +112,8 @@ async function seedIfEmpty(): Promise<void> {
       );
     }
   });
+
+  seeded = true;
 }
 
 export async function loadSettings(): Promise<Settings> {
