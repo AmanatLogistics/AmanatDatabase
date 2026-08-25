@@ -83,10 +83,15 @@ function connect() {
      * Both of these are about failing out loud. postgres.js waits 30 seconds
      * for a connection by default, which is longer than a serverless function
      * is allowed to live: an unreachable database produced a request that was
-     * killed by the platform mid-wait, so the log said nothing at all. Ten
-     * seconds leaves room to report the real error.
+     * killed by the platform mid-wait, so the log said nothing at all.
+     *
+     * Five, not ten. A Vercel Hobby function gets ten seconds in total, so a
+     * ten second connect timeout consumes the entire budget and leaves nothing
+     * with which to report what went wrong — the failure that says nothing,
+     * again. Five leaves room for the error to be logged and a real page to be
+     * rendered, and is still far longer than a healthy database ever needs.
      */
-    connect_timeout: 10,
+    connect_timeout: 5,
     idle_timeout: 20,
     onnotice: () => {},
   });

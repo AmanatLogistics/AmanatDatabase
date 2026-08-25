@@ -42,13 +42,21 @@ const PRIVATE = [
   "/documents",
   "/settings",
   "/settings/team",
-  "/shop",
-  "/shop/products",
-  "/shop/orders",
 ];
 
 /** Every route a customer must be able to reach without one. */
-const PUBLIC = ["/store", "/store/cart", "/store/checkout", "/track"];
+const PUBLIC = ["/track"];
+
+/**
+ * The shop, which is off by default.
+ *
+ * Off means absent, not merely hidden: these answer 404 to everyone, signed in
+ * or not. That is a stronger guarantee than the redirect the rest of PRIVATE
+ * gets, so it is asserted separately rather than folded into either list —
+ * checking them for a login redirect would fail, and checking them as public
+ * would pass for entirely the wrong reason.
+ */
+const SHOP = ["/store", "/store/cart", "/shop", "/shop/products"];
 
 let server: ReturnType<typeof spawn> | undefined;
 let browser: Browser | undefined;
@@ -104,6 +112,23 @@ async function landsOn(route: string, token?: string): Promise<string> {
   return landed;
 }
 
+/** What HTTP status does `route` answer with? */
+async function statusOf(route: string, token?: string): Promise<number> {
+  const context = await browser!.newContext();
+  if (token) {
+    await context.addCookies([
+      { name: SESSION_COOKIE, value: token, url: baseUrl },
+    ]);
+  }
+  const page = await context.newPage();
+  const response = await page.goto(`${baseUrl}${route}`, {
+    waitUntil: "domcontentloaded",
+  });
+  const status = response?.status() ?? 0;
+  await context.close();
+  return status;
+}
+
 before(async () => {
   if (!DATABASE_URL) return;
 
@@ -148,6 +173,24 @@ describe("the staff login", needsDatabase, () => {
         await landsOn(route),
         "/login",
         `${route} answered without a session`,
+      );
+    }
+  });
+
+  test("the shop is absent, not merely hidden", async () => {
+    await clearStaff(DATABASE_URL!);
+    const { token } = await signInDirectly(DATABASE_URL!);
+
+    for (const route of SHOP) {
+      assert.equal(
+        await statusOf(route),
+        404,
+        `${route} answered while the shop is switched off`,
+      );
+      assert.equal(
+        await statusOf(route, token),
+        404,
+        `${route} answered to a signed-in member of staff while switched off`,
       );
     }
   });

@@ -1,4 +1,7 @@
+import { notFound } from "next/navigation";
+
 import { StorefrontShell } from "@/features/store/storefront-shell";
+import { SHOP_ENABLED } from "@/lib/constants";
 import { listPublishedProducts } from "@/lib/server/shop";
 
 /**
@@ -29,6 +32,14 @@ export default async function StoreLayout({
 }: {
   children: React.ReactNode;
 }) {
+  /*
+   * Checked before the catalogue is fetched, not after. With the shop off this
+   * route must not touch the database at all — it is the one public surface
+   * that would otherwise wake a sleeping database for a page nobody is meant to
+   * see.
+   */
+  if (!SHOP_ENABLED) notFound();
+
   const catalogue = await listPublishedProducts();
 
   return <StorefrontShell catalogue={catalogue}>{children}</StorefrontShell>;

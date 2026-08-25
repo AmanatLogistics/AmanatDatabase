@@ -292,22 +292,34 @@ export const TEAM_ROLE_LABEL: Record<TeamRole, string> = {
 };
 
 /**
- * The customer tracking page at /track. On by default.
+ * The customer tracking page at /track. On by default, and the point of the
+ * public side of this app: a client types their reference and sees where their
+ * parcel is.
  *
- * It was gated off when orders lived in the JS bundle, where a public page
- * would have exposed them. That is no longer how the app stores anything:
- * orders are written to the visitor's own localStorage and are never bundled,
- * so a stranger's browser starts empty. There is nothing to leak.
- *
- * Set NEXT_PUBLIC_PUBLIC_TRACKING_ENABLED=false to take the page down again.
- *
- * Note this is about exposure, not usefulness: until a backend serves
- * `GET /api/track/:trackingNumber`, a lookup only finds orders saved in the
- * visitor's own browser, so a customer cannot yet be sent to this page and
- * find their order.
+ * It reads a projection assembled on the server by naming the fields a customer
+ * may see, so there is nothing here to leak. Set
+ * NEXT_PUBLIC_PUBLIC_TRACKING_ENABLED=false to take the page down.
  */
 export const PUBLIC_TRACKING_ENABLED =
   process.env.NEXT_PUBLIC_PUBLIC_TRACKING_ENABLED !== "false";
+
+/**
+ * The online shop — the storefront at /store and its admin at /shop. **Off by
+ * default.**
+ *
+ * The business runs on the operations side and the tracking page: staff enter
+ * orders, clients look them up. Selling from a catalogue is a separate thing
+ * that is not wanted yet, and a half-stocked shop on a public URL is worse than
+ * no shop at all.
+ *
+ * Off means gone rather than hidden: the routes answer 404 and the sidebar link
+ * disappears. Nothing is deleted — the screens, the tables and the checkout are
+ * all still here. Set NEXT_PUBLIC_SHOP_ENABLED=true to open it again.
+ *
+ * `/track` is deliberately not covered by this. It serves operations orders too,
+ * and is the one public page that matters.
+ */
+export const SHOP_ENABLED = process.env.NEXT_PUBLIC_SHOP_ENABLED === "true";
 
 /* -------------------------------------------------------------------------- */
 /* Documents                                                                   */

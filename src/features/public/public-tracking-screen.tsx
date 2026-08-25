@@ -24,7 +24,7 @@ import {
   type PublicTrackingResult,
 } from "@/lib/api";
 import { trackByReference } from "@/lib/server/shop";
-import { CLIENT_PROGRESS_STAGES } from "@/lib/constants";
+import { CLIENT_PROGRESS_STAGES, SHOP_ENABLED } from "@/lib/constants";
 import { formatDate, formatDateTime } from "@/lib/format";
 import { startHydration, useStoreHydrated } from "@/lib/hydration";
 import { cn } from "@/lib/utils";
@@ -97,21 +97,33 @@ export function PublicTrackingScreen({
        */}
       <header className="brand-gradient text-primary-foreground">
         <div className="mx-auto w-full max-w-3xl px-4 pt-8 pb-16 sm:pt-12 sm:pb-24">
+          {/*
+           * With the shop off this is the only page a customer ever sees, and
+           * both of these led into it. A logo that 404s and a Shop button that
+           * goes nowhere would make a working page feel broken, so neither is
+           * a link at all unless there is somewhere to go.
+           */}
           <div className="mb-6 flex items-center justify-between">
-            <Link href="/store">
-              <Logo tone="onDark" />
-            </Link>
-            <Button
-              variant="ghost"
-              size="sm"
-              asChild
-              className="text-primary-foreground/90 hover:bg-primary-foreground/10 hover:text-primary-foreground"
-            >
+            {SHOP_ENABLED ? (
               <Link href="/store">
-                <ShoppingBagIcon />
-                Shop
+                <Logo tone="onDark" />
               </Link>
-            </Button>
+            ) : (
+              <Logo tone="onDark" />
+            )}
+            {SHOP_ENABLED && (
+              <Button
+                variant="ghost"
+                size="sm"
+                asChild
+                className="text-primary-foreground/90 hover:bg-primary-foreground/10 hover:text-primary-foreground"
+              >
+                <Link href="/store">
+                  <ShoppingBagIcon />
+                  Shop
+                </Link>
+              </Button>
+            )}
           </div>
 
           <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">

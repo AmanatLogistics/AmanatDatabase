@@ -1,6 +1,9 @@
+import { notFound } from "next/navigation";
+
 import { ShopShell } from "@/components/layout/shop-shell";
 import { SignedInProvider } from "@/components/auth/signed-in";
 import { requireStaff } from "@/lib/auth/session";
+import { SHOP_ENABLED } from "@/lib/constants";
 
 /**
  * Shop admin route group.
@@ -15,6 +18,8 @@ export default async function ShopLayout({
 }: {
   children: React.ReactNode;
 }) {
+  if (!SHOP_ENABLED) notFound();
+
   const staff = await requireStaff();
 
   return (
