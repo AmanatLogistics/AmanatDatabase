@@ -66,6 +66,7 @@ export async function refreshOperations(): Promise<void> {
      * also what makes the figures move when you enter something.
      */
     today: new Date(),
+    loadedAt: Date.now(),
     clients: data.clients,
     orders: data.orders,
     purchases: data.purchases,

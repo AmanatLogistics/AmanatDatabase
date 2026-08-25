@@ -4,6 +4,7 @@ import * as React from "react";
 
 import { Skeleton } from "@/components/ui/skeleton";
 import { refreshOperations } from "@/lib/api/mutations";
+import { useDataStore } from "@/lib/store";
 
 /**
  * Holds a screen back until the operations data has arrived.
@@ -19,9 +20,31 @@ import { refreshOperations } from "@/lib/api/mutations";
  * shop where two people edit the same order in the same minute would need
  * more, and this one does not.
  */
+/**
+ * How stale the cache may be before a navigation quietly refreshes it.
+ *
+ * Nothing in this browser can go out of date without going through the mutation
+ * layer, which reloads as it writes. What this covers is somebody else's
+ * change, on another machine — worth picking up, not worth waiting for.
+ */
+const STALE_AFTER_MS = 30_000;
+
 export function StoreGate({ children }: { children: React.ReactNode }) {
+  /*
+   * Whether we have ever loaded, rather than whether we are loading now.
+   *
+   * This component wraps every admin screen, and it used to start each mount at
+   * "loading" and re-download clients, orders, purchases, payments and settings
+   * before rendering anything. Every click between screens therefore cost a
+   * full round trip and a flash of placeholders, for data the browser was
+   * already holding and had just finished drawing.
+   *
+   * So: if there is a dataset, show it immediately and refresh behind the
+   * screen. Placeholders are for the one load that genuinely has nothing.
+   */
+  const loadedAt = useDataStore((s) => s.loadedAt);
   const [status, setStatus] = React.useState<"loading" | "ready" | "failed">(
-    "loading",
+    loadedAt ? "ready" : "loading",
   );
   /*
    * Kept and shown, not swallowed. "Could not reach the database" is true and
@@ -34,6 +57,13 @@ export function StoreGate({ children }: { children: React.ReactNode }) {
 
   React.useEffect(() => {
     let cancelled = false;
+
+    /*
+     * A refresh that fails while we already have data is not worth a wiped
+     * screen — the figures on it were true a moment ago and still are, near
+     * enough. It goes to the console and the next attempt tries again.
+     */
+    const haveData = useDataStore.getState().loadedAt !== null;
 
     async function load() {
       try {
@@ -57,10 +87,32 @@ export function StoreGate({ children }: { children: React.ReactNode }) {
         if (!cancelled) setStatus("ready");
       } catch (error) {
         if (cancelled) return;
+        if (haveData) {
+          console.warn("[amanat] background refresh failed", error);
+          return;
+        }
         setReason((error as Error)?.message ?? String(error));
         setStatus("failed");
       }
     }
+
+    /*
+     * Fresh enough is fresh enough. Re-asking on every navigation for data
+     * seconds old is the cost with nothing bought.
+     */
+    /*
+     * Read, not subscribed to.
+     *
+     * With `loadedAt` in this effect's dependencies, a successful load updated
+     * the store, which re-ran the effect, whose cleanup set `cancelled` — and
+     * the original run then skipped its own `setStatus("ready")` on the very
+     * next line. The screen stayed on placeholders for ever while the data sat
+     * loaded behind them. This runs once, on mount, and looks the value up
+     * itself.
+     */
+    const cachedAt = useDataStore.getState().loadedAt;
+    const fresh = cachedAt !== null && Date.now() - cachedAt < STALE_AFTER_MS;
+    if (fresh) return;
 
     // Scheduled rather than called in the effect body, so the state change
     // never lands synchronously during the effect.

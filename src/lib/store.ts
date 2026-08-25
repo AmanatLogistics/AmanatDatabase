@@ -60,6 +60,14 @@ export interface DataState {
   settings: Settings;
   /** Frozen "now" so derived figures stay stable between server and client. */
   today: Date;
+  /**
+   * When the server dataset last arrived, or null if it never has.
+   *
+   * The screens read this to decide whether they have anything to show. It is
+   * the difference between "no orders" and "no orders yet, still asking" —
+   * which look identical and mean opposite things.
+   */
+  loadedAt: number | null;
 
   addClient: (client: Client) => void;
   updateClient: (id: string, patch: Partial<Client>) => void;
@@ -115,6 +123,7 @@ const initial = () => ({
   payments: initialData.payments,
   settings: initialData.settings,
   today: SSR_TODAY,
+  loadedAt: null,
 });
 
 export const useDataStore = create<DataState>()(
