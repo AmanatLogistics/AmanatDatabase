@@ -1,0 +1,11 @@
+import { chromium } from "playwright";
+const browser = await chromium.launch({ executablePath: "/opt/pw-browsers/chromium-1194/chrome-linux/chrome" });
+const page = await browser.newPage({ viewport: { width: 900, height: 700 } });
+const t0 = Date.now();
+await page.goto("http://localhost:3115/login", { waitUntil: "networkidle" }).catch(() => {});
+console.log(`  loaded in ${Date.now() - t0}ms`);
+const text = await page.locator("body").innerText().catch(() => "");
+console.log("  shows 'Cannot reach the database':", /Cannot reach the database/.test(text));
+console.log("  shows the checklist:", /Worth checking/.test(text));
+await page.screenshot({ path: "/tmp/claude-0/-home-user-AmanatDatabase/846045ee-037c-5b41-ae50-577b46a4b338/scratchpad/bh.png" });
+await browser.close();
