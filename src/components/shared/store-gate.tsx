@@ -123,7 +123,19 @@ export function StoreGate({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
-  if (status === "failed") {
+  /*
+   * Having data is what decides this, not a flag set by an effect.
+   *
+   * `status` began as the whole story, and it was wrong twice over: it is
+   * initialised on this component's first render, but the server-seeded data
+   * can arrive a moment later — so the gate sat on placeholders with the
+   * dataset already in the store, waiting for a fetch it had correctly
+   * decided not to make. Reading the store directly cannot fall out of step
+   * with it, and it costs no effect and no extra render.
+   */
+  const hasData = loadedAt !== null;
+
+  if (status === "failed" && !hasData) {
     return (
       <div className="mx-auto max-w-md py-16 text-center">
         <p className="font-medium">Could not load your data.</p>
@@ -157,7 +169,7 @@ export function StoreGate({ children }: { children: React.ReactNode }) {
     );
   }
 
-  if (status === "loading") {
+  if (status === "loading" && !hasData) {
     return (
       <div className="space-y-4" aria-busy="true" aria-live="polite">
         <span className="sr-only">Loading your data…</span>

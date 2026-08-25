@@ -1,9 +1,6 @@
 "use client";
 
 import * as React from "react";
-import dynamic from "next/dynamic";
-
-import { Skeleton } from "@/components/ui/skeleton";
 import Link from "next/link";
 import {
   AlertTriangleIcon,
@@ -40,36 +37,8 @@ import { Money } from "@/components/shared/money";
 import { ProductThumb } from "@/components/shared/product-thumb";
 import { StatCard } from "@/components/shared/stat-card";
 import { StatusBadge } from "@/components/shared/status-badge";
-/*
- * The charts arrive after the page does.
- *
- * Recharts is the single heaviest thing this app ships — the two screens that
- * draw a chart carried about 380KB more JavaScript than the ones that do not,
- * and all of it had to be parsed and evaluated before anything appeared. None
- * of it is needed to render the figures above the chart, which are the numbers
- * somebody actually opened the page for.
- *
- * `ssr: false` because a chart has nothing to say on the server: recharts sizes
- * itself by measuring the box it is in, so the server renders an empty one and
- * the browser immediately replaces it. The placeholders below are the exact
- * height of the real thing, so nothing on the page moves when it swaps in —
- * this app's cumulative layout shift is zero and stays that way.
- */
-const RevenueChart = dynamic(
-  () => import("@/features/dashboard/revenue-chart").then((m) => m.RevenueChart),
-  { ssr: false, loading: () => <Skeleton className="h-[280px] w-full" /> },
-);
-const StatusDonut = dynamic(
-  () => import("@/features/dashboard/status-donut").then((m) => m.StatusDonut),
-  {
-    ssr: false,
-    loading: () => (
-      <div className="flex flex-col items-center gap-4 sm:flex-row">
-        <Skeleton className="size-[172px] shrink-0 rounded-full" />
-      </div>
-    ),
-  },
-);
+import { RevenueChart } from "@/features/dashboard/revenue-chart";
+import { StatusDonut } from "@/features/dashboard/status-donut";
 import { useDashboard, useToday } from "@/lib/api";
 import { deltaPercent } from "@/lib/finance";
 import {
