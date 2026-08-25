@@ -5,10 +5,12 @@ a photo and a quantity; we buy the item abroad, bring it in, and they collect it
 from our office. This tracks the order and the money at every step, and gives
 the client a page to check on it themselves.
 
-It runs on Postgres (Neon in production) with server actions, staff logins
-and a public storefront. There is no mock data and nothing lives in the browser:
-open it on a fresh database and it will take you to `/setup` to create the first
-account.
+It runs on Postgres (Neon in production) with server actions and staff logins.
+There is no mock data and nothing lives in the browser: open it on a fresh
+database and it will take you to `/setup` to create the first account.
+
+The public side is the tracking page. The online shop is built but **switched
+off** — see "The shop, and how to turn it on" below.
 
 ```bash
 npm install
@@ -38,20 +40,28 @@ to look when one will not connect.
 | `/print/{invoice,quotation,receipt}/[id]` | A4 print-ready sheets |
 | `/settings/*` | Company profile, stores, payment methods, team |
 
-### The shop — its own admin
-
-| Route | What it does |
-|---|---|
-| `/shop`, `/shop/products` | The catalogue customers see, and what is published |
-| `/shop/orders`, `/shop/orders/[id]` | Website orders as they arrive, and turning one into a real order |
-
 ### Public — no login
 
 | Route | What it does |
 |---|---|
-| `/store`, `/store/p/[slug]` | Storefront: browse, search, filter, product gallery |
-| `/store/cart`, `/store/checkout`, `/store/thanks` | Basket and checkout — writes a real order and notifies you |
 | `/track` | A customer checking on their order by reference |
+
+### The shop, and how to turn it on
+
+Off by default. `/store` and `/shop` answer **404** and the sidebar link is
+absent — not hidden, absent, including from the ⌘K palette.
+
+The business runs on the operations side and the tracking page: staff enter
+orders, clients look them up. Nothing is deleted — the storefront, the shop
+admin, the basket, the checkout and their tables are all still here. Set
+`NEXT_PUBLIC_SHOP_ENABLED=true` and they come back:
+
+| Route | What it does |
+|---|---|
+| `/store`, `/store/p/[slug]` | Storefront: browse, search, filter |
+| `/store/cart`, `/store/checkout`, `/store/thanks` | Basket and checkout — writes a real order and notifies you |
+| `/shop`, `/shop/products` | The catalogue, and what is published |
+| `/shop/orders`, `/shop/orders/[id]` | Website orders, and turning one into a real order |
 
 ### Accounts
 

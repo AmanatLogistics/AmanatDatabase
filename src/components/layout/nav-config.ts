@@ -15,6 +15,8 @@ import {
   WalletIcon,
 } from "lucide-react";
 
+import { SHOP_ENABLED } from "@/lib/constants";
+
 export interface NavItem {
   label: string;
   href: string;
@@ -30,7 +32,7 @@ export interface NavSection {
 }
 
 /** Single source of truth for the sidebar and the command palette. */
-export const navigation: NavSection[] = [
+const ALL_SECTIONS: NavSection[] = [
   {
     caption: "Overview",
     items: [{ label: "Dashboard", href: "/", icon: LayoutDashboardIcon }],
@@ -53,7 +55,8 @@ export const navigation: NavSection[] = [
     items: [
       /*
        * The one door between the two systems. The shop keeps its own shell and
-       * navigation — this is a link across, not a merge.
+       * navigation — this is a link across, not a merge. Removed entirely when
+       * the shop is off, rather than shown leading to a 404.
        */
       { label: "Shop admin", href: "/shop", icon: StoreIcon },
     ],
@@ -105,6 +108,18 @@ export const settingsPages = [
   },
   { label: "Team", href: "/settings/team", icon: UsersRoundIcon },
 ];
+
+/**
+ * What the sidebar actually shows.
+ *
+ * The shop section comes out when the shop is off. Filtering here rather than
+ * in the sidebar means the ⌘K palette below loses it too — a command palette
+ * that still offers "Shop admin" is how a supposedly absent feature comes back
+ * to haunt you.
+ */
+export const navigation: NavSection[] = ALL_SECTIONS.filter(
+  (section) => SHOP_ENABLED || section.caption !== "Online shop",
+);
 
 /** Flat list of every navigable page, used by the ⌘K palette. */
 const sidebarLinks = navigation.flatMap((section) =>

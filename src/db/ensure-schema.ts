@@ -41,16 +41,28 @@ export function ensureSchema(): Promise<void> {
 }
 
 /**
- * How many times to re-enter the race before giving up.
+ * How long the whole thing may take, and how many goes it gets.
  *
- * Losing it is not a failure — it means somebody else is creating the very
- * tables we wanted — so a loser waits and looks again rather than reporting a
- * broken database. Bounded, because a migration that is genuinely wrong fails
- * the same way every time and should say so rather than spin.
+ * Both exist because this runs inside a serverless function, which is killed
+ * without ceremony when its time is up — ten seconds on Vercel's Hobby plan.
+ * The first version had neither: five migration attempts, each able to sit on a
+ * cold database for as long as it liked, with two and a half seconds of sleeps
+ * between them. Against a suspended compute that ran past the limit, the
+ * function was killed mid-migration, the cached promise was cleared because it
+ * had failed, and the next request started the whole thing over. From outside
+ * that looks like a page that spins and then dies, over and over — which is
+ * exactly what it was.
+ *
+ * So: finish inside the budget or say so. A clear error beats being killed
+ * silently, because only one of the two tells you what to do next.
  */
-const ATTEMPTS = 5;
+const BUDGET_MS = 8_000;
+const ATTEMPTS = 3;
 
 async function run(): Promise<void> {
+  const startedAt = Date.now();
+  const remaining = () => BUDGET_MS - (Date.now() - startedAt);
+
   if (await schemaExists()) return;
 
   console.warn(
@@ -74,19 +86,39 @@ async function run(): Promise<void> {
        * and this was a success — or still uncommitted, in which case looking
        * again in a moment will find them.
        *
-       * This replaces an advisory lock, which cannot work here: see the note in
+       * This is not an advisory lock, which cannot work here: see the note in
        * `scripts/migrate.mts`.
        */
       if (await schemaExists()) return;
 
-      if (attempt >= ATTEMPTS) {
-        console.error(`[amanat] Could not create the schema.\n\n${explainDbFailure(error)}`);
+      if (attempt >= ATTEMPTS || remaining() <= 0) {
+        console.error(
+          `[amanat] Could not create the schema.\n\n${outOfTime(remaining())}` +
+            `\n\n${explainDbFailure(error)}`,
+        );
         throw error;
       }
 
-      await new Promise((resolve) => setTimeout(resolve, attempt * 250));
+      // Never sleep past the budget — the nap would be all that is left of it.
+      await new Promise((resolve) =>
+        setTimeout(resolve, Math.max(0, Math.min(150 * attempt, remaining()))),
+      );
     }
   }
+}
+
+/** Said only when the clock, rather than the database, is what stopped us. */
+function outOfTime(left: number): string {
+  if (left > 0) return "";
+  return [
+    "This request ran out of time before the tables were finished.",
+    "",
+    "Creating the schema on a cold database can take longer than a serverless",
+    "function is allowed to live. Apply the migrations once from your machine",
+    "and the app will never need to do it during a request:",
+    "",
+    "  npx vercel env pull .env.local && npm run db:migrate",
+  ].join("\n");
 }
 
 /**
