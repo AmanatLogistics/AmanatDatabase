@@ -35,9 +35,19 @@ import type {
  * thing the server decided for itself, like the next order number.
  */
 
-/** Pull the whole operations dataset into the cache. */
+/**
+ * Pull the whole operations dataset into the cache.
+ *
+ * Goes through the variant that returns its failure rather than throwing it, so
+ * the reason survives the trip to the browser. Next would otherwise replace the
+ * message with a digest and React would render its own placeholder in its
+ * place, which is how a database that answers in ninety milliseconds spent a
+ * day looking unreachable.
+ */
 export async function refreshOperations(): Promise<void> {
-  const data = await server.loadOperations();
+  const result = await server.loadOperationsSafely();
+  if (!result.ok) throw new Error(result.message);
+  const data = result.data;
   useDataStore.setState({
     clients: data.clients,
     orders: data.orders,

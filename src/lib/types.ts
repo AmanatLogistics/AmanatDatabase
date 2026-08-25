@@ -414,3 +414,19 @@ export interface BusinessDocument {
   /** Route that renders the printable version. */
   href: string;
 }
+
+/**
+ * What a server action hands back when it is allowed to fail out loud.
+ *
+ * Next replaces the message of any error a server action throws with an opaque
+ * digest before it reaches the browser, which is right for a public site and
+ * blinding for an operator staring at "Could not reach the database" with no
+ * idea which of six causes it is. React shows its own placeholder for that —
+ * "Minified React error #441" — which names nothing at all.
+ *
+ * Returning the failure as data rather than throwing it opts out of that
+ * stripping deliberately, for screens that are already behind a staff login.
+ */
+export type ServerResult<T> =
+  | { ok: true; data: T }
+  | { ok: false; message: string };

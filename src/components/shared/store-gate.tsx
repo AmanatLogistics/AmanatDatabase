@@ -74,10 +74,10 @@ export function StoreGate({ children }: { children: React.ReactNode }) {
   if (status === "failed") {
     return (
       <div className="mx-auto max-w-md py-16 text-center">
-        <p className="font-medium">Could not reach the database.</p>
+        <p className="font-medium">Could not load your data.</p>
         <p className="text-muted-foreground mt-1 text-sm">
-          Nothing has been lost — this screen simply has nothing to show until
-          the connection comes back.
+          Nothing has been lost. The server refused this one request, and the
+          reason it gave is below.
         </p>
         {reason && (
           <pre className="bg-muted/50 text-muted-foreground mt-3 max-h-48 overflow-auto rounded-lg p-3 text-left text-[11px] whitespace-pre-wrap">

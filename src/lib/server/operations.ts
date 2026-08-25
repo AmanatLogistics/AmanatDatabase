@@ -25,6 +25,7 @@ import {
 import { requireStaff } from "@/lib/auth/session";
 import { loadSettings } from "@/lib/server/settings";
 import type {
+  ServerResult,
   Client,
   NotificationKind,
   Order,
@@ -66,6 +67,39 @@ export interface OperationsData {
  * calls could interleave with somebody else's write and disagree with
  * each other.
  */
+/**
+ * `loadOperations`, with its failure returned rather than thrown.
+ *
+ * Every admin screen waits on this one call, so when it fails the whole app is
+ * a placeholder — and in production the reason never reached the browser at
+ * all, because Next strips the message from anything a server action throws.
+ * That is the correct default and the wrong one here: this runs behind a staff
+ * login, and the person reading the screen is the person who has to fix it.
+ *
+ * Redirects are deliberately re-thrown. `requireStaff` signals "sign in again"
+ * by throwing, and swallowing that would turn an expired session into a
+ * mystifying error message instead of a login page.
+ */
+export async function loadOperationsSafely(): Promise<
+  ServerResult<OperationsData>
+> {
+  try {
+    return { ok: true, data: await loadOperations() };
+  } catch (error) {
+    const digest = (error as { digest?: unknown })?.digest;
+    if (typeof digest === "string" && /^NEXT_(REDIRECT|NOT_FOUND)/.test(digest)) {
+      throw error;
+    }
+
+    // Whole, in the runtime log, where a stack is useful.
+    console.error("[amanat] loadOperations failed", error);
+
+    const message = (error as Error)?.message ?? String(error);
+    const cause = (error as { cause?: { message?: string } })?.cause?.message;
+    return { ok: false, message: cause ? `${message}\n\n${cause}` : message };
+  }
+}
+
 export async function loadOperations(): Promise<OperationsData> {
   await requireStaff();
 
