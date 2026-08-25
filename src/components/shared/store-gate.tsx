@@ -29,7 +29,23 @@ export function StoreGate({ children }: { children: React.ReactNode }) {
 
     async function load() {
       try {
-        await refreshOperations();
+        /*
+         * A limit on this side as well as the server's.
+         *
+         * The server action has its own deadline, but the browser cannot rely
+         * on being told: if the function is killed by the platform, or the
+         * response never arrives, the promise simply never settles and this
+         * screen shows placeholders for ever. A person then cannot tell "still
+         * loading" from "never coming", and there is nothing on screen to act
+         * on. Fifteen seconds is far longer than a healthy load and far shorter
+         * than for ever.
+         */
+        await Promise.race([
+          refreshOperations(),
+          new Promise((_, reject) =>
+            setTimeout(() => reject(new Error("timed out")), 15_000),
+          ),
+        ]);
         if (!cancelled) setStatus("ready");
       } catch {
         if (!cancelled) setStatus("failed");
@@ -53,6 +69,13 @@ export function StoreGate({ children }: { children: React.ReactNode }) {
           Nothing has been lost — this screen simply has nothing to show until
           the connection comes back. Try reloading in a moment.
         </p>
+        <button
+          type="button"
+          onClick={() => window.location.reload()}
+          className="text-brand-700 dark:text-brand-300 mt-3 text-sm underline-offset-2 hover:underline"
+        >
+          Reload
+        </button>
       </div>
     );
   }

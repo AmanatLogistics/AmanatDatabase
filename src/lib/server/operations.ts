@@ -4,6 +4,7 @@ import { randomUUID } from "node:crypto";
 import { desc, eq, sql as raw } from "drizzle-orm";
 
 import { db } from "@/db";
+import { withDeadline } from "@/db/deadline";
 import {
   clients,
   notifications,
@@ -77,18 +78,27 @@ export async function loadOperations(): Promise<OperationsData> {
    */
   const settings = await loadSettings();
 
-  const [clientRows, orderRows, purchaseRows, paymentRows] = await Promise.all([
-    db.select().from(clients).orderBy(desc(clients.createdAt)),
-    db.query.orders.findMany({
-      with: { items: true, timeline: true },
-      orderBy: [desc(orders.requestedAt)],
-    }),
-    db.query.purchases.findMany({
-      with: { items: true },
-      orderBy: [desc(purchases.purchasedAt)],
-    }),
-    db.select().from(payments).orderBy(desc(payments.at)),
-  ]);
+  /*
+   * Bounded like everything else on the request path. This is the largest read
+   * the app makes and the one every admin screen waits on, so an unbounded one
+   * here is a page that shows placeholders for ever — the browser cannot tell
+   * "still loading" from "never coming".
+   */
+  const [clientRows, orderRows, purchaseRows, paymentRows] = await withDeadline(
+    Promise.all([
+      db.select().from(clients).orderBy(desc(clients.createdAt)),
+      db.query.orders.findMany({
+        with: { items: true, timeline: true },
+        orderBy: [desc(orders.requestedAt)],
+      }),
+      db.query.purchases.findMany({
+        with: { items: true },
+        orderBy: [desc(purchases.purchasedAt)],
+      }),
+      db.select().from(payments).orderBy(desc(payments.at)),
+    ]),
+    "loading your clients, orders, purchases and payments",
+  );
 
   return {
     clients: clientRows.map(toClient),
