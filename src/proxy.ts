@@ -1,9 +1,17 @@
 import { NextResponse, type NextRequest } from "next/server";
 
 import { SESSION_COOKIE } from "@/lib/auth/cookie";
+import { PUBLIC_TRACKING_ENABLED, SHOP_ENABLED } from "@/lib/constants";
 
 /**
- * Send signed-out visitors to the login page before a protected route renders.
+ * Send signed-out visitors somewhere sensible before a protected route renders.
+ *
+ * **Location matters.** This has to sit beside `app`, which in this project
+ * means `src/proxy.ts`. It lived at the repository root, where `app` is not,
+ * and Next never loaded it — so none of this ran, and the redirect people saw
+ * came from `requireStaff()` in the layout instead. That was invisible because
+ * the outcome looked similar: signed out, you ended up at the login page either
+ * way. The tell was the missing `?next=`.
  *
  * This is a redirect for the common case, **not** a security boundary. It only
  * looks at whether a session cookie is present — it does not check that the
@@ -37,6 +45,25 @@ export function proxy(request: NextRequest) {
 
   if (isPublic(pathname)) return NextResponse.next();
   if (request.cookies.has(SESSION_COOKIE)) return NextResponse.next();
+
+  /*
+   * A stranger at the front door wants to track a parcel, not sign in.
+   *
+   * With the shop switched off, `/` is the operations dashboard and every
+   * public way into the tracking page went with the storefront's header. A
+   * customer opening the site was shown a staff login form and no hint that the
+   * thing they came for exists.
+   *
+   * So an unauthenticated visit to the root goes to tracking instead. Staff are
+   * unaffected: they carry a session cookie and never reach this line, and the
+   * tracking page carries a quiet way in for them when they do not.
+   *
+   * Only the root. A signed-out visit to `/orders` still goes to the login page
+   * with `?next=`, because someone typing that URL meant to sign in.
+   */
+  if (pathname === "/" && PUBLIC_TRACKING_ENABLED && !SHOP_ENABLED) {
+    return NextResponse.redirect(new URL("/track", request.url));
+  }
 
   const login = new URL("/login", request.url);
   /*

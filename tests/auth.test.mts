@@ -30,7 +30,6 @@ const needsDatabase = { skip: DATABASE_URL ? false : "DATABASE_URL is not set" }
 
 /** Every route that must never answer to a stranger. */
 const PRIVATE = [
-  "/",
   "/orders",
   "/orders/new",
   "/clients",
@@ -56,7 +55,8 @@ const PUBLIC = ["/track"];
  * checking them for a login redirect would fail, and checking them as public
  * would pass for entirely the wrong reason.
  */
-const SHOP = ["/store", "/store/cart", "/shop", "/shop/products"];
+const SHOP_PUBLIC = ["/store", "/store/cart"];
+const SHOP_PRIVATE = ["/shop", "/shop/products"];
 
 let server: ReturnType<typeof spawn> | undefined;
 let browser: Browser | undefined;
@@ -177,20 +177,51 @@ describe("the staff login", needsDatabase, () => {
     }
   });
 
+  test("a stranger at the front door is sent to tracking, not to a login form", async () => {
+    await clearStaff(DATABASE_URL!);
+    await signInDirectly(DATABASE_URL!);
+
+    /*
+     * The whole public face of this app is "where is my parcel". Someone who
+     * opens the site is a customer far more often than a member of staff, and
+     * sending them to a password prompt hides the one thing they came for.
+     * Staff carry a session and never see this.
+     */
+    assert.equal(await landsOn("/"), "/track");
+  });
+
   test("the shop is absent, not merely hidden", async () => {
     await clearStaff(DATABASE_URL!);
     const { token } = await signInDirectly(DATABASE_URL!);
 
-    for (const route of SHOP) {
+    /*
+     * The storefront is public, so nothing redirects it — it answers 404 at its
+     * own URL, to everyone. That status is the whole assertion.
+     */
+    for (const route of SHOP_PUBLIC) {
+      assert.equal(await statusOf(route), 404, `${route} answered to a customer`);
       assert.equal(
-        await statusOf(route),
+        await statusOf(route, token),
         404,
-        `${route} answered while the shop is switched off`,
+        `${route} answered to a signed-in member of staff`,
       );
+    }
+
+    /*
+     * The shop admin is private as well as switched off. A stranger is turned
+     * away by the proxy before the route is reached and never learns either
+     * way; it is the operator, who *is* allowed in, who must find nothing.
+     */
+    for (const route of SHOP_PRIVATE) {
       assert.equal(
         await statusOf(route, token),
         404,
         `${route} answered to a signed-in member of staff while switched off`,
+      );
+      assert.equal(
+        await landsOn(route),
+        "/login",
+        `${route} did not send a stranger to sign in`,
       );
     }
   });
