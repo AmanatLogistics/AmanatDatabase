@@ -4,59 +4,78 @@ Postgres, reached through [Drizzle](https://orm.drizzle.team). The schema lives
 in `src/db/schema.ts`; the SQL that creates it lives in `drizzle/` and is
 committed, so you can read exactly what runs.
 
-Signing in already runs on it. The rest of the data moves across in the next
-stage.
+All of it runs on this now — clients, orders, purchases, payments, the shop and
+the staff logins. Nothing is kept in the browser.
 
-## Setting up Supabase
+## Setting up Neon
 
-You have to do this part; I cannot create an account for you.
+This project runs on Neon. It is ordinary Postgres, so nothing in the code is
+tied to it — but these are the steps that match what you actually have.
 
-1. Go to **supabase.com**, sign up, and create a project. Pick a region close
-   to Kabul — **Frankfurt (eu-central-1)** is the nearest sensible one. Save the
-   database password it gives you; it is shown once.
-2. In the project, go to **Project Settings → Database → Connection string**.
+1. Add it from **Vercel → your project → Storage → Create Database → Neon**, or
+   sign up at **neon.com** and connect the project afterwards. Pick a region
+   close to Kandahar — **Frankfurt (`eu-central-1`)** is the nearest sensible
+   one.
 
-   > **Use a pooler string. Not the direct connection.**
-   >
-   > The direct host, `db.<ref>.supabase.co`, resolves to an **IPv6 address
-   > only**. Vercel's functions are **IPv4-only**, so every query from a
-   > deployed app fails with `getaddrinfo ENOTFOUND db.<ref>.supabase.co` —
-   > which reads as a wrong hostname when the hostname is perfectly correct.
-   >
-   > The pooler hosts (`aws-0-<region>.pooler.supabase.com`) are IPv4 and exist
-   > for exactly this. **Their username is different too:
-   > `postgres.<project-ref>`, not plain `postgres`** — copying only the host
-   > across is the usual second mistake.
+2. **If you added it through Vercel, you are done.** The integration writes the
+   environment variables for you, and the app already reads the two that matter:
 
-   You need **two** of the strings there:
-   - **Transaction pooler**, port `6543` — this is the one the app uses. It
-     survives serverless, where each request may arrive on its own instance.
-   - **Session pooler**, port `5432`, same host — this is the one migrations
-     prefer. Creating tables needs a connection that stays put. Set it as
-     `DIRECT_DATABASE_URL`.
-3. In **Vercel → your project → Settings → Environment Variables**, add:
+   | Variable                | What it is        | What it is used for  |
+   | ----------------------- | ----------------- | -------------------- |
+   | `DATABASE_URL`          | pooled connection | serving every page   |
+   | `DATABASE_URL_UNPOOLED` | direct connection | running migrations   |
 
-   | Name           | Value                                   | Environments |
-   | -------------- | --------------------------------------- | ------------ |
-   | `DATABASE_URL` | the **transaction pooler** string, 6543 | all three    |
+   There is nothing to rename and nothing to paste. If you ever set
+   `DATABASE_URL` by hand it wins over everything else.
 
-   Replace `[YOUR-PASSWORD]` in the string with the password from step 1.
+3. **If you are wiring it up yourself,** copy the connection string from the
+   Neon console and set it as `DATABASE_URL` in **Vercel → Settings →
+   Environment Variables**, for all three environments. Use the **pooled**
+   string — its host has `-pooler` in it:
 
-### Or: the Supabase integration on Vercel
+   ```
+   postgresql://<user>:<password>@ep-xxxx-pooler.eu-central-1.aws.neon.tech/<db>?sslmode=require
+                                          ^^^^^^^
+   ```
 
-If you connect Supabase to Vercel through the marketplace integration instead,
-it adds the variables for you — but **it does not call any of them
-`DATABASE_URL`**. It typically adds `POSTGRES_URL` (pooled) and
-`POSTGRES_URL_NON_POOLING` (direct), among others.
+   Keep `?sslmode=require`. Neon refuses connections without it.
 
-Both of those are read automatically, so there is nothing to rename. The app
-looks for, in order:
+### Two things about Neon worth knowing
+
+**It goes to sleep.** On the free plan the compute suspends after a few minutes
+with no traffic, and the next request wakes it. That first request is slower —
+usually under a second, occasionally a few. It is not a fault, and the ten
+second connect timeout in `src/db/index.ts` leaves room for it. If a page ever
+seems to hang on the first load of the day, this is why.
+
+**Its pooled endpoint is a transaction pooler.** Same as Supabase's, and it
+carries the same trap: session state does not survive between statements,
+because each one may be handed to a different backend. That is why
+`prepare: false` is set on the connection and why nothing here takes a session
+advisory lock — see "Creating the tables" below, which is the whole story.
+
+### If you are on Supabase instead
+
+Also supported, no code change — but two extra traps, neither of which applies
+to Neon:
+
+- The direct host, `db.<ref>.supabase.co`, is **IPv6-only** and Vercel's
+  functions are IPv4-only, so it fails with `getaddrinfo ENOTFOUND` on a
+  hostname that is perfectly correct. Use a pooler string
+  (`aws-0-<region>.pooler.supabase.com`).
+- The pooler's **username is different** — `postgres.<project-ref>`, not plain
+  `postgres`. Copying only the host across is the usual second mistake.
+
+Supabase's Vercel integration names its variables `POSTGRES_URL` and
+`POSTGRES_URL_NON_POOLING`, never `DATABASE_URL`. Both are read automatically.
+
+### Every name the app looks for
+
+In order, first one set wins:
 
 - **App:** `DATABASE_URL`, `POSTGRES_URL`, `SUPABASE_DATABASE_URL`
 - **Migrations:** `DIRECT_DATABASE_URL`, `DATABASE_URL_UNPOOLED`,
   `POSTGRES_URL_NON_POOLING`, then the app list
-
-A `DATABASE_URL` you set by hand always wins.
 
 ## Checking it works
 

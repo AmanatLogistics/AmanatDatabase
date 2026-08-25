@@ -40,8 +40,9 @@ function connect() {
   /*
    * `max: 1` is not a typo. On Vercel every request can land in its own short
    * lived instance, and a pool of ten per instance exhausts Postgres long
-   * before the traffic justifies it. Supabase's transaction pooler does the
-   * real pooling; this side only needs one connection each.
+   * before the traffic justifies it. The provider's transaction pooler — Neon's
+   * `-pooler` endpoint, Supabase's port 6543 — does the real pooling; this side
+   * only needs one connection each.
    *
    * `prepare: false` is required by that pooler — prepared statements are bound
    * to a backend connection it is free to swap underneath us.

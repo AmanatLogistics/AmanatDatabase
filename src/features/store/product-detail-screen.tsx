@@ -39,6 +39,7 @@ export function ProductDetailScreen({
   const router = useRouter();
   const where = useWhereWeAre();
   const [qty, setQty] = React.useState(1);
+  const hasPhotos = product.imageUrls.length > 0;
 
   const buy = () => {
     addToCart(product.id, qty);
@@ -67,11 +68,30 @@ export function ProductDetailScreen({
       </nav>
 
       <div className="grid gap-6 lg:grid-cols-12 lg:gap-8">
-        <div className="lg:col-span-5">
-          <Gallery product={product} />
-        </div>
+        {/*
+         * No photograph, no empty frame. A placeholder square holding five
+         * columns of a product page says "the image is missing"; giving that
+         * width back to the description and the steps says "this is the
+         * product", which is the truth when nobody uploaded a photo.
+         */}
+        {hasPhotos && (
+          <div className="lg:col-span-5">
+            <Gallery product={product} />
+          </div>
+        )}
 
-        <div className="flex flex-col gap-4 lg:col-span-4">
+        {/*
+         * Without the gallery the column is twice as wide, and a price panel
+         * stretched across all of it looks like a mistake. Capped to a
+         * comfortable measure instead — the leftover space is quieter than a
+         * banner would be.
+         */}
+        <div
+          className={cn(
+            "flex flex-col gap-4",
+            hasPhotos ? "lg:col-span-4" : "lg:col-span-8 lg:max-w-2xl",
+          )}
+        >
           <div>
             <p className="text-muted-foreground text-[11px] tracking-wide uppercase">
               {PRODUCT_CATEGORY_LABEL[product.category]}
@@ -357,18 +377,25 @@ function ArrowButton({
 }
 
 function RelatedCard({ product }: { product: PublicProduct }) {
+  const photo = product.imageUrls[0];
+
   return (
     <Link href={`/store/p/${product.slug}`} className="group">
       <article className="bg-card hover:border-brand-600/50 flex h-full flex-col overflow-hidden rounded-xl border transition-all hover:-translate-y-0.5 hover:shadow-md">
-        <div className="bg-muted/30 aspect-square overflow-hidden">
-          <ProductThumb
-            size="fill"
-            category={product.category}
-            name={product.name}
-            imageUrl={product.imageUrls[0]}
-            className="size-full rounded-none border-0 transition-transform duration-200 group-hover:scale-[1.04]"
-          />
-        </div>
+        {/* Same reasoning as the storefront grid: no photo, no empty frame. */}
+        {photo ? (
+          <div className="bg-muted/30 aspect-square overflow-hidden">
+            <ProductThumb
+              size="fill"
+              category={product.category}
+              name={product.name}
+              imageUrl={photo}
+              className="size-full rounded-none border-0 transition-transform duration-200 group-hover:scale-[1.04]"
+            />
+          </div>
+        ) : (
+          <span aria-hidden className="bg-brand-600/70 h-1" />
+        )}
         <div className="flex flex-1 flex-col gap-1 p-2.5">
           <p className="line-clamp-2 text-[13px] leading-snug">{product.name}</p>
           <Money

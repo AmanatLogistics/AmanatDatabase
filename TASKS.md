@@ -44,9 +44,9 @@ typed in by an admin, and nothing is guessed on their behalf.
 
 **The database bringing itself up.** A deploy migrates before it builds, and if
 that did not happen the first request creates the schema itself. Neither path
-uses a session advisory lock, which cannot work over Supabase's transaction
-pooler — see `DATABASE.md`, "Creating the tables", for why that distinction cost
-a week.
+uses a session advisory lock, which cannot work over a transaction pooler —
+which is what both Neon and Supabase put in front of the database. See
+`DATABASE.md`, "Creating the tables", for why that distinction cost a week.
 
 ---
 
@@ -58,10 +58,14 @@ Images are resized to ~150KB and stored as data URLs in `product_images.url`.
 Fine at a few hundred products; wrong at a few thousand, because the image
 travels inside every query that reads the product.
 
-The fix is Supabase Storage — upload returns a URL, `url` stops being a data
-URL, and nothing that reads it changes. It needs the `@supabase/supabase-js`
-dependency, and `CLAUDE.md` says not to add one without asking. **So: say the
-word and it gets done.**
+The fix is object storage — upload returns a URL, `url` stops being a data URL,
+and nothing that reads it changes. Vercel Blob is the obvious choice given where
+this is hosted. It needs a new dependency, and `CLAUDE.md` says not to add one
+without asking.
+
+Not urgent: the decision so far is to run the shop without photographs at all,
+and the storefront is laid out to read well that way — no placeholder squares,
+no empty frames.
 
 ### 2. Staff roles do not restrict anything
 
@@ -92,10 +96,10 @@ Neither blocks anything; both were overtaken by the backend work.
   and they print on every invoice and show on the public tracking page.
 - **Confirm the database password was rotated.** It was pasted into a chat
   transcript. It appears in no file and no commit — that was checked — but a
-  transcript is not private storage. Supabase → Settings → Database → Reset
-  database password, then update the connection string in Vercel.
-- **Keep using the pooler host.** `db.<ref>.supabase.co` is IPv6-only and Vercel
-  is IPv4-only; that mismatch is what produced the original `ENOTFOUND`.
+  transcript is not private storage. Reset it in the database console, then
+  update the connection string in Vercel.
+- **Keep using the pooled connection string.** On Neon that is the host with
+  `-pooler` in it, and it needs `sslmode=require`.
 
 ---
 

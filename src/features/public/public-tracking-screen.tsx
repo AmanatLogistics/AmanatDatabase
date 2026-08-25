@@ -473,12 +473,15 @@ function Result({
                 key={index}
                 className="bg-muted/30 flex items-center gap-3 rounded-lg border p-3"
               >
-                <ProductThumb
-                  size="md"
-                  category="other"
-                  name={item.name}
-                  imageUrl={item.imageUrl}
-                />
+                {/* No photo, no grey square standing in for one. */}
+                {item.imageUrl && (
+                  <ProductThumb
+                    size="md"
+                    category="other"
+                    name={item.name}
+                    imageUrl={item.imageUrl}
+                  />
+                )}
                 <div className="flex min-w-0 flex-col">
                   <span className="line-clamp-2 text-sm font-medium">
                     {item.name}

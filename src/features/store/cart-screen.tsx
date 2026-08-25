@@ -48,12 +48,15 @@ export function CartScreen() {
             <ul className="divide-y">
               {lines.map(({ product, qty, lineTotalAfn }) => (
                 <li key={product.id} className="flex items-center gap-3 py-3">
-                  <ProductThumb
-                    size="md"
-                    category={product.category}
-                    name={product.name}
-                    imageUrl={product.imageUrls[0]}
-                  />
+                  {/* No photo, no grey square standing in for one. */}
+                  {product.imageUrls[0] && (
+                    <ProductThumb
+                      size="md"
+                      category={product.category}
+                      name={product.name}
+                      imageUrl={product.imageUrls[0]}
+                    />
+                  )}
                   <div className="min-w-0 flex-1">
                     <Link
                       href={`/store/p/${product.slug}`}
