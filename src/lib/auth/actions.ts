@@ -6,6 +6,7 @@ import { eq, sql as raw } from "drizzle-orm";
 
 import { db } from "@/db";
 import { ensureSchema } from "@/db/ensure-schema";
+import { withDeadline } from "@/db/deadline";
 import { staff } from "@/db/schema";
 import { hashPassword, verifyPassword } from "@/lib/auth/password";
 import { passwordProblem } from "@/lib/auth/policy";
@@ -118,9 +119,10 @@ export async function needsFirstOwner(): Promise<boolean> {
   // The very first thing the app ever asks the database. If the tables are not
   // there yet, this is where they get made.
   await ensureSchema();
-  const [row] = await db
-    .select({ count: raw<number>`count(*)::int` })
-    .from(staff);
+  const [row] = await withDeadline(
+    db.select({ count: raw<number>`count(*)::int` }).from(staff),
+    "counting the staff accounts",
+  );
   return (row?.count ?? 0) === 0;
 }
 

@@ -8,6 +8,7 @@ import { and, eq, gt, lt } from "drizzle-orm";
 
 import { db } from "@/db";
 import { ensureSchema } from "@/db/ensure-schema";
+import { withDeadline } from "@/db/deadline";
 import { sessions, staff } from "@/db/schema";
 import { SESSION_COOKIE } from "@/lib/auth/cookie";
 import type { TeamRole } from "@/lib/types";
@@ -78,7 +79,8 @@ export const readSession = cache(async (): Promise<SignedInStaff | null> => {
   // `relation "staff" does not exist` on a database nobody migrated.
   await ensureSchema();
 
-  const rows = await db
+  const rows = await withDeadline(
+    db
     .select({
       id: staff.id,
       name: staff.name,
@@ -94,7 +96,9 @@ export const readSession = cache(async (): Promise<SignedInStaff | null> => {
         gt(sessions.expiresAt, new Date()),
       ),
     )
-    .limit(1);
+    .limit(1),
+    "reading your session",
+  );
 
   const found = rows[0];
   // A deactivated account keeps its rows but stops being able to do anything.

@@ -7,6 +7,7 @@ import { sql as raw } from "drizzle-orm";
 import { migrate } from "drizzle-orm/postgres-js/migrator";
 
 import { db, explainDbFailure } from "@/db";
+import { withDeadline } from "@/db/deadline";
 
 /**
  * Make sure the tables exist before anything tries to read them.
@@ -63,7 +64,8 @@ async function run(): Promise<void> {
   const startedAt = Date.now();
   const remaining = () => BUDGET_MS - (Date.now() - startedAt);
 
-  if (await schemaExists()) return;
+  if (await withDeadline(schemaExists(), "looking for the tables", remaining()))
+    return;
 
   console.warn(
     "[amanat] The database has no tables. Applying migrations now — this " +
@@ -74,7 +76,17 @@ async function run(): Promise<void> {
 
   for (let attempt = 1; ; attempt++) {
     try {
-      await migrate(db, { migrationsFolder: folder });
+      /*
+       * The deadline goes around the migration itself, not merely between
+       * tries. Checking the clock between attempts bounds nothing when it is a
+       * single call that hangs — and a migration blocked behind a lock left by
+       * an earlier killed request hangs exactly once, for ever.
+       */
+      await withDeadline(
+        migrate(db, { migrationsFolder: folder }),
+        "creating the schema",
+        Math.max(1_000, remaining()),
+      );
       console.warn("[amanat] Migrations applied.");
       return;
     } catch (error) {
@@ -89,7 +101,16 @@ async function run(): Promise<void> {
        * This is not an advisory lock, which cannot work here: see the note in
        * `scripts/migrate.mts`.
        */
-      if (await schemaExists()) return;
+      if (
+        remaining() > 0 &&
+        (await withDeadline(
+          schemaExists(),
+          "looking for the tables",
+          Math.max(500, remaining()),
+        ).catch(() => false))
+      ) {
+        return;
+      }
 
       if (attempt >= ATTEMPTS || remaining() <= 0) {
         console.error(
