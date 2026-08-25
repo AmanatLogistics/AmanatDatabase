@@ -3,24 +3,22 @@
 /**
  * Turning a chosen file into something we can store and show.
  *
- * There is no file storage in this app — no server, no bucket — so an image is
- * read into a data URL and kept in the record itself. That is the only option
- * that works today, and it comes with a real cost: the image travels inside
- * every copy of the data, so it must be small.
+ * There is no object storage wired up yet, so an image is read into a data URL
+ * and kept in the row itself — `product_images.url` in Postgres. It works, and
+ * it has a real cost: the image travels inside every query that reads the
+ * product, so it must stay small.
  *
- * Hence the resize. A phone photo is several megabytes and would blow through
- * the browser's storage quota after a handful of products; downscaling to fit a
- * 900px box and re-encoding as JPEG brings a typical photo under ~150KB while
- * still looking right on a product card.
- *
- * When a backend arrives this whole module is replaced by an upload to a bucket
- * that returns a URL, and `imageUrl` stops being a data URL without anything
- * that reads it having to change.
+ * Hence the resize. A phone photo is several megabytes; downscaling to fit a
+ * 900px box and re-encoding as JPEG brings a typical one under ~150KB while
+ * still looking right on a product card. At a few hundred products that is
+ * fine. At a few thousand it is not, and the fix is Supabase Storage: upload
+ * returns a URL, `url` stops being a data URL, and nothing that reads it has to
+ * change. That swap is the one piece of the image story still outstanding.
  */
 
-export const ACCEPTED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp"];
+const ACCEPTED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp"];
 /** Before resizing. Generous, because we shrink it ourselves straight after. */
-export const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
+const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
 const MAX_EDGE = 900;
 const JPEG_QUALITY = 0.82;
 

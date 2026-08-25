@@ -104,17 +104,3 @@ export async function clearNotifications(): Promise<void> {
   await db.delete(notifications);
 }
 
-/**
- * How many unread there are.
- *
- * Its own query rather than counting a list, because the bell polls this and
- * the list is fifty rows of text it does not need.
- */
-export async function countUnread(): Promise<number> {
-  await requireStaff();
-  const [row] = await db
-    .select({ count: raw<number>`count(*)::int` })
-    .from(notifications)
-    .where(eq(notifications.read, false));
-  return row?.count ?? 0;
-}

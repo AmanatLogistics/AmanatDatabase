@@ -337,12 +337,3 @@ export const DOCUMENT_KIND_TONE: Record<DocumentKind, BadgeTone> = {
 export const FREIGHT_COST_NUMERATOR = 3;
 export const FREIGHT_COST_DENOMINATOR = 4;
 
-/** Categorical colours used across charts; mirrors --chart-N in globals.css. */
-export const CHART_COLORS = [
-  "var(--color-chart-1)",
-  "var(--color-chart-2)",
-  "var(--color-chart-3)",
-  "var(--color-chart-4)",
-  "var(--color-chart-5)",
-  "var(--color-chart-6)",
-];

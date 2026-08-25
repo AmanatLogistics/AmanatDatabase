@@ -24,26 +24,19 @@ import {
 } from "@/lib/finance";
 import { useDataStore } from "@/lib/store";
 import {
-  CLIENT_STATUS_MESSAGE,
-  clientProgressIndex,
   DOCUMENT_KIND_LABEL,
   ORDER_STATUS,
 } from "@/lib/constants";
 import type {
-  AppNotification,
   BusinessDocument,
   Client,
   ID,
   ISODate,
   Order,
-  OrderStatus,
   Payment,
   PaymentMethod,
   Purchase,
-  Settings,
   Store,
-  StoreProduct,
-  WebOrder,
   PublicProduct,
 } from "@/lib/types";
 
@@ -61,8 +54,23 @@ import type {
 /* Settings — GET /api/settings                                                */
 /* -------------------------------------------------------------------------- */
 
-export function useSettings(): Settings {
-  return useDataStore((s) => s.settings);
+/**
+ * One set of order-keyed lookups shared by every derivation on the screen.
+ *
+ * Without it, each of the ~150 orders re-scans all payments, purchases and
+ * payments to find its own — quadratic work repeated on every render. Building
+ * the index once per data change makes those lookups constant time.
+ *
+ * Private: every consumer of it lives in this file.
+ */
+function useLedgerIndex(): LedgerIndex {
+  const orders = useDataStore((s) => s.orders);
+  const purchases = useDataStore((s) => s.purchases);
+  const payments = useDataStore((s) => s.payments);
+  return useMemo(
+    () => buildLedgerIndex(orders, purchases, payments),
+    [orders, purchases, payments],
+  );
 }
 
 export function useCompany() {
@@ -89,23 +97,6 @@ export function useToday(): Date {
 /* -------------------------------------------------------------------------- */
 /* Ledger index                                                                */
 /* -------------------------------------------------------------------------- */
-
-/**
- * One set of order-keyed lookups shared by every derivation on the screen.
- *
- * Without it, each of the ~150 orders re-scans all payments, purchases and
- * payments to find its own — quadratic work repeated on every render. Building
- * the index once per data change makes those lookups constant time.
- */
-export function useLedgerIndex(): LedgerIndex {
-  const orders = useDataStore((s) => s.orders);
-  const purchases = useDataStore((s) => s.purchases);
-  const payments = useDataStore((s) => s.payments);
-  return useMemo(
-    () => buildLedgerIndex(orders, purchases, payments),
-    [orders, purchases, payments],
-  );
-}
 
 /* -------------------------------------------------------------------------- */
 /* Lookup helpers                                                              */
@@ -339,121 +330,9 @@ export function usePublicPickupDetails(): PublicPickupDetails {
   );
 }
 
-/** The stages at which the parcel is physically with us in Kabul. */
-const ARRIVED_STATUSES: OrderStatus[] = [
-  "arrived",
-  "ready_for_pickup",
-  "delivered",
-];
-
-/**
- * Look one order up by whatever reference the customer happens to hold.
- *
- * They may have either: a tracking number, if we have already taken the order
- * on; or the WEB-… reference the storefront gave them at checkout, before a
- * human has looked at it. Both must work, because the customer does not know
- * which of our systems their order is currently sitting in — and telling them
- * "not found" for a reference we ourselves issued would be indefensible.
- *
- * A website order that has since been converted resolves to the real order, so
- * the old reference keeps working forever rather than going dead the moment
- * staff process it.
- */
-export function usePublicTracking(
-  reference: string,
-): PublicTrackingResult | null {
-  const orders = useDataStore((s) => s.orders);
-  const webOrders = useDataStore((s) => s.webOrders);
-  const storeProducts = useDataStore((s) => s.storeProducts);
-
-  return useMemo(() => {
-    const wanted = reference.trim().toUpperCase();
-    if (!wanted) return null;
-
-    let order = orders.find((o) => o.trackingNumber === wanted);
-
-    if (!order) {
-      const web = webOrders.find((w) => w.reference === wanted);
-      if (!web) return null;
-
-      // Converted: follow it through to the order it became.
-      if (web.convertedOrderId) {
-        order = orders.find((o) => o.id === web.convertedOrderId);
-      }
-
-      // Still waiting on us. Show it honestly as received but not yet started,
-      // rather than pretending it is further along than it is.
-      if (!order) {
-        const dismissed = web.status === "dismissed";
-        return {
-          trackingNumber: web.reference,
-          statusLabel: dismissed ? "Not proceeding" : "Order received",
-          statusMessage: dismissed
-            ? "We were not able to take this order on. Please contact us."
-            : "We have your order and are confirming the price. We will call you shortly.",
-          progressIndex: dismissed ? null : 0,
-          arrivedAtOffice: false,
-          delivered: false,
-          placedAt: web.placedAt,
-          items: web.lines.map((line) => ({
-            name: line.name,
-            qty: line.qty,
-            imageUrl: storeProducts.find((p) => p.id === line.productId)
-              ?.imageUrls[0],
-          })),
-          timeline: [{ at: web.placedAt, statusLabel: "Order received" }],
-        };
-      }
-    }
-
-    if (!order) return null;
-
-    return {
-      trackingNumber: order.trackingNumber,
-      statusLabel: ORDER_STATUS[order.status].label,
-      statusMessage: CLIENT_STATUS_MESSAGE[order.status],
-      progressIndex: clientProgressIndex(order.status),
-      arrivedAtOffice: ARRIVED_STATUSES.includes(order.status),
-      delivered: order.status === "delivered",
-      placedAt: order.requestedAt,
-      deliveredAt: order.deliveredAt,
-      items: order.items.map((item) => ({
-        name: item.name,
-        qty: item.qty,
-        imageUrl: item.imageUrl,
-      })),
-      timeline: order.timeline
-        .filter((event) => event.status in ORDER_STATUS)
-        .map((event) => ({
-          at: event.at,
-          statusLabel: ORDER_STATUS[event.status as OrderStatus].label,
-        })),
-    };
-  }, [orders, webOrders, storeProducts, reference]);
-}
-
 /* -------------------------------------------------------------------------- */
 /* Shop — GET /api/shop/products, /api/shop/orders                             */
 /* -------------------------------------------------------------------------- */
-
-/** Everything in the catalogue, published or not. Staff only. */
-export function useStoreProducts(): StoreProduct[] {
-  return useDataStore((s) => s.storeProducts);
-}
-
-/** Only what a customer may see. The storefront reads this, never the above. */
-export function usePublishedProducts(): StoreProduct[] {
-  const products = useDataStore((s) => s.storeProducts);
-  return useMemo(() => products.filter((p) => p.active), [products]);
-}
-
-export function useStoreProductBySlug(slug: string): StoreProduct | undefined {
-  const products = useDataStore((s) => s.storeProducts);
-  return useMemo(
-    () => products.find((p) => p.slug === slug && p.active),
-    [products, slug],
-  );
-}
 
 export interface CartRow {
   /** Public shape: a basket is a customer surface and holds no cost prices. */
@@ -492,39 +371,9 @@ export function useCart(): { lines: CartRow[]; totalAfn: number; count: number }
   }, [cart, products]);
 }
 
-export function useWebOrders(): WebOrder[] {
-  return useDataStore((s) => s.webOrders);
-}
-
-export function useWebOrder(id: ID): WebOrder | undefined {
-  const webOrders = useDataStore((s) => s.webOrders);
-  return useMemo(() => webOrders.find((o) => o.id === id), [webOrders, id]);
-}
-
-/** Web orders nobody has dealt with yet — the shop admin's inbox count. */
-export function useNewWebOrderCount(): number {
-  const webOrders = useDataStore((s) => s.webOrders);
-  return useMemo(
-    () => webOrders.filter((o) => o.status === "new").length,
-    [webOrders],
-  );
-}
-
 /* -------------------------------------------------------------------------- */
 /* Notifications — GET /api/notifications                                      */
 /* -------------------------------------------------------------------------- */
-
-export function useNotifications(): AppNotification[] {
-  return useDataStore((s) => s.notifications);
-}
-
-export function useUnreadNotificationCount(): number {
-  const notifications = useDataStore((s) => s.notifications);
-  return useMemo(
-    () => notifications.filter((n) => !n.read).length,
-    [notifications],
-  );
-}
 
 /* -------------------------------------------------------------------------- */
 /* Purchases — GET /api/purchases                                              */

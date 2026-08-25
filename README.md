@@ -1,60 +1,88 @@
-# Amanat Shopping — Client Order & Business Management System
+# Amanat Shopping — order and business management
 
-Internal operations app for Amanat Shopping. Clients send us a product link, a
-photo and a quantity; we buy the item from Amazon, Daraz, Noon or AliExpress,
-consolidate it through a forwarder, ship it to Kabul, hand it over, and track
-the money at every step.
+Operations app for Amanat Shopping, Kandahar. A client sends us a product link,
+a photo and a quantity; we buy the item abroad, bring it in, and they collect it
+from our office. This tracks the order and the money at every step, and gives
+the client a page to check on it themselves.
 
-This repository currently contains the **frontend only**. It runs on a realistic
-in-memory dataset and is structured so a real API can be dropped in without
-touching any screen.
+It runs on Postgres (Supabase in production) with server actions, staff logins
+and a public storefront. There is no mock data and nothing lives in the browser:
+open it on a fresh database and it will take you to `/setup` to create the first
+account.
 
 ```bash
 npm install
-npm run dev      # http://localhost:3000
+cp .env.example .env.local     # put a connection string in it
+npm run db:migrate             # optional — the app will do this itself
+npm run dev                    # http://localhost:3000
 ```
+
+`DATABASE.md` is the full account of connecting a database, and the first place
+to look when one will not connect.
 
 ---
 
 ## What is in the box
 
-| Area | Route | What it does |
-|---|---|---|
-| Dashboard | `/` | KPIs, revenue vs cost chart, order pipeline, sales by store, "needs attention" |
-| Orders | `/orders`, `/orders/[id]`, `/orders/new` | Full order lifecycle, items, purchases, tracking, payments, activity |
-| Clients | `/clients`, `/clients/[id]`, `/clients/new` | Contact book, order history, payments, running-balance statement |
-| Purchases | `/purchases`, `/purchases/[id]` | Where we bought it, store order number, USD cost and FX rate |
-| Tracking | `/tracking`, `/tracking/[id]` | Carrier, tracking number, event timeline, landed cost |
-| Payments | `/payments` | Client payments ledger with receipts |
-| Finance | `/finance`, `/finance/expenses`, `/finance/balances` | P&L, expense register, receivables ageing |
-| Documents | `/documents` | Register of every printable document |
-| Print | `/print/{invoice,quotation,receipt,packing-list,label}/[id]` | A4 print-ready sheets |
-| Settings | `/settings/*` | Company profile, stores, payment methods, expense categories, team |
+### Operations — behind a staff login
 
-**Working interactions** — creating an order, recording a payment, logging a
-purchase, adding tracking, adding an expense and changing an order's status all
-mutate the shared store and every dependent figure recalculates immediately
-(client balance, order margin, dashboard KPIs, ageing report).
+| Route | What it does |
+|---|---|
+| `/` | KPIs, revenue vs cost, order pipeline, sales by store, "needs attention" |
+| `/orders`, `/orders/[id]`, `/orders/new` | Order lifecycle, items, purchases, tracking, payments, activity |
+| `/clients`, `/clients/[id]`, `/clients/new` | Contact book, order history, payments, running-balance statement |
+| `/purchases`, `/purchases/[id]` | Where we bought it, the store's order number, what it cost |
+| `/payments` | Client payments ledger with receipts |
+| `/finance`, `/finance/balances` | P&L, receivables ageing |
+| `/documents` | Register of every printable document |
+| `/print/{invoice,quotation,receipt}/[id]` | A4 print-ready sheets |
+| `/settings/*` | Company profile, stores, payment methods, team |
 
-State lives in memory and **resets on a full page reload**. That is deliberate
-for a frontend-only build.
+### The shop — its own admin
+
+| Route | What it does |
+|---|---|
+| `/shop`, `/shop/products` | The catalogue customers see, and what is published |
+| `/shop/orders`, `/shop/orders/[id]` | Website orders as they arrive, and turning one into a real order |
+
+### Public — no login
+
+| Route | What it does |
+|---|---|
+| `/store`, `/store/p/[slug]` | Storefront: browse, search, filter, product gallery |
+| `/store/cart`, `/store/checkout`, `/store/thanks` | Basket and checkout — writes a real order and notifies you |
+| `/track` | A customer checking on their order by reference |
+
+### Accounts
+
+`/setup` creates the first owner; `/login` after that. One account per person,
+scrypt-hashed passwords, database-backed sessions that store only the SHA-256 of
+the cookie token, and lockout after repeated failures.
 
 ---
 
-## Money model
+## Money
 
-- The reporting and billing currency is **AFN**. Every field named `*Afn` is a
-  whole number of Afghani.
-- Purchases from foreign stores are recorded in **USD** (`*Usd`) together with
-  the `fxRate` in force on the day, so historic costs never drift when the rate
-  moves.
-- A quoted product price is the **landed** price: the store's sticker price
-  converted at roughly `fx × 1.15`, which absorbs the store's sales tax,
-  domestic shipping to the forwarder, and FX drift. The order's **service fee**
-  (14% by default) is the margin on top.
+**Afghani only.** Every field named `*_afn` is a whole number of Afghani. There
+is no second currency, no exchange rate and no conversion anywhere in the code —
+what a purchase cost abroad is entered by an admin as the AFN figure they
+actually paid. Nothing is guessed on their behalf: no percentage markup, no
+auto-suggested price, no pre-filled delivery charge.
 
-All money maths lives in one place — `src/lib/finance.ts` — so the dashboard,
-the order page, the client statement and the P&L can never disagree.
+All money arithmetic lives in `src/lib/finance.ts` and is pure, so the
+dashboard, the order page, the client statement and the P&L cannot disagree.
+
+## Tracking
+
+Internal only. No DHL, FedEx or AfterShip — we mint our own reference, and the
+public page reports where the parcel is because a member of staff moved it to
+that status. References are unique at the database level and minted under an
+advisory lock inside the writing transaction, so two people creating an order at
+the same moment cannot collide.
+
+The public projection is built by **naming** the fields a customer may see, not
+by removing the ones they may not, so a column added to `orders` tomorrow does
+not leak by default.
 
 ---
 
@@ -63,62 +91,54 @@ the order page, the client statement and the P&L can never disagree.
 ```
 src/
   app/
-    (app)/                 Screens inside the sidebar shell
-    (print)/               Print route group — no chrome, A4 sheet
+    (app)/        Operations screens, inside the sidebar shell
+    (auth)/       Login and first-run setup
+    (print)/      Print route group — no chrome, A4 sheet
+    (public)/     The customer's tracking page
+    (shop)/       Shop admin
+    (store)/      The storefront
   components/
-    ui/                    shadcn/ui primitives (Radix + CVA + Tailwind)
-    layout/                Sidebar, topbar, command palette, app shell
-    shared/                DataTable, StatCard, StatusBadge, Timeline, Money…
-    brand/                 Logo lockup
-  features/                One folder per domain area; screens and dialogs
+    ui/           shadcn/ui primitives (Radix + CVA + Tailwind)
+    layout/       Sidebar, topbar, command palette, app shells
+    shared/       DataTable, StatCard, StatusBadge, Timeline, Money…
+    brand/        Logo lockup
+  db/
+    schema.ts     17 tables — the source of truth
+    index.ts      The connection: lazy, one per process, pooler-safe
+    ensure-schema.ts  Creates the schema on first use if a deploy did not
+    map.ts        Row ↔ domain conversions
+    url.ts        Finding the connection string, and explaining a bad one
+  features/       One folder per domain area; screens and dialogs
   lib/
-    types.ts               Domain model — the contract the API must satisfy
-    constants.ts           Status registries, labels, badge tones
-    finance.ts             Pure money derivations (no I/O)
-    format.ts              Currency, date and text formatting
-    mock/                  Deterministic seed data
-    store.ts               Zustand store (stand-in for the server)
-    api/
-      queries.ts           Read hooks — one per future GET endpoint
-      mutations.ts         Async write functions — one per future POST/PATCH
+    types.ts      Domain model
+    finance.ts    Pure money derivations (no I/O)
+    tracking.ts   Reference minting
+    server/       Server actions — the only things that touch the database
+    api/          Client-side read hooks and write functions
 ```
 
-### Connecting a real backend
-
-Screens never import `@/lib/store` or `@/lib/mock/*`. They only use
-`@/lib/api`. That is the seam:
-
-1. **Reads.** Every hook in `src/lib/api/queries.ts` carries a comment naming the
-   endpoint it stands for (`GET /api/orders`, `GET /api/clients/:id`, …). Replace
-   the body with a `useQuery` / `use(fetch(...))` against that endpoint. The
-   return shapes (`OrderRow`, `ClientRow`, `DashboardData`, …) are the contract —
-   keep them and no screen changes.
-
-2. **Writes.** Every function in `src/lib/api/mutations.ts` is already `async`,
-   takes a typed input and returns the created entity. Swap the store call for
-   `await fetch(endpoint, { method, body })`.
-
-3. **Delete** `src/lib/store.ts` and `src/lib/mock/` once nothing references
-   them. `src/lib/finance.ts` stays — it is pure and equally useful on a server.
-
-Because `finance.ts` is pure, the same derivations can be reused server-side to
-guarantee the API and the UI agree on every figure.
+**The rule that keeps it honest:** screens never import `@/db` or
+`src/lib/server/*` directly. Reads arrive as props from a server component or
+through `@/lib/api`; writes go through `src/lib/api/mutations.ts`, which calls a
+server action and then refreshes. `server-only` at the top of `src/db/index.ts`
+turns a mistake here into a build error rather than a connection string in a
+browser bundle.
 
 ---
 
 ## Design
 
-Layout, spacing, tables and navigation follow the supplied reference
-screenshots: a grouped collapsible sidebar with section captions, KPI cards with
-a delta pill and thin progress bar, status sub-tabs with count chips, dense
-sortable tables with a per-row action menu, and a `Showing X of N` pagination
-footer.
+A grouped collapsible sidebar with section captions, KPI cards with a delta pill
+and thin progress bar, status sub-tabs with count chips, dense sortable tables
+with a per-row action menu, and a `Showing X of N` pagination footer. The
+storefront shares none of that — it is laid out like a shop, because that is
+what customers already know how to read.
 
-Brand colours are sampled from the company logo — a deep maroon (`--brand-*`)
-for primary actions and brand chrome, gold (`--gold-*`) as the accent, and
-neutral greys everywhere else. Both light and dark themes are supported.
+Brand colours are sampled from the company logo: deep maroon (`--brand-*`) for
+primary actions and chrome, gold (`--gold-*`) as the accent, neutral greys
+everywhere else. Light and dark both supported.
 
-> **Logo:** the mark is currently a vector reconstruction of the supplied logo
+> **Logo:** the mark is a vector reconstruction of the supplied logo
 > (`src/components/brand/logo.tsx`). See `public/README-branding.md` for how to
 > drop in the official artwork — the colour tokens are already correct.
 
@@ -126,21 +146,27 @@ neutral greys everywhere else. Both light and dark themes are supported.
 
 ## Stack
 
-Next.js 16 (App Router) · TypeScript · Tailwind CSS v4 · shadcn/ui (Radix) ·
-TanStack Table · Recharts · Zustand · next-themes · Sonner · date-fns ·
-lucide-react
+Next.js 16 (App Router) · TypeScript · Postgres via Drizzle ORM · Tailwind CSS
+v4 · shadcn/ui (Radix) · TanStack Table · Recharts · Zustand · next-themes ·
+Sonner · date-fns · lucide-react
 
 ## Scripts
 
 ```bash
-npm run dev      # dev server
-npm run build    # production build (typechecks as part of the build)
-npm run start    # serve the production build
-npm run lint     # ESLint + React Compiler rules
+npm run dev        # dev server
+npm run build      # production build
+npm run start      # serve the production build
+npm run lint       # ESLint + React Compiler rules
+npm run typecheck  # tsc --noEmit
+npm test           # needs DATABASE_URL pointed at a scratch database
+
+npm run db:generate   # write a migration from a schema change
+npm run db:migrate    # apply migrations
+npm run db:check      # is it reachable, are the tables there, anything stuck
+npm run db:studio     # browse the data
 ```
 
-## Not built yet
+## What is not built
 
-Backend, database, authentication, API routes, file uploads. Buttons that would
-need them (logo upload, invite team member, sign out) are visibly disabled and
-labelled.
+See `TASKS.md` — product photos still live inside database rows rather than
+object storage, and staff roles exist but do not yet restrict anything.
