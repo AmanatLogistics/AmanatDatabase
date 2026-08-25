@@ -57,7 +57,7 @@ export class DatabaseUnreachableError extends Error {
  * and send a real page with the remaining four, which is the whole point —
  * finishing second is still finishing.
  */
-export const REQUEST_DEADLINE_MS = 6_000;
+const REQUEST_DEADLINE_MS = 6_000;
 
 export async function withDeadline<T>(
   work: Promise<T>,

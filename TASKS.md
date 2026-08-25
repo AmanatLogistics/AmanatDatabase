@@ -11,7 +11,7 @@ work waiting on a developer.
 npm run typecheck    # exit 0, no output
 npm run lint         # 0 errors (1 pre-existing warning in data-table.tsx is expected)
 npm run build        # exit 0
-npm test             # 51 passing, 0 failing (needs DATABASE_URL pointed at a scratch database)
+npm test             # 61 passing, 0 failing (needs DATABASE_URL pointed at a scratch database)
 ```
 
 ---
@@ -37,6 +37,13 @@ and notifies you. Its admin lives at `/shop`, apart from operations.
 **Accounts.** One login per person, scrypt-hashed, database-backed sessions
 storing only the SHA-256 of the cookie token, lockout after repeated failures.
 First run takes you to `/setup` to create the owner.
+
+**The dashboard adds up.** An order entered by staff is filed as `confirmed`,
+which is a status the finance side counts — it used to be filed as `requested`,
+meaning every order you typed in was invisible to revenue, profit and the
+client's balance. And the operations screens now know what day it is: `today`
+was a fixed reference date replaced only by a hydration step the admin never
+ran, so every figure filtered by period measured January.
 
 **Money.** Afghani only, stored as whole integers named `*_afn`. No currency
 conversion anywhere, no `$`, no exchange-rate API — per `CLAUDE.md`. Amounts are
