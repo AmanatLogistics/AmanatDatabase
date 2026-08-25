@@ -113,25 +113,45 @@ export async function loadOperations(): Promise<OperationsData> {
   const settings = await loadSettings();
 
   /*
-   * Bounded like everything else on the request path. This is the largest read
-   * the app makes and the one every admin screen waits on, so an unbounded one
-   * here is a page that shows placeholders for ever — the browser cannot tell
-   * "still loading" from "never coming".
+   * One at a time, not all at once.
+   *
+   * These four used to run in a `Promise.all`, which is the reflex — four
+   * independent reads, why wait for each. Against a transaction pooler it is
+   * the wrong reflex: concurrent statements are handed to whichever backend is
+   * free, and the app sat here until its deadline while the database itself was
+   * answering every one of these queries in single-digit milliseconds when
+   * asked for them singly. `/api/health` runs the same reads sequentially and
+   * finishes all seven in 89ms; this ran four in parallel and timed out at six
+   * seconds. That is not a database that is slow.
+   *
+   * The parallelism was never worth much anyway. Four queries at a few
+   * milliseconds each cost a few milliseconds more in sequence, and a page that
+   * loads is worth more than one that might load faster.
    */
-  const [clientRows, orderRows, purchaseRows, paymentRows] = await withDeadline(
-    Promise.all([
-      db.select().from(clients).orderBy(desc(clients.createdAt)),
-      db.query.orders.findMany({
-        with: { items: true, timeline: true },
-        orderBy: [desc(orders.requestedAt)],
-      }),
-      db.query.purchases.findMany({
-        with: { items: true },
-        orderBy: [desc(purchases.purchasedAt)],
-      }),
-      db.select().from(payments).orderBy(desc(payments.at)),
-    ]),
-    "loading your clients, orders, purchases and payments",
+  const clientRows = await withDeadline(
+    db.select().from(clients).orderBy(desc(clients.createdAt)),
+    "loading your clients",
+  );
+
+  const orderRows = await withDeadline(
+    db.query.orders.findMany({
+      with: { items: true, timeline: true },
+      orderBy: [desc(orders.requestedAt)],
+    }),
+    "loading your orders",
+  );
+
+  const purchaseRows = await withDeadline(
+    db.query.purchases.findMany({
+      with: { items: true },
+      orderBy: [desc(purchases.purchasedAt)],
+    }),
+    "loading your purchases",
+  );
+
+  const paymentRows = await withDeadline(
+    db.select().from(payments).orderBy(desc(payments.at)),
+    "loading your payments",
   );
 
   return {

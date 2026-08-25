@@ -120,12 +120,18 @@ export async function loadSettings(): Promise<Settings> {
   await requireStaff();
   await seedIfEmpty();
 
-  const [company, storeRows, methodRows, staffRows] = await Promise.all([
-    db.query.companyProfile.findFirst({ where: eq(companyProfile.id, COMPANY_ROW) }),
-    db.select().from(stores),
-    db.select().from(paymentMethods),
-    db.select().from(staff),
-  ]);
+  /*
+   * Sequential, for the same reason as `loadOperations` — see the note there.
+   * Four tiny reads issued at once against a transaction pooler is how this
+   * page stopped loading; the same four in a row take a handful of
+   * milliseconds and always arrive.
+   */
+  const company = await db.query.companyProfile.findFirst({
+    where: eq(companyProfile.id, COMPANY_ROW),
+  });
+  const storeRows = await db.select().from(stores);
+  const methodRows = await db.select().from(paymentMethods);
+  const staffRows = await db.select().from(staff);
 
   return {
     company: company
