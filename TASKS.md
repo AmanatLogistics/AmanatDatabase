@@ -11,7 +11,7 @@ work waiting on a developer.
 npm run typecheck    # exit 0, no output
 npm run lint         # 0 errors (1 pre-existing warning in data-table.tsx is expected)
 npm run build        # exit 0
-npm test             # 61 passing, 0 failing (needs DATABASE_URL pointed at a scratch database)
+npm test             # 65 passing, 0 failing (needs DATABASE_URL pointed at a scratch database)
 ```
 
 ---
@@ -44,6 +44,12 @@ meaning every order you typed in was invisible to revenue, profit and the
 client's balance. And the operations screens now know what day it is: `today`
 was a fixed reference date replaced only by a hydration step the admin never
 ran, so every figure filtered by period measured January.
+
+**Printing.** Invoices, quotations and receipts open on their own — which is
+the only way anybody opens them. They were answering 404 for every document,
+because they are client components that look their record up in the store and
+the print route group was the one group that never filled it. Covered by tests
+now, including that no printed sheet ever shows a dollar sign.
 
 **Money.** Afghani only, stored as whole integers named `*_afn`. No currency
 conversion anywhere, no `$`, no exchange-rate API — per `CLAUDE.md`. Amounts are
